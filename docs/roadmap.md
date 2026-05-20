@@ -27,11 +27,11 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 
 ### Application
 
-- [ ] `cmd/vfx`: Cobra-based CLI dispatching to subcommands.
+- [x] `cmd/vfx`: Cobra-based CLI dispatching to subcommands.
 - [ ] `vfx gateway`: Connect RPC server, auth, matchmaking worker, Agones Allocator client.
 - [ ] `vfx room`: Agones SDK integration, WebTransport server, wazero plugin host, tick loop.
 - [ ] `vfx admin`: minimal HTTP API (web UI deferred to later phase).
-- [ ] `vfx migrate`: thin wrapper around atlas.
+- [x] `vfx migrate`: thin wrapper around atlas (apply / status / down).
 
 ### SDK
 
