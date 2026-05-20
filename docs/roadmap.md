@@ -35,7 +35,7 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
   - [ ] Valkey-backed queue (multi-gateway)
   - [ ] Tier-based matching (rating / region relaxation)
   - [ ] Agones Allocator integration
-- [ ] `vfx room`: Agones SDK integration, WebTransport server, wazero plugin host, tick loop.
+- [x] `vfx room`: WebTransport server, plugin host (Go-native), tick loop, match orchestrator. Agones SDK and wazero deferred to Phase 2.
 - [ ] `vfx admin`: minimal HTTP API (web UI deferred to later phase).
 - [x] `vfx migrate`: thin wrapper around atlas (apply / status / down).
 
@@ -48,8 +48,9 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 ### Example
 
 - [ ] `examples/rps/`: Rock-paper-scissors (best of 3) as the canonical Phase 1 sample.
-  - [ ] Plugin (TinyGo → WASM): round resolution, best-of-3 state, timeout default.
-  - [ ] CLI client (Go): used by integration tests.
+  - [x] Plugin (Go-native): round resolution, best-of-3 state, end-to-end verified.
+  - [x] CLI client (Go): used by integration tests.
+  - [ ] TinyGo build of the same plugin → WASM (Phase 2 with wazero).
   - [ ] Web client (TypeScript): used for demos and screenshots.
   - [ ] Helm values + README.
 

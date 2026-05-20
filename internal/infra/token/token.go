@@ -33,6 +33,13 @@ type AccessClaims struct {
 type SessionClaims struct {
 	PlayerID uuid.UUID `json:"sub"`
 	MatchID  string    `json:"mid"`
+
+	// MatchPlayers is the full roster the gateway paired together for
+	// this match. The room daemon uses the first joining player's
+	// roster to call plugin.Init so plugins that require an exact
+	// player count work even when joins arrive one by one.
+	MatchPlayers []string `json:"mps,omitempty"`
+
 	jwt.RegisteredClaims
 }
 
@@ -65,11 +72,14 @@ func (s *Signer) SignAccess(playerID uuid.UUID, now time.Time, ttl time.Duration
 
 // SignSession issues a short-lived token used by clients to connect to
 // the assigned room. The room daemon trusts these because it shares the
-// signing secret with the gateway.
-func (s *Signer) SignSession(playerID uuid.UUID, matchID string, now time.Time, ttl time.Duration) (string, error) {
+// signing secret with the gateway. matchPlayers is the full roster the
+// gateway paired together; the room reads it from the first joining
+// player to initialise the plugin with the right player set.
+func (s *Signer) SignSession(playerID uuid.UUID, matchID string, matchPlayers []string, now time.Time, ttl time.Duration) (string, error) {
 	claims := SessionClaims{
-		PlayerID: playerID,
-		MatchID:  matchID,
+		PlayerID:     playerID,
+		MatchID:      matchID,
+		MatchPlayers: matchPlayers,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),

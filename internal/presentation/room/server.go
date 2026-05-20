@@ -51,19 +51,26 @@ func NewServer(cfg *config.Room, signer *token.Signer, manager *usecaseroom.Mana
 	mux := http.NewServeMux()
 	mux.HandleFunc("/room/", s.handleRoom)
 
-	s.wt = &webtransport.Server{
-		H3: &http3.Server{
-			Addr:    cfg.ListenAddr,
-			Handler: mux,
-			TLSConfig: &tls.Config{
-				Certificates: []tls.Certificate{cert},
-				NextProtos:   []string{"h3"},
-				MinVersion:   tls.VersionTLS13,
-			},
-			QUICConfig: &quic.Config{
-				HandshakeIdleTimeout: cfg.HandshakeTimeout,
-			},
+	h3 := &http3.Server{
+		Addr:    cfg.ListenAddr,
+		Handler: mux,
+		TLSConfig: &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			NextProtos:   []string{"h3"},
+			MinVersion:   tls.VersionTLS13,
 		},
+		QUICConfig: &quic.Config{
+			HandshakeIdleTimeout:             cfg.HandshakeTimeout,
+			EnableDatagrams:                  true,
+			EnableStreamResetPartialDelivery: true,
+		},
+	}
+	// Hands H3 the SETTINGS frame, datagram toggle, and ConnContext hook
+	// that webtransport.Server.Upgrade needs to find the QUIC conn.
+	webtransport.ConfigureHTTP3Server(h3)
+
+	s.wt = &webtransport.Server{
+		H3: h3,
 		CheckOrigin: func(_ *http.Request) bool {
 			// Phase 1: accept any origin. Production deployments add a
 			// list once the client domain is known.
@@ -136,7 +143,20 @@ func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
 		"player_id", claims.PlayerID,
 	)
 
-	match, err := s.manager.FindOrCreate(r.Context(), matchID, []uuid.UUID{claims.PlayerID})
+	roster := make([]uuid.UUID, 0, len(claims.MatchPlayers))
+	for _, raw := range claims.MatchPlayers {
+		id, parseErr := uuid.Parse(raw)
+		if parseErr != nil {
+			s.logger.Warn("room: invalid player id in token", "value", raw)
+			continue
+		}
+		roster = append(roster, id)
+	}
+	if len(roster) == 0 {
+		roster = []uuid.UUID{claims.PlayerID}
+	}
+
+	match, err := s.manager.FindOrCreate(r.Context(), matchID, roster)
 	if err != nil {
 		s.logger.Error("room: match unavailable", "err", err)
 		return

@@ -118,8 +118,13 @@ func (m *Matchmaker) pair(ctx context.Context, mode string, tickets []*match.Tic
 	now := clock.Now(ctx)
 	expiresAt := now.Add(m.sessionTokenTTL)
 
+	matchPlayers := make([]string, 0, len(tickets))
 	for _, t := range tickets {
-		sessionToken, signErr := m.signer.SignSession(t.PlayerID, allocation.MatchID, now, m.sessionTokenTTL)
+		matchPlayers = append(matchPlayers, t.PlayerID.String())
+	}
+
+	for _, t := range tickets {
+		sessionToken, signErr := m.signer.SignSession(t.PlayerID, allocation.MatchID, matchPlayers, now, m.sessionTokenTTL)
 		if signErr != nil {
 			// Tell the player it failed; do not leak which signing step broke.
 			//nolint:errcheck // Best-effort notification; we already return err.
