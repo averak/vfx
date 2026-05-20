@@ -11,8 +11,8 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 - [x] `mise.toml` with CLI versions pinned (Go, buf, sqlc, atlas, helm, kubectl, kind, golangci-lint, gofumpt). TinyGo to be re-added when plugin SDK work starts.
 - [x] `compose.yml` for PostgreSQL and Valkey.
 - [x] `Dockerfile` for the `vfx` binary (multi-stage, distroless, non-root, 40MB).
-- [ ] `deploy/local/kind-config.yaml` and `deploy/local/values.yaml`.
-- [ ] `deploy/helm/vfx/` with default Chart, configurable for in-cluster or external DB.
+- [x] `deploy/local/kind-config.yaml` and `deploy/local/values.yaml`.
+- [x] `deploy/helm/vfx/` with default Chart, configurable for external DB / Valkey / TLS secrets.
 
 ### Schema
 
@@ -56,9 +56,14 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 
 ### Observability
 
-- [ ] OpenTelemetry traces and metrics from `gateway` and `room`.
-- [ ] Prometheus-compatible `/metrics` endpoint.
-- [ ] Health/readiness probes.
+- [ ] OpenTelemetry traces from `gateway` and `room` (W3C Trace Context propagated end-to-end).
+- [x] Prometheus-compatible `/metrics` endpoint (gateway today; room daemon HTTP/1.1 sidecar pending).
+- [x] Health (`/healthz`) and readiness (`/readyz` with PostgreSQL ping) probes on the gateway.
+
+### CI / Release
+
+- [x] `.github/workflows/ci.yml` runs generate / lint / test / build on every PR and push to main.
+- [ ] `.github/workflows/release.yml` builds and pushes the image and chart on tagged releases.
 
 ## Phase 2 — General-purpose backend features
 
