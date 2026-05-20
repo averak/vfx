@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"sync/atomic"
 
@@ -65,10 +64,8 @@ func (s *playerSession) readLoop(ctx context.Context, match *usecaseroom.Match) 
 	for {
 		raw, err := s.session.ReceiveDatagram(ctx)
 		if err != nil {
-			if !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
-				s.logger.Debug("room session read ended",
-					"match_id", s.matchID, "player_id", s.playerID, "err", err)
-			}
+			s.logger.Debug("room: session read ended",
+				"match_id", s.matchID, "player_id", s.playerID, "err", err)
 			return
 		}
 

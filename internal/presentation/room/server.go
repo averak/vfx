@@ -156,7 +156,13 @@ func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
 		roster = []uuid.UUID{claims.PlayerID}
 	}
 
-	match, err := s.manager.FindOrCreate(r.Context(), matchID, roster)
+	// The HTTP request context fires Done as soon as net/http considers
+	// the response sent, which for a WebTransport Upgrade happens
+	// immediately. The session keeps its own context that mirrors the
+	// actual transport lifetime — use that everywhere downstream.
+	sessionCtx := session.Context()
+
+	match, err := s.manager.FindOrCreate(sessionCtx, matchID, roster)
 	if err != nil {
 		s.logger.Error("room: match unavailable", "err", err)
 		return
@@ -169,7 +175,7 @@ func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
 	}
 	defer match.Leave(claims.PlayerID, "disconnected")
 
-	playerIO.readLoop(r.Context(), match)
+	playerIO.readLoop(sessionCtx, match)
 }
 
 func (s *Server) authenticate(r *http.Request) (*token.SessionClaims, error) {

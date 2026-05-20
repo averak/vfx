@@ -23,7 +23,7 @@ type Room struct {
 // NewRoom constructs and validates the room container. The registry
 // must already carry the plugin selected by VFX_ROOM_PLUGIN_NAME, or
 // startup fails with a helpful error.
-func NewRoom(_ context.Context, registry *plugin.Registry, logger *slog.Logger) (*Room, func(), error) {
+func NewRoom(ctx context.Context, registry *plugin.Registry, logger *slog.Logger) (*Room, func(), error) {
 	cfg, err := config.LoadRoom()
 	if err != nil {
 		return nil, nil, err
@@ -46,13 +46,15 @@ func NewRoom(_ context.Context, registry *plugin.Registry, logger *slog.Logger) 
 	}
 
 	signer := token.NewSigner(cfg.JWTSecret)
-	manager := usecaseroom.NewManager(factory, logger)
+	manager := usecaseroom.NewManager(ctx, factory, logger)
 	server, err := roomhandler.NewServer(cfg, signer, manager, logger)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	cleanup := func() {}
+	cleanup := func() {
+		manager.Close()
+	}
 
 	return &Room{
 		Config:  cfg,

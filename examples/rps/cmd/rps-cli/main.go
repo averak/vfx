@@ -160,13 +160,13 @@ func runRoomSession(ctx context.Context, endpoint, sessionToken string, auto boo
 	header := http.Header{}
 	header.Set("Authorization", "Bearer "+sessionToken)
 
-	rsp, session, err := dialer.Dial(ctx, u.String(), header)
+	// In webtransport-go the http.Response body returned by Dial wraps
+	// the WebTransport upgrade stream itself — closing it terminates
+	// the session before any datagram can flow. We deliberately leave
+	// the body open and silence the linter.
+	_, session, err := dialer.Dial(ctx, u.String(), header) //nolint:bodyclose // see comment above.
 	if err != nil {
 		return fmt.Errorf("webtransport dial: %w", err)
-	}
-	if rsp != nil && rsp.Body != nil {
-		//nolint:errcheck // body close error not actionable here.
-		_ = rsp.Body.Close()
 	}
 	//nolint:errcheck // best-effort cleanup
 	defer func() { _ = session.CloseWithError(0, "client done") }()

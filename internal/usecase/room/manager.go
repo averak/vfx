@@ -16,22 +16,37 @@ import (
 // WebTransport handler calls FindOrCreate when a player connects so
 // the first arrival lazily creates the match, and subsequent arrivals
 // join the same one.
+//
+// The manager owns a long-lived context (the daemon's context) that is
+// passed to every Match.Run goroutine; this prevents a player's HTTP
+// request cancellation from tearing down a match that other players
+// are still part of.
 type Manager struct {
-	logger  *slog.Logger
-	factory plugin.Factory
+	logger    *slog.Logger
+	factory   plugin.Factory
+	matchCtx  context.Context //nolint:containedctx // Long-lived per-daemon context; never per-request.
+	cancelAll context.CancelFunc
 
 	mu      sync.Mutex
 	matches map[uuid.UUID]*Match
 }
 
-// NewManager constructs a Manager wired to a Factory.
-func NewManager(factory plugin.Factory, logger *slog.Logger) *Manager {
+// NewManager constructs a Manager wired to a Factory. The supplied ctx
+// outlives every Match the manager creates; cancel it (typically at
+// daemon shutdown) to tear them all down.
+func NewManager(ctx context.Context, factory plugin.Factory, logger *slog.Logger) *Manager {
+	mctx, cancel := context.WithCancel(ctx)
 	return &Manager{
-		logger:  logger,
-		factory: factory,
-		matches: make(map[uuid.UUID]*Match),
+		logger:    logger,
+		factory:   factory,
+		matchCtx:  mctx,
+		cancelAll: cancel,
+		matches:   make(map[uuid.UUID]*Match),
 	}
 }
+
+// Close cancels every running match. Safe to call multiple times.
+func (mgr *Manager) Close() { mgr.cancelAll() }
 
 // FindOrCreate returns the active Match for matchID, creating one if
 // needed. Creation is serialised under the manager lock so two
@@ -65,8 +80,11 @@ func (mgr *Manager) FindOrCreate(ctx context.Context, matchID uuid.UUID, players
 	match := NewMatch(matchID, pl, initResp.GetTickRateHz(), mgr.logger)
 	mgr.matches[matchID] = match
 
+	// match.Run uses the manager's long-lived ctx, never the caller's
+	// request ctx — a player disconnecting must not tear down the
+	// whole match for everyone else.
 	go func() {
-		if err := match.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		if err := match.Run(mgr.matchCtx); err != nil && !errors.Is(err, context.Canceled) {
 			mgr.logger.Error("match run failed", "match_id", matchID, "err", err)
 		}
 		mgr.cleanup(matchID)
