@@ -1,0 +1,14 @@
+version: v2
+
+modules:
+  - path: schema/api
+
+lint:
+  use:
+    - STANDARD
+  except:
+    - PACKAGE_VERSION_SUFFIX
+
+breaking:
+  use:
+    - FILE

@@ -1,0 +1,56 @@
+# Binaries
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+
+# Coverage
+*.coverprofile
+coverage.*
+
+# Generated code
+/gen/
+/sdk/client/ts/src/gen/
+/sdk/client/go/gen/
+/sdk/plugin/go/gen/
+**/*.pb.go
+**/*.connect.go
+
+# Atlas
+/schema/db/migrations/atlas.sum.bak
+
+# Node / TypeScript
+node_modules/
+*.tsbuildinfo
+.npm/
+.pnpm-store/
+
+# WASM artifacts
+*.wasm
+
+# Local environment
+.env
+.env.local
+*.local.yaml
+*.local.toml
+
+# Docker / Compose volumes (just in case)
+.volumes/
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# mise local overrides
+mise.local.toml
+.mise.local.toml
+
+# kubeconfig generated locally
+.kube/
+
+# Logs
+*.log

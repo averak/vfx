@@ -1,0 +1,184 @@
+#:schema https://mise.jdx.dev/schema/mise.json
+
+# ============================================================================
+# Tool versions
+# ============================================================================
+
+[tools]
+go = "1.26.3"
+"go:github.com/bufbuild/buf/cmd/buf" = "1.69.0"
+"go:github.com/sqlc-dev/sqlc/cmd/sqlc" = "1.31.1"
+"go:ariga.io/atlas/cmd/atlas" = "1.2.0"
+"go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "2.12.2"
+"go:mvdan.cc/gofumpt" = "0.7.0"
+tinygo = "0.41.1"
+helm = "4.2.0"
+kubectl = "1.36.1"
+kind = "0.31.0"
+
+# ============================================================================
+# Environment
+# ============================================================================
+
+[env]
+DATABASE_URL = "postgres://vfx:dev@localhost:5432/vfx?sslmode=disable"
+VALKEY_URL = "redis://localhost:6379"
+KUBECONFIG = "{{config_root}}/.kube/config"
+KIND_CLUSTER_NAME = "vfx-local"
+GOFLAGS = "-buildvcs=false"
+
+# ============================================================================
+# Code generation
+# ============================================================================
+
+[tasks.gen]
+description = "Generate all code (proto + sqlc)"
+depends = ["gen-proto", "gen-sqlc"]
+
+[tasks.gen-proto]
+description = "Generate code from .proto files"
+run = "buf generate"
+
+[tasks.gen-sqlc]
+description = "Generate Go code from SQL queries"
+run = "sqlc generate"
+
+# ============================================================================
+# Lint / Format
+# ============================================================================
+
+[tasks.lint]
+description = "Run all linters"
+depends = ["lint-proto", "lint-go"]
+
+[tasks.lint-proto]
+description = "Lint .proto files and detect breaking changes"
+run = [
+    "buf lint",
+    "buf breaking --against '.git#branch=main' || true",
+]
+
+[tasks.lint-go]
+description = "Lint Go code"
+run = "golangci-lint run ./..."
+
+[tasks.fmt]
+description = "Format all source files"
+depends = ["fmt-go", "fmt-proto"]
+
+[tasks.fmt-go]
+run = [
+    "gofumpt -w .",
+    "go mod tidy",
+]
+
+[tasks.fmt-proto]
+run = "buf format -w"
+
+# ============================================================================
+# Database
+# ============================================================================
+
+[tasks.db-migrate]
+description = "Apply pending migrations to local DB"
+run = "atlas migrate apply --dir 'file://schema/db/migrations' --url $DATABASE_URL"
+
+[tasks.db-status]
+description = "Show migration status"
+run = "atlas migrate status --dir 'file://schema/db/migrations' --url $DATABASE_URL"
+
+[tasks.db-diff]
+description = "Generate a new migration from schema.sql diff"
+usage = '''
+arg "<name>" help="Migration name (snake_case)"
+'''
+run = "atlas migrate diff {{arg(name='name')}} --dir 'file://schema/db/migrations' --to 'file://schema/db/schema.sql' --dev-url 'docker://postgres/16/dev?search_path=public'"
+
+[tasks.db-shell]
+description = "Open psql against local DB"
+run = "docker compose exec postgres psql -U vfx -d vfx"
+
+# ============================================================================
+# Local environment (compose + kind)
+# ============================================================================
+
+[tasks.up]
+description = "Start full local environment (compose + kind + helm)"
+depends = ["compose-up", "cluster-up"]
+
+[tasks.down]
+description = "Tear down local environment"
+depends = ["cluster-down", "compose-down"]
+
+[tasks.compose-up]
+description = "Start PostgreSQL and Valkey"
+run = [
+    "docker compose up -d",
+    "until docker compose exec -T postgres pg_isready -U vfx > /dev/null 2>&1; do sleep 1; done",
+]
+
+[tasks.compose-down]
+description = "Stop compose stack (data preserved)"
+run = "docker compose down"
+
+[tasks.compose-reset]
+description = "Stop compose and wipe volumes"
+run = "docker compose down -v"
+
+[tasks.cluster-up]
+description = "Create kind cluster and install Agones + vfx"
+run = [
+    "kind create cluster --config deploy/local/kind-config.yaml --name $KIND_CLUSTER_NAME",
+    "kubectl create namespace agones-system",
+    "helm repo add agones https://agones.dev/chart/stable",
+    "helm install agones agones/agones --namespace agones-system",
+    "kubectl wait --for=condition=Available --timeout=180s deployment -n agones-system --all",
+    "helm install vfx ./deploy/helm/vfx --values ./deploy/local/values.yaml",
+]
+
+[tasks.cluster-down]
+description = "Delete kind cluster"
+run = "kind delete cluster --name $KIND_CLUSTER_NAME"
+
+[tasks.logs-gateway]
+description = "Tail gateway logs"
+run = "kubectl logs -f -l app=vfx-gateway"
+
+[tasks.logs-room]
+description = "Tail room logs"
+run = "kubectl logs -f -l app=vfx-room"
+
+# ============================================================================
+# Build
+# ============================================================================
+
+[tasks.build]
+description = "Build vfx binary"
+run = "go build -o bin/vfx ./cmd/vfx"
+
+[tasks.build-image]
+description = "Build vfx Docker image"
+run = "docker build -t vfx:dev ."
+
+# ============================================================================
+# Test
+# ============================================================================
+
+[tasks.test]
+description = "Run all tests"
+depends = ["test-unit", "test-component"]
+
+[tasks.test-unit]
+description = "Run fast unit tests"
+run = "go test -race -short ./..."
+
+[tasks.test-component]
+description = "Run component tests (requires compose-up)"
+run = "go test -race ./..."
+
+[tasks.test-cover]
+description = "Run tests with coverage"
+run = [
+    "go test -race -coverprofile=coverage.out ./...",
+    "go tool cover -func=coverage.out",
+]
