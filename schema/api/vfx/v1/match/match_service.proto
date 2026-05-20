@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package vfx.v1.match;
+
+import "google/protobuf/timestamp.proto";
+
+// MatchService はマッチメイキング関連の RPC を提供する。
+//
+// プレイヤーは CreateTicket でチケットを投入し、WatchTicket で server stream
+// を購読してマッチ成立を待つ。サーバ側 matchmaker が定期的にキューを走査し、
+// 互換性のあるチケット同士をグループ化して room を割り当てる。
+//
+// 切断後の再接続は GetCurrentMatch で現在の接続情報を引き直す。
+service MatchService {
+  // CreateTicket はマッチング待ち行列にチケットを投入する。
+  // 成立は WatchTicket で待機する。
+  rpc CreateTicket(CreateTicketRequest) returns (CreateTicketResponse);
+
+  // WatchTicket はチケットの状態変化を server stream で通知する。
+  // マッチが成立すると Matched イベントが流れ、ストリームは閉じる。
+  rpc WatchTicket(WatchTicketRequest) returns (stream WatchTicketResponse);
+
+  // CancelTicket はチケットを取り消す。
+  rpc CancelTicket(CancelTicketRequest) returns (CancelTicketResponse);
+
+  // GetCurrentMatch は現在進行中のマッチがあれば接続情報を返す。
+  //
+  // 切断・アプリ再起動・端末復帰など、クライアントが session_token を
+  // 失った状態から再接続する際に使う。room daemon 側は player の grace
+  // period 内 (デフォルト 60 秒) はスロットを保持しているので、その
+  // 期間内にこの RPC で取得した token で再接続すれば同じスロットに復帰できる。
+  rpc GetCurrentMatch(GetCurrentMatchRequest) returns (GetCurrentMatchResponse);
+}
+
+message CreateTicketRequest {
+  // ゲームモード識別子 (例: "casual_4p", "ranked_1v1")。
+  string game_mode = 1;
+
+  // 任意のマッチング属性。プラグイン側で解釈する。
+  map<string, string> attributes = 2;
+
+  // 任意。同じパーティを組みたい相手の player_id 群。
+  // 全員が同じ party_members で CreateTicket するとパーティとしてマッチング対象になる。
+  repeated string party_members = 3;
+
+  // 任意。レーティング (rating 差ベースのマッチング用)。
+  optional double rating = 4;
+
+  // 任意。地域コード (region ベースのマッチング用)。
+  optional string region = 5;
+}
+
+message CreateTicketResponse {
+  string ticket_id = 1;
+}
+
+message WatchTicketRequest {
+  string ticket_id = 1;
+}
+
+message WatchTicketResponse {
+  oneof event {
+    TicketQueued queued = 1;
+    TicketMatched matched = 2;
+    TicketFailed failed = 3;
+  }
+}
+
+// TicketQueued はチケットが待ち行列に入ったことを示す。
+message TicketQueued {
+  google.protobuf.Timestamp queued_at = 1;
+
+  // 現在のキュー深さ (参考値)。
+  int32 queue_depth = 2;
+}
+
+// TicketMatched はマッチが成立し、room の接続情報が確定したことを示す。
+// このイベント後、クライアントは endpoint に session_token で接続する。
+message TicketMatched {
+  // 接続先 (例: "vfx-room-xyz.example.com:443")。
+  string endpoint = 1;
+
+  // room への接続に使う短命トークン (デフォルト 5 分有効)。
+  string session_token = 2;
+
+  // session_token の失効時刻。
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+// TicketFailed はマッチング失敗を示す。
+// reason は機械処理向けのコード、message はユーザー向け説明。
+message TicketFailed {
+  string reason = 1;
+  string message = 2;
+}
+
+message CancelTicketRequest {
+  string ticket_id = 1;
+}
+
+message CancelTicketResponse {}
+
+message GetCurrentMatchRequest {}
+
+message GetCurrentMatchResponse {
+  // 進行中のマッチがない場合は未設定。
+  optional CurrentMatch match = 1;
+}
+
+// CurrentMatch は再接続用のマッチ情報。
+message CurrentMatch {
+  string match_id = 1;
+
+  // 接続先 room の endpoint (例: "vfx-room-xyz.example.com:443")。
+  string endpoint = 2;
+
+  // room への接続トークン。GetCurrentMatch のたびに再発行される。
+  string session_token = 3;
+
+  // session_token の失効時刻。
+  google.protobuf.Timestamp expires_at = 4;
+}

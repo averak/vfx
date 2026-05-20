@@ -165,6 +165,40 @@ sequenceDiagram
     Note over A: Fleet replenishes with new Ready Pod
 ```
 
+## Reconnection
+
+Players will lose their connection to the room — Wi-Fi to cellular handoff, app backgrounding, brief network blips, full restarts. The protocol handles each of these without forcing a rematch.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant G as vfx gateway
+    participant R as vfx room
+    participant P as Plugin (WASM)
+
+    Note over C,R: realtime gameplay in progress
+    C--xR: connection lost (network blip)
+    R->>P: NetworkEvent{PlayerDisconnected}
+    Note over R: keep slot reserved<br/>(grace period, default 60s)
+
+    Note over C: app resumes / network restored
+    C->>G: GetCurrentMatch()
+    G-->>C: CurrentMatch{endpoint, session_token, expires_at}
+    C->>R: WebTransport reconnect (+ token)
+    R->>R: match player_id to reserved slot
+    R->>P: NetworkEvent{PlayerReconnected}
+    R->>C: StateSnapshot (catch up to current tick)
+    Note over C,R: gameplay resumes
+```
+
+Key design points:
+
+- The room keeps the player's slot reserved for a configurable grace period (default 60s) after a disconnect.
+- `MatchService.GetCurrentMatch` returns a fresh short-lived session token if the player is still in a match — the client does not need to remember its old token, only its login.
+- The plugin sees three distinct events: `PlayerDisconnected` (transient), `PlayerReconnected` (came back), and `PlayerLeft` (permanently gone). The plugin decides how to handle each — pause the player's actions during disconnect, replay missed events on reconnect, or surrender the slot.
+- On reconnect, the room sends a full `StateSnapshot` so the client catches up immediately without replaying every delta.
+
 ## Storage
 
 ### PostgreSQL

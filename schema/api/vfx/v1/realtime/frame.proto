@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package vfx.v1.realtime;
+
+// Frame は WebTransport 上を流れるすべてのメッセージを包む envelope。
+//
+// Reliable Stream と Unreliable Datagram の両方で同じ codec を使う。
+// 重要イベント (game_started, score 等) は Reliable Stream、高頻度の
+// 状態更新 (位置・物理) は Datagram で送ることを想定する。
+message Frame {
+  // Reliable Stream で送る場合の連番。Datagram では 0。
+  uint64 seq = 1;
+
+  oneof body {
+    // Client → Server
+    PlayerInput input = 10;
+    Heartbeat heartbeat = 11;
+
+    // Server → Client
+    StateSnapshot snapshot = 20;
+    StateDelta delta = 21;
+    SystemEvent event = 22;
+    ErrorMessage error = 23;
+  }
+}
+
+// PlayerInput はプレイヤーの操作を表す。
+// 高頻度送信を想定し、原則として Datagram で送る。
+message PlayerInput {
+  // クライアント側 tick 番号 (client-side prediction との突き合わせ用)。
+  uint32 tick = 1;
+
+  // プラグインが解釈する任意のペイロード。
+  bytes payload = 2;
+}
+
+// Heartbeat は接続維持用の keepalive。
+// クライアントが定期的に送り、サーバ側で接続死活を判定する。
+message Heartbeat {
+  uint64 client_time_ms = 1;
+}
+
+// StateSnapshot は完全な状態をクライアントに伝える。
+// 定期的に Reliable Stream で送ることで datagram のロスから自然回復させる。
+message StateSnapshot {
+  uint32 tick = 1;
+
+  // プラグインが生成する任意のペイロード。
+  bytes payload = 2;
+}
+
+// StateDelta は前 tick からの差分を伝える。
+// 高頻度送信を想定し、原則として Datagram で送る。
+message StateDelta {
+  uint32 from_tick = 1;
+  uint32 to_tick = 2;
+
+  // プラグインが生成する任意のペイロード。
+  bytes payload = 3;
+}
+
+// SystemEvent はゲーム進行に関わる重要イベント。
+// 失われたら困る情報なので Reliable Stream で送る。
+message SystemEvent {
+  // イベント種別 (例: "game_started", "game_ended", "player_joined")。
+  string type = 1;
+
+  // プラグインが生成する任意のペイロード。
+  bytes payload = 2;
+}
+
+// ErrorMessage はサーバ側エラーをクライアントに通知する。
+message ErrorMessage {
+  // 機械処理向けコード (例: "invalid_token", "session_expired", "internal")。
+  string code = 1;
+
+  // ユーザー向けの説明文。
+  string message = 2;
+}

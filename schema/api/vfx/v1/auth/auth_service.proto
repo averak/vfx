@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package vfx.v1.auth;
+
+import "google/protobuf/timestamp.proto";
+
+// AuthService は認証関連の RPC を提供する。
+//
+// Phase 1 では匿名 (ゲスト) 認証のみをサポートする。OAuth やメール認証は
+// Phase 2 で追加予定で、その際は同じ Player を維持したまま credential を
+// 紐付けられるようにする (LinkCredential RPC を追加予定)。
+service AuthService {
+  // Login は credential を検証して access_token と refresh_token を発行する。
+  rpc Login(LoginRequest) returns (LoginResponse);
+
+  // Refresh は refresh_token を使って新しい access_token を発行する。
+  rpc Refresh(RefreshRequest) returns (RefreshResponse);
+
+  // Logout は現在のセッションを無効化する。
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+
+  // UpdateProfile は認証済みプレイヤーのプロフィールを更新する。
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+}
+
+message LoginRequest {
+  // 現状は anonymous のみ。Phase 2 で OAuth / Email を追加する。
+  oneof credential {
+    AnonymousCredential anonymous = 1;
+  }
+}
+
+// AnonymousCredential はゲストアカウント用の credential。
+//
+// クレデンシャル不要で即プレイ可能。device_id を指定すると同一端末で
+// 同じ Player を取り戻せる。後で OAuth と紐付けて本アカウントに昇格できる。
+message AnonymousCredential {
+  // 任意。指定すると同一端末で同じプレイヤーを再取得できる。
+  // 未指定の場合は毎回新規プレイヤーとして登録される。
+  optional string device_id = 1;
+
+  // 任意。初回登録時のみ採用される。既存プレイヤーには影響しない。
+  // 後から変更する場合は UpdateProfile を使う。
+  optional string nickname = 2;
+}
+
+message LoginResponse {
+  // API 呼び出し用の短命トークン。
+  string access_token = 1;
+
+  // access_token 再発行用の長命トークン。
+  // 匿名 credential では device_id 指定時のみ意味を持つ。
+  string refresh_token = 2;
+
+  // 認証されたプレイヤー。
+  Player player = 3;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
+}
+
+message RefreshResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
+message LogoutRequest {}
+
+message LogoutResponse {}
+
+message UpdateProfileRequest {
+  // 未指定の場合は変更しない。
+  optional string nickname = 1;
+}
+
+message UpdateProfileResponse {
+  Player player = 1;
+}
+
+// Player は認証済みプレイヤーを表す。
+message Player {
+  // サーバ生成の永続 ID (UUID)。
+  string id = 1;
+
+  // 表示名。複数プレイヤーが同じ値を持ち得る (ユニーク制約なし)。
+  // 未設定の場合はクライアント側で適切にフォールバック表示する。
+  optional string nickname = 2;
+
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}

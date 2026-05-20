@@ -1,0 +1,161 @@
+syntax = "proto3";
+
+package plugin.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// PluginService は WASM ゲームプラグインが実装すべき ABI を定義する。
+//
+// vfx room はプラグインをロードした後、Init を 1 回呼んでマニフェストを
+// 受け取り、その後は固定 tick rate で OnTick を回す。試合終了 (tick で
+// game_ended=true を返す) の後に OnGameEnd が呼ばれ、永続化すべき最終
+// 結果を受け取る。
+//
+// すべての境界越え呼び出しは protobuf シリアライズを介して行う。FFI コスト
+// を抑えるため、1 tick 分の入力と出力をそれぞれまとめて 1 回ずつ渡す。
+service PluginService {
+  // Init はプラグインのロード直後に 1 回だけ呼ばれる。
+  // プラグインは tick rate などの実行要件を返す。
+  rpc Init(InitRequest) returns (InitResponse);
+
+  // OnTick は 1 tick の進行を処理する。
+  // ホストが initial_tick_rate_hz に従って定周期で呼び出す。
+  rpc OnTick(OnTickRequest) returns (OnTickResponse);
+
+  // OnGameEnd は試合終了処理を行う。
+  // OnTick が game_ended=true を返した後にホストが呼び出す。
+  rpc OnGameEnd(OnGameEndRequest) returns (OnGameEndResponse);
+}
+
+message InitRequest {
+  // この試合に参加する player_id 一覧。
+  repeated string player_ids = 1;
+
+  // 決定的乱数生成のための seed。
+  // 同じ seed と同じ入力列なら同じ結果が再現できる (リプレイ可能性のため)。
+  uint64 random_seed = 2;
+
+  // ゲームモードに紐づくパラメータ。
+  // CreateTicket の attributes やデプロイ設定からホストが合成する。
+  map<string, string> game_options = 3;
+}
+
+message InitResponse {
+  // プラグインが希望する tick rate (Hz)。
+  // 0 を返すとイベント駆動 (ターン制等) を意味し、入力が到着したときだけ
+  // OnTick が呼ばれる。
+  uint32 tick_rate_hz = 1;
+
+  // 初期 snapshot (任意)。クライアントに最初に配信される。
+  bytes initial_snapshot = 2;
+}
+
+message OnTickRequest {
+  // 試合開始からの tick 番号 (Init 直後は 0)。
+  uint32 tick = 1;
+
+  // この tick のサーバ側時刻。
+  google.protobuf.Timestamp timestamp = 2;
+
+  // この tick で集まった全プレイヤーの入力。
+  repeated PlayerAction actions = 3;
+
+  // この tick で発生したネットワークイベント (参加・離脱等)。
+  repeated NetworkEvent network_events = 4;
+}
+
+// PlayerAction は 1 件のプレイヤー入力を表す。
+message PlayerAction {
+  string player_id = 1;
+
+  // クライアント側 tick (lag compensation 用)。
+  uint32 client_tick = 2;
+
+  // プラグインが解釈する任意のペイロード。
+  bytes payload = 3;
+}
+
+message NetworkEvent {
+  oneof event {
+    PlayerJoined joined = 1;
+    PlayerDisconnected disconnected = 2;
+    PlayerReconnected reconnected = 3;
+    PlayerLeft left = 4;
+  }
+}
+
+// PlayerJoined は新規参加 (初回のセッション確立) を通知する。
+// 再接続は PlayerReconnected で別途通知する。
+message PlayerJoined {
+  string player_id = 1;
+}
+
+// PlayerDisconnected は一時的な切断を通知する。
+// プレイヤーのスロットは grace period 内であれば保持される。
+// この期間に PlayerReconnected が来なければ PlayerLeft が通知される。
+message PlayerDisconnected {
+  string player_id = 1;
+}
+
+// PlayerReconnected は切断後の再接続を通知する。
+// プラグインは state を維持したまま処理を継続できる。
+message PlayerReconnected {
+  string player_id = 1;
+}
+
+// PlayerLeft は永続的な離脱を通知する。
+// grace period 経過後の自動切り捨て、明示的退室、kick 等で発生する。
+message PlayerLeft {
+  string player_id = 1;
+
+  // 離脱理由 (例: "timeout", "kicked", "left")。
+  string reason = 2;
+}
+
+message OnTickResponse {
+  // クライアントに配信する状態差分。
+  bytes state_delta = 1;
+
+  // この tick で送るシステムイベント (任意)。
+  repeated OutboundEvent events = 2;
+
+  // 試合終了フラグ。true で OnGameEnd が呼ばれる。
+  bool game_ended = 3;
+}
+
+// OutboundEvent はサーバからクライアントへの非状態系メッセージ。
+// 例: "ラウンド開始"、"フラグ獲得" 等。
+message OutboundEvent {
+  // 送信先 player_id 群。空ならブロードキャスト。
+  repeated string recipients = 1;
+
+  // イベント種別。
+  string type = 2;
+
+  // 任意のペイロード。
+  bytes payload = 3;
+}
+
+message OnGameEndRequest {
+  // 終了時の tick 番号。
+  uint32 final_tick = 1;
+}
+
+message OnGameEndResponse {
+  // 永続化する最終状態 (任意)。
+  bytes final_state = 1;
+
+  // 各プレイヤーの結果。leaderboard 更新等に使う。
+  repeated PlayerResult player_results = 2;
+}
+
+message PlayerResult {
+  string player_id = 1;
+
+  // ランクや勝敗 (例: 1=勝利, 0=引き分け, -1=敗北)。
+  // 意味付けはゲームによる。
+  int32 rank = 2;
+
+  // ゲーム固有の追加データ。
+  map<string, string> stats = 3;
+}
