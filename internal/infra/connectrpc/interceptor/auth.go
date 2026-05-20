@@ -2,6 +2,7 @@ package interceptor
 
 import (
 	"context"
+	"net/http"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -21,25 +22,49 @@ const (
 // it requires authentication and reads from authctx accordingly.
 //
 // This deliberate softness means Login/Refresh keep working without an
-// Authorization header, while Logout/UpdateProfile can opt into a hard
-// check via authctx.From.
-func Auth(signer *token.Signer) connect.UnaryInterceptorFunc {
-	return func(next connect.UnaryFunc) connect.UnaryFunc {
-		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			header := req.Header().Get(authorizationHeader)
-			if header == "" {
-				return next(ctx, req)
-			}
-			rawToken, ok := strings.CutPrefix(header, bearerPrefix)
-			if !ok {
-				return next(ctx, req)
-			}
-			claims, err := signer.Verify(rawToken)
-			if err != nil {
-				return next(ctx, req)
-			}
-			ctx = authctx.With(ctx, claims.PlayerID)
-			return next(ctx, req)
-		}
+// Authorization header, while Logout/UpdateProfile/Match.* can opt into
+// a hard check via authctx.From.
+//
+// The interceptor implements the full [connect.Interceptor] so it
+// applies to both unary and streaming RPCs (WatchTicket and similar).
+func Auth(signer *token.Signer) connect.Interceptor {
+	return &authInterceptor{signer: signer}
+}
+
+type authInterceptor struct {
+	signer *token.Signer
+}
+
+func (a *authInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
+	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+		ctx = a.populate(ctx, req.Header())
+		return next(ctx, req)
 	}
+}
+
+func (a *authInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+	return next
+}
+
+func (a *authInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		ctx = a.populate(ctx, conn.RequestHeader())
+		return next(ctx, conn)
+	}
+}
+
+func (a *authInterceptor) populate(ctx context.Context, header http.Header) context.Context {
+	raw := header.Get(authorizationHeader)
+	if raw == "" {
+		return ctx
+	}
+	rawToken, ok := strings.CutPrefix(raw, bearerPrefix)
+	if !ok {
+		return ctx
+	}
+	claims, err := a.signer.Verify(rawToken)
+	if err != nil {
+		return ctx
+	}
+	return authctx.With(ctx, claims.PlayerID)
 }

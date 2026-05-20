@@ -54,6 +54,14 @@ func runGateway(ctx context.Context) error {
 		close(serverErr)
 	}()
 
+	matchmakerCtx, stopMatchmaker := context.WithCancel(ctx)
+	defer stopMatchmaker()
+	go func() {
+		if err := container.Matchmaker.Run(matchmakerCtx); err != nil {
+			logger.Error("matchmaker exited", "err", err)
+		}
+	}()
+
 	select {
 	case <-ctx.Done():
 		logger.Info("gateway shutting down")

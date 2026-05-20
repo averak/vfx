@@ -13,15 +13,20 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	valkeygo "github.com/valkey-io/valkey-go"
 
+	domainmatch "github.com/averak/vfx/internal/domain/match"
 	"github.com/averak/vfx/internal/domain/player"
+	"github.com/averak/vfx/internal/infra/allocator"
 	"github.com/averak/vfx/internal/infra/config"
+	"github.com/averak/vfx/internal/infra/matchqueue"
 	"github.com/averak/vfx/internal/infra/postgres"
 	"github.com/averak/vfx/internal/infra/repository"
 	"github.com/averak/vfx/internal/infra/token"
 	"github.com/averak/vfx/internal/infra/valkey"
 	gatewayauthhandler "github.com/averak/vfx/internal/presentation/gateway/auth"
+	gatewaymatchhandler "github.com/averak/vfx/internal/presentation/gateway/match"
 	"github.com/averak/vfx/internal/stdx/db"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
+	usecasematch "github.com/averak/vfx/internal/usecase/match"
 )
 
 // Gateway bundles everything the gateway process needs at runtime.
@@ -37,8 +42,15 @@ type Gateway struct {
 	PlayerRepo       player.Repository
 	RefreshTokenRepo player.RefreshTokenRepository
 
+	MatchQueue     domainmatch.Queue
+	MatchAllocator domainmatch.Allocator
+	Matchmaker     *usecasematch.Matchmaker
+
 	AuthUsecase *usecaseauth.Usecase
 	AuthHandler *gatewayauthhandler.Handler
+
+	MatchUsecase *usecasematch.Usecase
+	MatchHandler *gatewaymatchhandler.Handler
 }
 
 // NewGateway constructs and validates the gateway container. The
@@ -75,6 +87,17 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	)
 	authHandler := gatewayauthhandler.New(authUC)
 
+	matchQueue := matchqueue.NewInMem()
+	matchAllocator := allocator.NewStub(cfg.RoomEndpoint)
+	matchUC := usecasematch.New(matchQueue)
+	matchHandler := gatewaymatchhandler.New(matchUC)
+	matchmaker := usecasematch.NewMatchmaker(matchQueue, matchAllocator, signer, usecasematch.Config{
+		Interval:        cfg.MatchmakerInterval,
+		SessionTokenTTL: cfg.SessionTokenTTL,
+		PlayersPerMatch: 2,
+		GameModes:       []string{"rps"},
+	})
+
 	cleanup := func() {
 		valkeyClient.Close()
 		pool.Close()
@@ -88,7 +111,12 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 		Signer:           signer,
 		PlayerRepo:       playerRepo,
 		RefreshTokenRepo: refreshRepo,
+		MatchQueue:       matchQueue,
+		MatchAllocator:   matchAllocator,
+		Matchmaker:       matchmaker,
 		AuthUsecase:      authUC,
 		AuthHandler:      authHandler,
+		MatchUsecase:     matchUC,
+		MatchHandler:     matchHandler,
 	}, cleanup, nil
 }

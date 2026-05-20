@@ -28,6 +28,14 @@ type AccessClaims struct {
 	jwt.RegisteredClaims
 }
 
+// SessionClaims are embedded in a short-lived room-connection token.
+// The room daemon verifies these to gate WebTransport handshakes.
+type SessionClaims struct {
+	PlayerID uuid.UUID `json:"sub"`
+	MatchID  string    `json:"mid"`
+	jwt.RegisteredClaims
+}
+
 // Signer issues and verifies access tokens.
 type Signer struct {
 	secret []byte
@@ -53,6 +61,42 @@ func (s *Signer) SignAccess(playerID uuid.UUID, now time.Time, ttl time.Duration
 		return "", fmt.Errorf("token: sign: %w", err)
 	}
 	return signed, nil
+}
+
+// SignSession issues a short-lived token used by clients to connect to
+// the assigned room. The room daemon trusts these because it shares the
+// signing secret with the gateway.
+func (s *Signer) SignSession(playerID uuid.UUID, matchID string, now time.Time, ttl time.Duration) (string, error) {
+	claims := SessionClaims{
+		PlayerID: playerID,
+		MatchID:  matchID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+		},
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := tok.SignedString(s.secret)
+	if err != nil {
+		return "", fmt.Errorf("token: sign session: %w", err)
+	}
+	return signed, nil
+}
+
+// VerifySession parses and validates a session token, returning its
+// claims when the signature, algorithm, and expiry all check out.
+func (s *Signer) VerifySession(tokenStr string) (*SessionClaims, error) {
+	claims := &SessionClaims{}
+	_, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method %q", t.Method.Alg())
+		}
+		return s.secret, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("token: verify session: %w", err)
+	}
+	return claims, nil
 }
 
 // Verify parses and validates an access token string. It returns the

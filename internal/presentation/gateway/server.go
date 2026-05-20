@@ -13,6 +13,7 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
+	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
 	"github.com/averak/vfx/internal/bootstrap"
 	"github.com/averak/vfx/internal/infra/connectrpc/interceptor"
 )
@@ -28,6 +29,9 @@ func NewHandler(c *bootstrap.Gateway) http.Handler {
 
 	authPath, authHandler := authconnect.NewAuthServiceHandler(c.AuthHandler, interceptors)
 	mux.Handle(authPath, authHandler)
+
+	matchPath, matchHandler := matchconnect.NewMatchServiceHandler(c.MatchHandler, interceptors)
+	mux.Handle(matchPath, matchHandler)
 
 	// Liveness/readiness for orchestrators. A more thorough readiness
 	// check (DB ping, Valkey ping) belongs in a later observability pass.

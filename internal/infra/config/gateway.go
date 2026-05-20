@@ -31,6 +31,15 @@ type Gateway struct {
 	JWTSecret       string        `env:"VFX_JWT_SECRET,required,notEmpty"`
 	AccessTokenTTL  time.Duration `env:"VFX_ACCESS_TOKEN_TTL"  envDefault:"15m"`
 	RefreshTokenTTL time.Duration `env:"VFX_REFRESH_TOKEN_TTL" envDefault:"720h"`
+	SessionTokenTTL time.Duration `env:"VFX_SESSION_TOKEN_TTL" envDefault:"5m"`
+
+	// MatchmakerInterval is how often the worker scans the queue.
+	MatchmakerInterval time.Duration `env:"VFX_MATCHMAKER_INTERVAL" envDefault:"200ms"`
+
+	// RoomEndpoint is the address handed to clients. With the stub
+	// allocator every match points at the same address; once Agones is
+	// wired this is replaced by the GameServer address.
+	RoomEndpoint string `env:"VFX_ROOM_ENDPOINT" envDefault:"localhost:7777"`
 }
 
 // LoadGateway reads the gateway configuration from the environment.
