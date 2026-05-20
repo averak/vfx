@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MISE_EXPERIMENTAL: "1"
+
+jobs:
+  generate:
+    name: gen (proto + sqlc)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install mise + tools
+        uses: jdx/mise-action@v2
+        with:
+          experimental: true
+          cache: true
+
+      - name: regenerate code
+        run: mise run gen
+
+      - name: ensure generated code is gitignored, not committed dirty
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::generated code drift; commit only authored sources"
+            git status
+            git --no-pager diff
+            exit 1
+          fi
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    needs: generate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install mise + tools
+        uses: jdx/mise-action@v2
+        with:
+          experimental: true
+          cache: true
+
+      - name: regenerate code
+        run: mise run gen
+
+      - name: buf lint + breaking
+        run: |
+          mise exec -- buf lint
+          mise exec -- buf breaking --against '.git#branch=main' || true
+
+      - name: golangci-lint
+        run: mise exec -- golangci-lint run ./...
+
+      - name: gofumpt check
+        run: |
+          out=$(mise exec -- gofumpt -l .)
+          if [ -n "$out" ]; then
+            echo "::error::gofumpt would change the following files:"
+            echo "$out"
+            exit 1
+          fi
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    needs: generate
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vfx
+          POSTGRES_PASSWORD: dev
+          POSTGRES_DB: vfx
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vfx"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      valkey:
+        image: valkey/valkey:8-alpine
+        ports:
+          - 6379:6379
+
+    env:
+      DATABASE_URL: postgres://vfx:dev@localhost:5432/vfx?sslmode=disable
+      VALKEY_URL: redis://localhost:6379
+      VFX_JWT_SECRET: ci-only-do-not-use-in-production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install mise + tools
+        uses: jdx/mise-action@v2
+        with:
+          experimental: true
+          cache: true
+
+      - name: regenerate code
+        run: mise run gen
+
+      - name: apply migrations
+        run: mise run db-migrate
+
+      - name: go test
+        run: go test -race -count=1 ./...
+
+  build:
+    name: build (Go + Docker)
+    runs-on: ubuntu-latest
+    needs: generate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install mise + tools
+        uses: jdx/mise-action@v2
+        with:
+          experimental: true
+          cache: true
+
+      - name: regenerate code
+        run: mise run gen
+
+      - name: build vfx
+        run: go build -o bin/vfx ./cmd/vfx
+
+      - name: build vfx-rps
+        run: go build -o bin/vfx-rps ./examples/rps/cmd/vfx-rps
+
+      - name: build rps-cli
+        run: go build -o bin/rps-cli ./examples/rps/cmd/rps-cli
+
+      - name: docker build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: vfx:ci
+          build-args: |
+            VERSION=ci-${{ github.sha }}
