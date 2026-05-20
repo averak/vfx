@@ -1,0 +1,40 @@
+# Helm values for local kind deployments of vfx.
+#
+# Apply with:
+#   helm install vfx ./deploy/helm/vfx --values deploy/local/values.yaml
+#
+# Assumes:
+#   - compose.yml is running so PostgreSQL is at host.docker.internal:5432
+#     and Valkey at host.docker.internal:6379.
+#   - A self-signed TLS pair is loaded into a Secret named "vfx-local-tls"
+#     before installing the chart. The repo's deploy/local/certs/ output
+#     is suitable; load it with:
+#       kubectl create secret tls vfx-local-tls \
+#         --cert=deploy/local/certs/dev-cert.pem \
+#         --key=deploy/local/certs/dev-key.pem
+
+image:
+  tag: dev
+  pullPolicy: IfNotPresent
+
+externalDatabase:
+  enabled: true
+  url: postgres://vfx:dev@host.docker.internal:5432/vfx?sslmode=disable
+
+externalValkey:
+  enabled: true
+  url: redis://host.docker.internal:6379
+
+jwtSecret: dev-only-do-not-use-in-production
+
+gateway:
+  replicas: 1
+  service:
+    type: NodePort
+
+room:
+  replicas: 1
+  tls:
+    existingSecretName: vfx-local-tls
+  service:
+    type: NodePort

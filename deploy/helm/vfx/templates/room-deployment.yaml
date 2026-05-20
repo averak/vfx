@@ -1,0 +1,66 @@
+{{- if .Values.room.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vfx.fullname" . }}-room
+  labels:
+    {{- include "vfx.labels" . | nindent 4 }}
+    app.kubernetes.io/component: room
+spec:
+  replicas: {{ .Values.room.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "vfx.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: room
+  template:
+    metadata:
+      labels:
+        {{- include "vfx.labels" . | nindent 8 }}
+        app.kubernetes.io/component: room
+        {{- with .Values.room.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.room.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      containers:
+        - name: room
+          image: {{ include "vfx.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["room"]
+          env:
+            - name: VFX_ROOM_LISTEN_ADDR
+              value: ":{{ .Values.room.service.port }}"
+            - name: VFX_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "vfx.jwtSecretName" . }}
+                  key: jwt-secret
+            - name: VFX_ROOM_TLS_CERT
+              value: /etc/vfx/tls/{{ .Values.room.tls.certFile }}
+            - name: VFX_ROOM_TLS_KEY
+              value: /etc/vfx/tls/{{ .Values.room.tls.keyFile }}
+            - name: VFX_ROOM_TICK_RATE_HZ
+              value: {{ .Values.room.tickRateHz | quote }}
+            {{- with .Values.room.pluginName }}
+            - name: VFX_ROOM_PLUGIN_PATH
+              value: {{ . | quote }}
+            {{- end }}
+          ports:
+            - name: webtransport
+              containerPort: {{ .Values.room.service.port }}
+              protocol: UDP
+          volumeMounts:
+            - name: tls
+              mountPath: /etc/vfx/tls
+              readOnly: true
+          resources:
+            {{- toYaml .Values.room.resources | nindent 12 }}
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ required "room.tls.existingSecretName is required (cert + key)" .Values.room.tls.existingSecretName }}
+{{- end }}

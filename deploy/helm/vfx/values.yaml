@@ -1,0 +1,73 @@
+# Default values for vfx.
+#
+# Override with `helm install vfx ./deploy/helm/vfx --values <file>` or
+# `--set key=value` flags.
+
+image:
+  repository: ghcr.io/averak/vfx
+  tag: "" # Defaults to .Chart.AppVersion when unset.
+  pullPolicy: IfNotPresent
+
+# externalDatabase points at a PostgreSQL outside the chart. When
+# enabled the chart will not provision its own database; the operator
+# is responsible for the URL working from the cluster.
+externalDatabase:
+  enabled: true
+  url: "" # e.g. postgres://vfx:secret@db.example.com:5432/vfx
+
+# externalValkey is the same idea for Valkey/Redis.
+externalValkey:
+  enabled: true
+  url: "" # e.g. redis://valkey.example.com:6379
+
+# jwtSecret is loaded into a Kubernetes Secret. Override via
+# --set-string jwtSecret=... or, better, supply your own secret name.
+jwtSecret: ""
+existingJwtSecretName: "" # When set, the chart binds VFX_JWT_SECRET to this Secret instead of creating one.
+
+# gateway is the stateless API tier.
+gateway:
+  enabled: true
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 1
+      memory: 512Mi
+  service:
+    type: ClusterIP
+    port: 8080
+  podAnnotations: {}
+  podLabels: {}
+
+# room is the WebTransport tier. Phase 1 ships as a Deployment; once
+# Agones integration lands the chart will template a Fleet instead.
+room:
+  enabled: true
+  replicas: 3
+  pluginName: "" # When empty the room boots with the first registered plugin.
+  tickRateHz: 30
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+  service:
+    type: ClusterIP
+    port: 7777 # UDP for QUIC/WebTransport
+  tls:
+    existingSecretName: "" # required; chart does not generate certificates
+    certFile: tls.crt
+    keyFile: tls.key
+  podAnnotations: {}
+  podLabels: {}
+
+# migrate runs as a Helm pre-install / pre-upgrade hook so schema is
+# applied before the gateway starts.
+migrate:
+  enabled: true
+  backoffLimit: 3

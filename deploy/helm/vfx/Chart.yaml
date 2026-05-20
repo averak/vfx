@@ -1,0 +1,16 @@
+apiVersion: v2
+name: vfx
+description: A lightweight, WebTransport-native, and WASM-driven game server engine.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/averak/vfx
+sources:
+  - https://github.com/averak/vfx
+maintainers:
+  - name: averak
+keywords:
+  - game-server
+  - webtransport
+  - wasm
+  - realtime

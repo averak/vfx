@@ -1,0 +1,20 @@
+{{- if .Values.room.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vfx.fullname" . }}-room
+  labels:
+    {{- include "vfx.labels" . | nindent 4 }}
+    app.kubernetes.io/component: room
+spec:
+  type: {{ .Values.room.service.type }}
+  ports:
+    - name: webtransport
+      port: {{ .Values.room.service.port }}
+      targetPort: webtransport
+      protocol: UDP
+  selector:
+    app.kubernetes.io/name: {{ include "vfx.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: room
+{{- end }}

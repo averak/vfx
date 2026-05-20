@@ -1,0 +1,64 @@
+{{- if .Values.gateway.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vfx.fullname" . }}-gateway
+  labels:
+    {{- include "vfx.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ .Values.gateway.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "vfx.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "vfx.labels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+        {{- with .Values.gateway.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.gateway.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      containers:
+        - name: gateway
+          image: {{ include "vfx.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["gateway"]
+          env:
+            - name: VFX_GATEWAY_LISTEN_ADDR
+              value: ":{{ .Values.gateway.service.port }}"
+            - name: DATABASE_URL
+              value: {{ required "externalDatabase.url is required" .Values.externalDatabase.url | quote }}
+            - name: VALKEY_URL
+              value: {{ required "externalValkey.url is required" .Values.externalValkey.url | quote }}
+            - name: VFX_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "vfx.jwtSecretName" . }}
+                  key: jwt-secret
+          ports:
+            - name: http
+              containerPort: {{ .Values.gateway.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+{{- end }}
