@@ -56,3 +56,4 @@ mise.local.toml
 
 # Scratch / temporary work
 /tmp/
+/deploy/local/certs/

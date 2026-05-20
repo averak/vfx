@@ -3,17 +3,22 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/averak/vfx/internal/infra/config"
+	"github.com/averak/vfx/internal/infra/token"
+	"github.com/averak/vfx/internal/presentation/room"
 )
 
 func newRoomCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "room",
-		Short: "Run a single match-hosting room",
-		Long: "Starts a WebTransport server that hosts exactly one match, " +
-			"running the configured WASM plugin via wazero. The room registers " +
-			"with Agones (Ready → Allocated → Shutdown) for lifecycle management.",
+		Short: "Run the match-hosting WebTransport server",
+		Long: "Starts a WebTransport server that hosts matches via the configured " +
+			"WASM plugin. Session tokens issued by the gateway grant connection rights.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runRoom(cmd.Context())
 		},
@@ -21,13 +26,18 @@ func newRoomCmd() *cobra.Command {
 	return cmd
 }
 
-func runRoom(_ context.Context) error {
-	// TODO: implement in task #5
-	//   - load config (env-driven)
-	//   - load WASM plugin via wazero
-	//   - integrate Agones SDK (Ready/Health/Shutdown)
-	//   - start WebTransport server
-	//   - run tick loop
-	fmt.Println("room: not yet implemented")
-	return nil
+func runRoom(ctx context.Context) error {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	cfg, err := config.LoadRoom()
+	if err != nil {
+		return fmt.Errorf("room: %w", err)
+	}
+
+	signer := token.NewSigner(cfg.JWTSecret)
+	srv, err := room.NewServer(cfg, signer, logger)
+	if err != nil {
+		return fmt.Errorf("room: %w", err)
+	}
+	return srv.ListenAndServe(ctx)
 }

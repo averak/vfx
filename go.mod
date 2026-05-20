@@ -14,11 +14,17 @@ require (
 )
 
 require (
+	github.com/dunglas/httpsfv v1.1.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/quic-go/qpack v0.6.0 // indirect
+	github.com/quic-go/quic-go v0.59.1 // indirect
+	github.com/quic-go/webtransport-go v0.10.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
+	github.com/tetratelabs/wazero v1.11.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
 	golang.org/x/net v0.54.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
