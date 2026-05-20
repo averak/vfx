@@ -41,7 +41,11 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 
 ### Example
 
-- [ ] `examples/1_turn_based/`: A complete sample game (plugin + web client + Helm values) demonstrating the full stack.
+- [ ] `examples/rps/`: Rock-paper-scissors (best of 3) as the canonical Phase 1 sample.
+  - [ ] Plugin (TinyGo → WASM): round resolution, best-of-3 state, timeout default.
+  - [ ] CLI client (Go): used by integration tests.
+  - [ ] Web client (TypeScript): used for demos and screenshots.
+  - [ ] Helm values + README.
 
 ### Observability
 
