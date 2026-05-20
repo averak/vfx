@@ -8,21 +8,22 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 
 ### Tooling & Project Skeleton
 
-- [ ] `mise.toml` with all CLI versions pinned (Go, buf, sqlc, atlas, TinyGo, helm, kubectl, kind, golangci-lint).
-- [ ] `compose.yml` for PostgreSQL and Valkey.
+- [x] `mise.toml` with CLI versions pinned (Go, buf, sqlc, atlas, helm, kubectl, kind, golangci-lint, gofumpt). TinyGo to be re-added when plugin SDK work starts.
+- [x] `compose.yml` for PostgreSQL and Valkey.
 - [ ] `Dockerfile` for the `vfx` binary.
 - [ ] `deploy/local/kind-config.yaml` and `deploy/local/values.yaml`.
 - [ ] `deploy/helm/vfx/` with default Chart, configurable for in-cluster or external DB.
 
 ### Schema
 
-- [ ] `buf.yaml` / `buf.gen.yaml` for Go and TypeScript code generation.
-- [ ] `schema/api/vfx/v1/auth/auth_service.proto`
-- [ ] `schema/api/vfx/v1/match/match_service.proto`
-- [ ] `schema/api/vfx/v1/realtime/frame.proto`
-- [ ] `schema/api/plugin/v1/plugin.proto` (host ⇔ guest ABI)
-- [ ] `schema/db/schema.sql` (PostgreSQL declarative schema).
-- [ ] `atlas.hcl` and `schema/db/migrations/` (atlas-managed).
+- [x] `buf.yaml` / `buf.gen.yaml` for Go and TypeScript code generation (managed mode, go_package_prefix).
+- [x] `schema/api/vfx/v1/auth/auth_service.proto`
+- [x] `schema/api/vfx/v1/match/match_service.proto`
+- [x] `schema/api/vfx/v1/realtime/frame.proto`
+- [x] `schema/api/plugin/v1/plugin.proto` (host ⇔ guest ABI)
+- [x] `schema/db/schema.sql` (PostgreSQL declarative schema).
+- [x] `atlas.hcl` and `schema/db/migrations/` (atlas-managed).
+- [x] `sqlc.yaml` and `schema/db/queries/` for type-safe SQL bindings.
 
 ### Application
 
