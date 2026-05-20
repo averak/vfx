@@ -50,7 +50,12 @@ linters:
         - rangeValCopy
     revive:
       rules:
+        # `exported` requires every exported symbol to carry its own
+        # comment. We document interfaces in domain/ but leave
+        # implementations in infra/ uncommented because the contract is
+        # already on the interface — duplicating it just drifts.
         - name: exported
+          disabled: true
         - name: unused-parameter
           disabled: true
     exhaustive:

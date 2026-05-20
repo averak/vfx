@@ -29,6 +29,10 @@ KUBECONFIG = "{{config_root}}/.kube/config"
 KIND_CLUSTER_NAME = "vfx-local"
 GOFLAGS = "-buildvcs=false"
 
+# Local dev secret only. Production deployments MUST override this via
+# their secret manager (Kubernetes Secret, AWS Secrets Manager, etc.).
+VFX_JWT_SECRET = "dev-only-do-not-use-in-production"
+
 # ============================================================================
 # Code generation
 # ============================================================================

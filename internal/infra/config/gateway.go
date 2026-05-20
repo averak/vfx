@@ -1,0 +1,43 @@
+// Package config loads process configuration from the environment.
+//
+// Each subcommand has its own config type so that running `vfx gateway`
+// never trips a validation rule that only `vfx room` cares about. The
+// types are plain structs with env tags; loading is a single function
+// per subcommand that returns a fully validated value or an error.
+package config
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/caarlos0/env/v11"
+)
+
+// Gateway holds every value the gateway process needs to start.
+//
+// Common variables (DATABASE_URL, VALKEY_URL) follow the unprefixed
+// convention shared with atlas, psql, redis-cli, etc. so the same env
+// file works for tooling. vfx-specific knobs carry the VFX_ prefix to
+// avoid collisions in shared environments.
+type Gateway struct {
+	ListenAddr string `env:"VFX_GATEWAY_LISTEN_ADDR" envDefault:":8080"`
+
+	DatabaseURL string `env:"DATABASE_URL,required,notEmpty"`
+	ValkeyURL   string `env:"VALKEY_URL,notEmpty"     envDefault:"redis://localhost:6379"`
+
+	// JWTSecret is the HMAC secret used to sign access tokens. The room
+	// daemon must be given the same value so it can verify session tokens
+	// the gateway hands out.
+	JWTSecret       string        `env:"VFX_JWT_SECRET,required,notEmpty"`
+	AccessTokenTTL  time.Duration `env:"VFX_ACCESS_TOKEN_TTL"  envDefault:"15m"`
+	RefreshTokenTTL time.Duration `env:"VFX_REFRESH_TOKEN_TTL" envDefault:"720h"`
+}
+
+// LoadGateway reads the gateway configuration from the environment.
+func LoadGateway() (*Gateway, error) {
+	var cfg Gateway
+	if err := env.Parse(&cfg); err != nil {
+		return nil, fmt.Errorf("config: %w", err)
+	}
+	return &cfg, nil
+}
