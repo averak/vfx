@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -22,7 +22,6 @@ func newAdminCmd() *cobra.Command {
 }
 
 func runAdmin(_ context.Context) error {
-	// TODO: implement (admin features are Phase 2+).
 	fmt.Println("admin: not yet implemented")
 	return nil
 }
