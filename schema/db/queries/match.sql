@@ -1,6 +1,6 @@
 -- name: CreateMatch :one
-INSERT INTO matches (id, game_mode, status)
-VALUES ($1, $2, 'pending')
+INSERT INTO matches (id, game_mode, status, created_at, updated_at)
+VALUES ($1, $2, 'pending', $3, $4)
 RETURNING *;
 
 -- name: GetMatchByID :one
@@ -10,8 +10,8 @@ WHERE id = $1;
 -- name: MarkMatchInProgress :one
 UPDATE matches
 SET status = 'in_progress',
-    started_at = NOW(),
-    updated_at = NOW()
+    started_at = $2,
+    updated_at = $3
 WHERE id = $1
   AND status = 'pending'
 RETURNING *;
@@ -19,23 +19,23 @@ RETURNING *;
 -- name: FinishMatch :one
 UPDATE matches
 SET status = 'finished',
-    ended_at = NOW(),
-    final_state = $2,
-    updated_at = NOW()
+    ended_at = $2,
+    final_state = $3,
+    updated_at = $4
 WHERE id = $1
 RETURNING *;
 
 -- name: CancelMatch :one
 UPDATE matches
 SET status = 'cancelled',
-    ended_at = NOW(),
-    updated_at = NOW()
+    ended_at = $2,
+    updated_at = $3
 WHERE id = $1
 RETURNING *;
 
 -- name: AddMatchPlayer :one
-INSERT INTO match_players (id, match_id, player_id)
-VALUES ($1, $2, $3)
+INSERT INTO match_players (id, match_id, player_id, created_at)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: SetMatchPlayerResult :one
