@@ -1,0 +1,67 @@
+# Keep the build context lean. Anything not needed to compile vfx or copy
+# migrations into the runtime image is excluded.
+
+.git/
+.github/
+.idea/
+.vscode/
+
+# Build outputs
+bin/
+dist/
+*.exe
+*.test
+*.out
+
+# Generated code (rebuilt during application development, not needed in image)
+gen/
+sdk/client/ts/src/gen/
+sdk/client/go/gen/
+sdk/plugin/go/gen/
+internal/infra/dbgen/
+
+# Node / TypeScript artifacts
+node_modules/
+*.tsbuildinfo
+.npm/
+.pnpm-store/
+
+# WASM artifacts (built per-plugin, not part of the server image)
+*.wasm
+
+# Local scratch and tooling state
+tmp/
+.kube/
+.env
+.env.local
+*.local.yaml
+*.local.toml
+mise.local.toml
+.mise.local.toml
+
+# Tests aren't compiled into the binary, but they bloat the context.
+# Keep them out unless we need them during build.
+**/*_test.go
+
+# Docs / non-build files
+README.md
+LICENSE
+docs/
+examples/
+deploy/
+
+# Tooling configs not consumed by the Docker build
+.editorconfig
+.gitignore
+.golangci.yml
+.dockerignore
+compose.yml
+mise.toml
+atlas.hcl
+sqlc.yaml
+buf.yaml
+buf.gen.yaml
+buf.lock
+
+# OS junk
+.DS_Store

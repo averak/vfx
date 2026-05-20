@@ -10,7 +10,7 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 
 - [x] `mise.toml` with CLI versions pinned (Go, buf, sqlc, atlas, helm, kubectl, kind, golangci-lint, gofumpt). TinyGo to be re-added when plugin SDK work starts.
 - [x] `compose.yml` for PostgreSQL and Valkey.
-- [ ] `Dockerfile` for the `vfx` binary.
+- [x] `Dockerfile` for the `vfx` binary (multi-stage, distroless, non-root, 40MB).
 - [ ] `deploy/local/kind-config.yaml` and `deploy/local/values.yaml`.
 - [ ] `deploy/helm/vfx/` with default Chart, configurable for in-cluster or external DB.
 
