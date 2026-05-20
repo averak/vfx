@@ -33,11 +33,26 @@ func NewHandler(c *bootstrap.Gateway) http.Handler {
 	matchPath, matchHandler := matchconnect.NewMatchServiceHandler(c.MatchHandler, interceptors)
 	mux.Handle(matchPath, matchHandler)
 
-	// Liveness/readiness for orchestrators. A more thorough readiness
-	// check (DB ping, Valkey ping) belongs in a later observability pass.
+	// Liveness probe: the process can answer HTTP, that's all this
+	// check guarantees. Used by Kubernetes to decide when to restart.
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+
+	// Readiness probe: the gateway's dependencies are reachable. A
+	// failing readyz takes the pod out of the Service backend without
+	// restarting it.
+	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		if err := c.Pool.Ping(r.Context()); err != nil {
+			http.Error(w, "postgres unreachable: "+err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Prometheus exposition. The registry is vfx-owned so we never
+	// leak metrics from transitive dependencies we did not vet.
+	mux.Handle("/metrics", c.Metrics.Handler())
 
 	return mux
 }

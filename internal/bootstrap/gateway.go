@@ -18,6 +18,7 @@ import (
 	"github.com/averak/vfx/internal/infra/allocator"
 	"github.com/averak/vfx/internal/infra/config"
 	"github.com/averak/vfx/internal/infra/matchqueue"
+	"github.com/averak/vfx/internal/infra/metrics"
 	"github.com/averak/vfx/internal/infra/postgres"
 	"github.com/averak/vfx/internal/infra/repository"
 	"github.com/averak/vfx/internal/infra/token"
@@ -33,8 +34,9 @@ import (
 type Gateway struct {
 	Config *config.Gateway
 
-	Pool   *pgxpool.Pool
-	Valkey valkeygo.Client
+	Pool    *pgxpool.Pool
+	Valkey  valkeygo.Client
+	Metrics *metrics.Registry
 
 	Session *db.Session
 	Signer  *token.Signer
@@ -107,6 +109,7 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 		Config:           cfg,
 		Pool:             pool,
 		Valkey:           valkeyClient,
+		Metrics:          metrics.NewRegistry(),
 		Session:          session,
 		Signer:           signer,
 		PlayerRepo:       playerRepo,
