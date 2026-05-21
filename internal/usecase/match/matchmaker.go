@@ -33,10 +33,11 @@ func (noopMetrics) MatchAllocated()           {}
 func (noopMetrics) SetQueueDepth(string, int) {}
 
 type Matchmaker struct {
-	queue     match.Queue
-	allocator match.Allocator
-	signer    *token.Signer
-	metrics   Metrics
+	queue       match.Queue
+	allocator   match.Allocator
+	signer      *token.Signer
+	assignments match.AssignmentStore
+	metrics     Metrics
 
 	interval        time.Duration
 	sessionTokenTTL time.Duration
@@ -50,6 +51,11 @@ type Config struct {
 	SessionTokenTTL time.Duration
 	PlayersPerMatch int
 	GameModes       []string
+
+	// Assignments persists each paired player's assignment so it can be
+	// recovered via GetCurrentMatch. When nil, assignments are only
+	// delivered over the live WatchTicket stream.
+	Assignments match.AssignmentStore
 
 	// Metrics is optional; when nil the matchmaker records nothing.
 	Metrics Metrics
@@ -67,10 +73,14 @@ func NewMatchmaker(queue match.Queue, allocator match.Allocator, signer *token.S
 	if cfg.Metrics == nil {
 		cfg.Metrics = noopMetrics{}
 	}
+	if cfg.Assignments == nil {
+		cfg.Assignments = noopAssignmentStore{}
+	}
 	return &Matchmaker{
 		queue:           queue,
 		allocator:       allocator,
 		signer:          signer,
+		assignments:     cfg.Assignments,
 		metrics:         cfg.Metrics,
 		interval:        cfg.Interval,
 		sessionTokenTTL: cfg.SessionTokenTTL,
@@ -163,6 +173,15 @@ func (m *Matchmaker) pair(ctx context.Context, mode string, tickets []*match.Tic
 			SessionToken: sessionToken,
 			ExpiresAt:    expiresAt,
 		}
+
+		// Persist before publishing so a client that reads the live
+		// Matched event and immediately calls GetCurrentMatch (e.g. after
+		// a reconnect) cannot race ahead of the store.
+		if storeErr := m.assignments.Put(ctx, t.PlayerID, assignment, m.sessionTokenTTL); storeErr != nil {
+			logger := slog.Default().With("worker", "matchmaker")
+			logger.Error("failed to persist assignment", "player_id", t.PlayerID, "err", storeErr)
+		}
+
 		//nolint:errcheck // Best-effort notification; subscriber may have dropped.
 		_ = m.queue.Publish(ctx, t.ID, match.EventMatched{Assignment: assignment})
 	}

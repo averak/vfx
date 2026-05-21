@@ -16,6 +16,7 @@ import (
 	domainmatch "github.com/averak/vfx/internal/domain/match"
 	"github.com/averak/vfx/internal/domain/player"
 	"github.com/averak/vfx/internal/infra/allocator"
+	"github.com/averak/vfx/internal/infra/assignmentstore"
 	"github.com/averak/vfx/internal/infra/config"
 	"github.com/averak/vfx/internal/infra/matchqueue"
 	"github.com/averak/vfx/internal/infra/metrics"
@@ -44,9 +45,10 @@ type Gateway struct {
 	PlayerRepo       player.Repository
 	RefreshTokenRepo player.RefreshTokenRepository
 
-	MatchQueue     domainmatch.Queue
-	MatchAllocator domainmatch.Allocator
-	Matchmaker     *usecasematch.Matchmaker
+	MatchQueue       domainmatch.Queue
+	MatchAllocator   domainmatch.Allocator
+	MatchAssignments domainmatch.AssignmentStore
+	Matchmaker       *usecasematch.Matchmaker
 
 	AuthUsecase *usecaseauth.Usecase
 	AuthHandler *gatewayauthhandler.Handler
@@ -108,13 +110,15 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 
 	matchQueue := matchqueue.NewInMem()
 	matchAllocator := allocator.NewStub(cfg.RoomEndpoint)
-	matchUC := usecasematch.New(matchQueue)
+	matchAssignments := assignmentstore.NewValkey(valkeyClient)
+	matchUC := usecasematch.New(matchQueue, matchAssignments)
 	matchHandler := gatewaymatchhandler.New(matchUC)
 	matchmaker := usecasematch.NewMatchmaker(matchQueue, matchAllocator, signer, usecasematch.Config{
 		Interval:        cfg.MatchmakerInterval,
 		SessionTokenTTL: cfg.SessionTokenTTL,
 		PlayersPerMatch: 2,
 		GameModes:       []string{"rps"},
+		Assignments:     matchAssignments,
 		Metrics:         matchmakerMetrics{reg: metricsReg},
 	})
 
@@ -134,6 +138,7 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 		RefreshTokenRepo: refreshRepo,
 		MatchQueue:       matchQueue,
 		MatchAllocator:   matchAllocator,
+		MatchAssignments: matchAssignments,
 		Matchmaker:       matchmaker,
 		AuthUsecase:      authUC,
 		AuthHandler:      authHandler,

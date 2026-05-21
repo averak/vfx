@@ -19,6 +19,7 @@ import (
 
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
+	"github.com/averak/vfx/internal/infra/assignmentstore"
 	"github.com/averak/vfx/internal/infra/connectrpc/interceptor"
 	"github.com/averak/vfx/internal/infra/matchqueue"
 	"github.com/averak/vfx/internal/infra/repository"
@@ -58,7 +59,7 @@ func New(t *testing.T) *Server {
 		15*time.Minute,
 		720*time.Hour,
 	)
-	matchUC := usecasematch.New(matchqueue.NewInMem())
+	matchUC := usecasematch.New(matchqueue.NewInMem(), assignmentstore.NewInMem())
 
 	interceptors := connect.WithInterceptors(
 		interceptor.Clock(),

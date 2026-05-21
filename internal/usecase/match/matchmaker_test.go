@@ -9,6 +9,7 @@ import (
 
 	domainmatch "github.com/averak/vfx/internal/domain/match"
 	"github.com/averak/vfx/internal/infra/allocator"
+	"github.com/averak/vfx/internal/infra/assignmentstore"
 	"github.com/averak/vfx/internal/infra/matchqueue"
 	"github.com/averak/vfx/internal/infra/token"
 	"github.com/averak/vfx/internal/stdx/clock"
@@ -19,24 +20,27 @@ const gameMode = "rps"
 
 func TestMatchmaker_PairsTwoTicketsInSameMode(t *testing.T) {
 	queue := matchqueue.NewInMem()
-	uc := usecasematch.New(queue)
+	store := assignmentstore.NewInMem()
+	uc := usecasematch.New(queue, store)
 	mm := usecasematch.NewMatchmaker(queue, allocator.NewStub("room:7777"), token.NewSigner("secret"),
 		usecasematch.Config{
 			Interval:        10 * time.Millisecond,
 			SessionTokenTTL: time.Minute,
 			PlayersPerMatch: 2,
 			GameModes:       []string{gameMode},
+			Assignments:     store,
 		})
 
 	ctx, cancel := context.WithCancel(clock.With(context.Background(), time.Now()))
 	defer cancel()
 
 	// Two players queue tickets and watch them.
-	ticketA, err := uc.CreateTicket(ctx, &usecasematch.TicketInput{PlayerID: uuid.New(), GameMode: gameMode})
+	playerA, playerB := uuid.New(), uuid.New()
+	ticketA, err := uc.CreateTicket(ctx, &usecasematch.TicketInput{PlayerID: playerA, GameMode: gameMode})
 	if err != nil {
 		t.Fatalf("CreateTicket A: %v", err)
 	}
-	ticketB, err := uc.CreateTicket(ctx, &usecasematch.TicketInput{PlayerID: uuid.New(), GameMode: gameMode})
+	ticketB, err := uc.CreateTicket(ctx, &usecasematch.TicketInput{PlayerID: playerB, GameMode: gameMode})
 	if err != nil {
 		t.Fatalf("CreateTicket B: %v", err)
 	}
@@ -64,11 +68,28 @@ func TestMatchmaker_PairsTwoTicketsInSameMode(t *testing.T) {
 	if assignA.SessionToken == "" || assignB.SessionToken == "" {
 		t.Error("a paired ticket has an empty session token")
 	}
+
+	// The matchmaker should have persisted each assignment so a
+	// reconnecting client can recover it via GetCurrentMatch.
+	currentA, err := uc.GetCurrentMatch(ctx, playerA)
+	if err != nil {
+		t.Fatalf("GetCurrentMatch A: %v", err)
+	}
+	if currentA == nil {
+		t.Fatal("GetCurrentMatch A returned no assignment after a match")
+	}
+	if currentA.MatchID != assignA.MatchID || currentA.SessionToken != assignA.SessionToken {
+		t.Errorf("stored assignment for A = %+v, want match %s with the streamed token",
+			currentA, assignA.MatchID)
+	}
+	if currentB, err := uc.GetCurrentMatch(ctx, playerB); err != nil || currentB == nil {
+		t.Fatalf("GetCurrentMatch B = (%+v, %v), want a stored assignment", currentB, err)
+	}
 }
 
 func TestMatchmaker_LeavesLoneTicketQueued(t *testing.T) {
 	queue := matchqueue.NewInMem()
-	uc := usecasematch.New(queue)
+	uc := usecasematch.New(queue, assignmentstore.NewInMem())
 	mm := usecasematch.NewMatchmaker(queue, allocator.NewStub("room:7777"), token.NewSigner("secret"),
 		usecasematch.Config{
 			Interval:        10 * time.Millisecond,

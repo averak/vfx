@@ -30,8 +30,8 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 - [x] `cmd/vfx`: Cobra-based CLI dispatching to subcommands.
 - [x] `vfx gateway`: Connect RPC server, auth, matchmaking worker.
   - [x] AuthService (Login/Refresh/Logout/UpdateProfile) end-to-end with anonymous credential
-  - [x] MatchService (CreateTicket/WatchTicket/CancelTicket; GetCurrentMatch returns nil until assignment store lands)
-  - [x] Matchmaker worker (in-memory queue, pair-up policy, stub allocator)
+  - [x] MatchService (CreateTicket/WatchTicket/CancelTicket; GetCurrentMatch served from the Valkey assignment store for reconnect / multi-replica recovery)
+  - [x] Matchmaker worker (in-memory queue, pair-up policy, stub allocator; assignments persisted to Valkey)
   - [ ] Valkey-backed queue (multi-gateway)
   - [ ] Tier-based matching (rating / region relaxation)
   - [ ] Agones Allocator integration

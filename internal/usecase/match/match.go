@@ -10,6 +10,7 @@ package match
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -19,13 +20,31 @@ import (
 
 // Usecase is the application-side entrypoint for matchmaking.
 type Usecase struct {
-	queue match.Queue
+	queue       match.Queue
+	assignments match.AssignmentStore
 }
 
 // New wires the usecase. The matchmaker worker is a separate
-// long-running component constructed by NewMatchmaker.
-func New(queue match.Queue) *Usecase {
-	return &Usecase{queue: queue}
+// long-running component constructed by NewMatchmaker. assignments may
+// be nil, in which case GetCurrentMatch always reports "no active match"
+// — convenient for tests that only exercise the ticket flow.
+func New(queue match.Queue, assignments match.AssignmentStore) *Usecase {
+	if assignments == nil {
+		assignments = noopAssignmentStore{}
+	}
+	return &Usecase{queue: queue, assignments: assignments}
+}
+
+// noopAssignmentStore is the fallback when no store is supplied: writes
+// are dropped and reads report nothing.
+type noopAssignmentStore struct{}
+
+func (noopAssignmentStore) Put(context.Context, uuid.UUID, *match.Assignment, time.Duration) error {
+	return nil
+}
+
+func (noopAssignmentStore) Get(context.Context, uuid.UUID) (*match.Assignment, error) {
+	return nil, nil //nolint:nilnil // no store configured means no current match.
 }
 
 // TicketInput carries the request parameters from the handler down to
@@ -73,11 +92,10 @@ func (u *Usecase) CancelTicket(ctx context.Context, ticketID uuid.UUID) error {
 
 // GetCurrentMatch returns the player's active match assignment, if any.
 //
-// Phase 1 has no persistence layer for assignments; the matchmaker
-// publishes them to the in-memory queue and clients are expected to
-// reconnect via the same WatchTicket stream after a transient drop.
-// A future iteration backs this with Valkey so a fresh process or a
-// different gateway replica can still re-hand the assignment.
-func (u *Usecase) GetCurrentMatch(_ context.Context, _ uuid.UUID) (*match.Assignment, error) {
-	return nil, nil //nolint:nilnil // intentional: "no active match" returns (nil, nil) until the assignment store lands.
+// The matchmaker writes assignments to the AssignmentStore as it pairs
+// tickets, so a client that dropped before reading EventMatched — or one
+// that lands on a different gateway replica — can recover its room here
+// without re-queuing. (nil, nil) means no active match.
+func (u *Usecase) GetCurrentMatch(ctx context.Context, playerID uuid.UUID) (*match.Assignment, error) {
+	return u.assignments.Get(ctx, playerID)
 }
