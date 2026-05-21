@@ -63,7 +63,7 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 ### CI / Release
 
 - [x] `.github/workflows/ci.yml` runs generate / lint / test / build on every PR and push to main.
-- [ ] `.github/workflows/release.yml` builds and pushes the image and chart on tagged releases.
+- [x] `.github/workflows/release.yml` builds and pushes a multi-arch image and the Helm chart (OCI) to GHCR on `v*` tags, then cuts a GitHub release.
 
 ## Phase 2 — General-purpose backend features
 

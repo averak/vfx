@@ -1,0 +1,124 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  MISE_EXPERIMENTAL: "1"
+  REGISTRY: ghcr.io
+
+jobs:
+  image:
+    name: build and push image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: derive version
+        id: version
+        # Strip the leading "v" so 1.2.3 is the canonical version used by
+        # both the image tag and the chart.
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: install mise + tools
+        uses: jdx/mise-action@v2
+        with:
+          experimental: true
+          cache: true
+
+      - name: regenerate code
+        # gen/go and internal/infra/dbgen are gitignored, so the image
+        # builder needs them produced into the context first.
+        run: mise run gen
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: log in to ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+
+      - name: build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+
+  chart:
+    name: package and push chart
+    runs-on: ubuntu-latest
+    needs: image
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: derive version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: install mise + tools
+        uses: jdx/mise-action@v2
+        with:
+          experimental: true
+          cache: true
+
+      - name: log in to ghcr
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            mise exec -- helm registry login "${REGISTRY}" \
+              --username "${{ github.actor }}" --password-stdin
+
+      - name: package chart
+        # The chart's image defaults to .Chart.AppVersion, so stamping both
+        # version and appVersion keeps the chart and image in lockstep.
+        run: |
+          mise exec -- helm package deploy/helm/vfx \
+            --version "${{ steps.version.outputs.version }}" \
+            --app-version "${{ steps.version.outputs.version }}"
+
+      - name: push chart
+        run: |
+          mise exec -- helm push \
+            "vfx-${{ steps.version.outputs.version }}.tgz" \
+            "oci://${REGISTRY}/${{ github.repository_owner }}/charts"
+
+  release:
+    name: github release
+    runs-on: ubuntu-latest
+    needs: [image, chart]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

@@ -13,12 +13,13 @@ dist/
 *.test
 *.out
 
-# Generated code (rebuilt during application development, not needed in image)
-gen/
+# Generated code. The server binary imports gen/go (protobuf/connect) and
+# internal/infra/dbgen (sqlc), so those must reach the builder — run
+# `mise run gen` before `docker build`. Only the client/plugin SDK output,
+# which the server never imports, is excluded to keep the context lean.
 sdk/client/ts/src/gen/
 sdk/client/go/gen/
 sdk/plugin/go/gen/
-internal/infra/dbgen/
 
 # Node / TypeScript artifacts
 node_modules/
