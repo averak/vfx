@@ -45,6 +45,8 @@ spec:
               value: /etc/vfx/tls/{{ .Values.room.tls.keyFile }}
             - name: VFX_ROOM_TICK_RATE_HZ
               value: {{ .Values.room.tickRateHz | quote }}
+            - name: VFX_ROOM_METRICS_ADDR
+              value: ":{{ .Values.room.metricsPort }}"
             {{- with .Values.room.pluginName }}
             - name: VFX_ROOM_PLUGIN_PATH
               value: {{ . | quote }}
@@ -53,6 +55,15 @@ spec:
             - name: webtransport
               containerPort: {{ .Values.room.service.port }}
               protocol: UDP
+            - name: metrics
+              containerPort: {{ .Values.room.metricsPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
           volumeMounts:
             - name: tls
               mountPath: /etc/vfx/tls

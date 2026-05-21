@@ -60,6 +60,7 @@ room:
   gameMode: rps # Stamped as the vfx.dev/game-mode label so the allocator can select this Fleet.
   pluginName: "" # When empty the room boots with the first registered plugin.
   tickRateHz: 30
+  metricsPort: 9090 # Plain-HTTP port for /metrics and probes (separate from the UDP WebTransport port).
   resources:
     requests:
       cpu: 200m

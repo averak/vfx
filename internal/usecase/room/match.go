@@ -37,9 +37,10 @@ type PlayerIO interface {
 
 // Match is the in-memory state of one ongoing game.
 type Match struct {
-	id     uuid.UUID
-	logger *slog.Logger
-	plugin plugin.Plugin
+	id      uuid.UUID
+	logger  *slog.Logger
+	plugin  plugin.Plugin
+	metrics Metrics
 
 	mu          sync.Mutex
 	players     map[uuid.UUID]*matchPlayer
@@ -58,10 +59,14 @@ type matchPlayer struct {
 
 // NewMatch constructs a Match. The Plugin must already be initialised
 // (via Run, below); Match treats it as a pure tick processor.
-func NewMatch(id uuid.UUID, p plugin.Plugin, tickRateHz uint32, logger *slog.Logger) *Match {
+func NewMatch(id uuid.UUID, p plugin.Plugin, tickRateHz uint32, logger *slog.Logger, metrics Metrics) *Match {
+	if metrics == nil {
+		metrics = noopMetrics{}
+	}
 	return &Match{
 		id:         id,
 		plugin:     p,
+		metrics:    metrics,
 		players:    make(map[uuid.UUID]*matchPlayer),
 		tickRateHz: tickRateHz,
 		inputs:     make(chan *pluginv1.PlayerAction, 256),
@@ -191,7 +196,9 @@ func (m *Match) tick(ctx context.Context) (bool, error) {
 		NetworkEvents: events,
 	}
 
+	tickStart := time.Now()
 	resp, err := m.plugin.OnTick(ctx, req)
+	m.metrics.ObserveTick(time.Since(tickStart))
 	if err != nil {
 		return false, fmt.Errorf("plugin OnTick: %w", err)
 	}

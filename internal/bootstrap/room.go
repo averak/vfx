@@ -6,9 +6,11 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/averak/vfx/internal/domain/plugin"
 	"github.com/averak/vfx/internal/infra/config"
+	"github.com/averak/vfx/internal/infra/metrics"
 	"github.com/averak/vfx/internal/infra/plugin/wazerohost"
 	"github.com/averak/vfx/internal/infra/token"
 	roomhandler "github.com/averak/vfx/internal/presentation/room"
@@ -21,7 +23,18 @@ type Room struct {
 	Signer  *token.Signer
 	Manager *usecaseroom.Manager
 	Server  *roomhandler.Server
+	Metrics *metrics.Registry
 }
+
+// roomMetrics adapts the Prometheus registry to usecaseroom.Metrics so
+// the usecase layer carries no concrete metrics dependency.
+type roomMetrics struct {
+	reg *metrics.Registry
+}
+
+func (m roomMetrics) IncActiveMatches()           { m.reg.RoomMatchesActive.Inc() }
+func (m roomMetrics) DecActiveMatches()           { m.reg.RoomMatchesActive.Dec() }
+func (m roomMetrics) ObserveTick(d time.Duration) { m.reg.RoomTickDuration.Observe(d.Seconds()) }
 
 // NewRoom constructs and validates the room container.
 //
@@ -45,7 +58,8 @@ func NewRoom(ctx context.Context, registry *plugin.Registry, logger *slog.Logger
 	}
 
 	signer := token.NewSigner(cfg.JWTSecret)
-	manager := usecaseroom.NewManager(ctx, factory, logger)
+	metricsReg := metrics.NewRegistry()
+	manager := usecaseroom.NewManager(ctx, factory, logger, roomMetrics{reg: metricsReg})
 	server, err := roomhandler.NewServer(cfg, signer, manager, logger)
 	if err != nil {
 		factoryCleanup()
@@ -62,6 +76,7 @@ func NewRoom(ctx context.Context, registry *plugin.Registry, logger *slog.Logger
 		Signer:  signer,
 		Manager: manager,
 		Server:  server,
+		Metrics: metricsReg,
 	}, cleanup, nil
 }
 

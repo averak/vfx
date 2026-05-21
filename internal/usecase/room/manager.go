@@ -32,6 +32,7 @@ var tracer = otel.Tracer("github.com/averak/vfx/internal/usecase/room")
 type Manager struct {
 	logger    *slog.Logger
 	factory   plugin.Factory
+	metrics   Metrics
 	matchCtx  context.Context //nolint:containedctx // Long-lived per-daemon context; never per-request.
 	cancelAll context.CancelFunc
 
@@ -41,12 +42,17 @@ type Manager struct {
 
 // NewManager constructs a Manager wired to a Factory. The supplied ctx
 // outlives every Match the manager creates; cancel it (typically at
-// daemon shutdown) to tear them all down.
-func NewManager(ctx context.Context, factory plugin.Factory, logger *slog.Logger) *Manager {
+// daemon shutdown) to tear them all down. metrics may be nil, in which
+// case nothing is recorded.
+func NewManager(ctx context.Context, factory plugin.Factory, logger *slog.Logger, metrics Metrics) *Manager {
+	if metrics == nil {
+		metrics = noopMetrics{}
+	}
 	mctx, cancel := context.WithCancel(ctx)
 	return &Manager{
 		logger:    logger,
 		factory:   factory,
+		metrics:   metrics,
 		matchCtx:  mctx,
 		cancelAll: cancel,
 		matches:   make(map[uuid.UUID]*Match),
@@ -98,8 +104,9 @@ func (mgr *Manager) FindOrCreate(ctx context.Context, matchID uuid.UUID, players
 		return nil, err
 	}
 
-	match := NewMatch(matchID, pl, initResp.GetTickRateHz(), mgr.logger)
+	match := NewMatch(matchID, pl, initResp.GetTickRateHz(), mgr.logger, mgr.metrics)
 	mgr.matches[matchID] = match
+	mgr.metrics.IncActiveMatches()
 
 	// match.Run uses the manager's long-lived ctx, never the caller's
 	// request ctx — a player disconnecting must not tear down the
@@ -109,6 +116,7 @@ func (mgr *Manager) FindOrCreate(ctx context.Context, matchID uuid.UUID, players
 			mgr.logger.Error("match run failed", "match_id", matchID, "err", err)
 		}
 		mgr.cleanup(matchID)
+		mgr.metrics.DecActiveMatches()
 	}()
 
 	mgr.mu.Unlock()

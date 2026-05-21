@@ -56,10 +56,16 @@ spec:
                   value: /etc/vfx/tls/{{ .Values.room.tls.keyFile }}
                 - name: VFX_ROOM_TICK_RATE_HZ
                   value: {{ .Values.room.tickRateHz | quote }}
+                - name: VFX_ROOM_METRICS_ADDR
+                  value: ":{{ .Values.room.metricsPort }}"
                 {{- with .Values.room.pluginName }}
                 - name: VFX_ROOM_PLUGIN_PATH
                   value: {{ . | quote }}
                 {{- end }}
+              ports:
+                - name: metrics
+                  containerPort: {{ .Values.room.metricsPort }}
+                  protocol: TCP
               volumeMounts:
                 - name: tls
                   mountPath: /etc/vfx/tls

@@ -46,6 +46,12 @@ type Room struct {
 	// AgonesHealthInterval is how often the daemon pings the Agones SDK
 	// health stream. Must be shorter than the Fleet's health.periodSeconds.
 	AgonesHealthInterval time.Duration `env:"VFX_ROOM_AGONES_HEALTH_INTERVAL" envDefault:"2s"`
+
+	// MetricsAddr is the TCP address for the room's HTTP/1.1 metrics and
+	// probe server (/metrics, /healthz, /readyz). The WebTransport tier
+	// is HTTP/3 over UDP, so Prometheus scraping needs this separate
+	// plain-HTTP listener.
+	MetricsAddr string `env:"VFX_ROOM_METRICS_ADDR" envDefault:":9090"`
 }
 
 // LoadRoom reads the room configuration from the environment.

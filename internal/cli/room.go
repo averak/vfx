@@ -2,8 +2,10 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"time"
 
@@ -59,5 +61,40 @@ func runRoom(ctx context.Context, registry *plugin.Registry) error {
 		defer stopAgones()
 	}
 
+	if addr := container.Config.MetricsAddr; addr != "" {
+		stopMetrics := startRoomMetricsServer(addr, container, logger)
+		defer stopMetrics()
+	}
+
 	return container.Server.ListenAndServe(ctx)
+}
+
+// startRoomMetricsServer runs the room's plain-HTTP listener for
+// Prometheus scraping and orchestrator probes, alongside the
+// WebTransport (HTTP/3) tier. It returns a shutdown function.
+func startRoomMetricsServer(addr string, container *bootstrap.Room, logger *slog.Logger) func() {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", container.Metrics.Handler())
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mux.HandleFunc("/readyz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	go func() {
+		logger.Info("room metrics listening", "addr", addr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("room metrics server failed", "err", err)
+		}
+	}()
+
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			logger.Warn("room metrics shutdown", "err", err)
+		}
+	}
 }
