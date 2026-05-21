@@ -36,10 +36,20 @@ type Gateway struct {
 	// MatchmakerInterval is how often the worker scans the queue.
 	MatchmakerInterval time.Duration `env:"VFX_MATCHMAKER_INTERVAL" envDefault:"200ms"`
 
-	// RoomEndpoint is the address handed to clients. With the stub
-	// allocator every match points at the same address; once Agones is
-	// wired this is replaced by the GameServer address.
+	// RoomEndpoint is the address handed to clients by the stub
+	// allocator; every match points at the same address. The Agones
+	// allocator ignores it in favour of the allocated GameServer's
+	// address.
 	RoomEndpoint string `env:"VFX_ROOM_ENDPOINT" envDefault:"localhost:7777"`
+
+	// Allocator selects how rooms are reserved: "stub" (the default,
+	// single fixed endpoint for local/compose runs) or "agones" (creates
+	// a GameServerAllocation per match against the in-cluster API).
+	Allocator string `env:"VFX_ALLOCATOR" envDefault:"stub"`
+
+	// AgonesNamespace is the namespace the Agones allocator creates
+	// GameServerAllocations in. Only used when Allocator is "agones".
+	AgonesNamespace string `env:"VFX_AGONES_NAMESPACE" envDefault:"default"`
 }
 
 // LoadGateway reads the gateway configuration from the environment.

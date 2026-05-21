@@ -37,6 +37,15 @@ type Room struct {
 	// WebTransport handshake to complete before tearing the connection
 	// down.
 	HandshakeTimeout time.Duration `env:"VFX_ROOM_HANDSHAKE_TIMEOUT" envDefault:"10s"`
+
+	// AgonesEnabled turns on the Agones game-server SDK: the daemon marks
+	// itself Ready, sends health pings, and Shutdown on exit. Leave it
+	// off for compose/local runs where no Agones SDK sidecar exists.
+	AgonesEnabled bool `env:"VFX_ROOM_AGONES_ENABLED" envDefault:"false"`
+
+	// AgonesHealthInterval is how often the daemon pings the Agones SDK
+	// health stream. Must be shorter than the Fleet's health.periodSeconds.
+	AgonesHealthInterval time.Duration `env:"VFX_ROOM_AGONES_HEALTH_INTERVAL" envDefault:"2s"`
 }
 
 // LoadRoom reads the room configuration from the environment.

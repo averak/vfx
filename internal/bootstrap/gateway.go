@@ -72,6 +72,20 @@ func (m matchmakerMetrics) SetQueueDepth(gameMode string, depth int) {
 	m.reg.QueueDepth.WithLabelValues(gameMode).Set(float64(depth))
 }
 
+// newAllocator picks the room allocator from config: the stub (single
+// fixed endpoint, for compose/local) or Agones (a GameServerAllocation
+// per match against the in-cluster API).
+func newAllocator(cfg *config.Gateway) (domainmatch.Allocator, error) {
+	switch cfg.Allocator {
+	case "agones":
+		return allocator.NewAgones(cfg.AgonesNamespace)
+	case "", "stub":
+		return allocator.NewStub(cfg.RoomEndpoint), nil
+	default:
+		return nil, fmt.Errorf("bootstrap: unknown allocator %q (want \"stub\" or \"agones\")", cfg.Allocator)
+	}
+}
+
 // NewGateway constructs and validates the gateway container. The
 // returned cleanup function closes long-lived resources and must be
 // called before the process exits.
@@ -109,7 +123,12 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	authHandler := gatewayauthhandler.New(authUC)
 
 	matchQueue := matchqueue.NewInMem()
-	matchAllocator := allocator.NewStub(cfg.RoomEndpoint)
+	matchAllocator, err := newAllocator(cfg)
+	if err != nil {
+		valkeyClient.Close()
+		pool.Close()
+		return nil, nil, err
+	}
 	matchAssignments := assignmentstore.NewValkey(valkeyClient)
 	matchUC := usecasematch.New(matchQueue, matchAssignments)
 	matchHandler := gatewaymatchhandler.New(matchUC)

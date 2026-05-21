@@ -11,6 +11,7 @@ import (
 
 	"github.com/averak/vfx/internal/bootstrap"
 	"github.com/averak/vfx/internal/domain/plugin"
+	"github.com/averak/vfx/internal/infra/agones"
 	"github.com/averak/vfx/internal/infra/tracing"
 )
 
@@ -49,6 +50,14 @@ func runRoom(ctx context.Context, registry *plugin.Registry) error {
 		return fmt.Errorf("room bootstrap: %w", err)
 	}
 	defer cleanup()
+
+	if container.Config.AgonesEnabled {
+		stopAgones, agonesErr := agones.Start(ctx, container.Config.AgonesHealthInterval, logger)
+		if agonesErr != nil {
+			return fmt.Errorf("room agones: %w", agonesErr)
+		}
+		defer stopAgones()
+	}
 
 	return container.Server.ListenAndServe(ctx)
 }
