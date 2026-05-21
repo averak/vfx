@@ -31,11 +31,11 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 - [x] `vfx gateway`: Connect RPC server, auth, matchmaking worker.
   - [x] AuthService (Login/Refresh/Logout/UpdateProfile) end-to-end with anonymous credential
   - [x] MatchService (CreateTicket/WatchTicket/CancelTicket; GetCurrentMatch served from the Valkey assignment store for reconnect / multi-replica recovery)
-  - [x] Matchmaker worker (in-memory queue, pair-up policy, stub allocator; assignments persisted to Valkey)
+  - [x] Matchmaker worker (in-memory queue, pair-up policy; stub allocator for local, Agones allocator for clusters; assignments persisted to Valkey)
+  - [x] Agones Allocator integration (GameServerAllocation via the in-cluster API, selected with VFX_ALLOCATOR=agones). Verified on kind: matchmaking allocates a Ready GameServer and hands its address:port to clients.
   - [ ] Valkey-backed queue (multi-gateway)
   - [ ] Tier-based matching (rating / region relaxation)
-  - [ ] Agones Allocator integration
-- [x] `vfx room`: WebTransport server, tick loop, match orchestrator, and both plugin hosts — Go-native (registry) and WASM (wazero). Agones SDK integration deferred to Phase 2.
+- [x] `vfx room`: WebTransport server, tick loop, match orchestrator, and both plugin hosts — Go-native (registry) and WASM (wazero). Agones game-server SDK (Ready/Health/Shutdown) wired in, gated by VFX_ROOM_AGONES_ENABLED.
 - [ ] `vfx admin`: minimal HTTP API (web UI deferred to later phase).
 - [x] `vfx migrate`: thin wrapper around atlas (apply / status / down).
 
@@ -52,7 +52,7 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
   - [x] CLI client (Go): built on the Go SDK.
   - [x] Web client (TypeScript): built on the TS SDK, Vite dev server.
   - [x] TinyGo build of the same plugin → WASM, run in the room's wazero sandbox.
-  - [ ] Helm values overlay (needs a vfx-rps image build).
+  - [x] Helm values overlay + image: examples/rps/Dockerfile bakes rps.wasm onto the vfx image; deploy/local/values-agones.yaml runs it as an Agones Fleet on kind.
 
 ### Observability
 

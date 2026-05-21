@@ -1,0 +1,45 @@
+# Helm values for a local kind deployment of vfx with Agones.
+#
+# Prereqs (see docs):
+#   - kind cluster with Agones installed.
+#   - compose.yml running so PostgreSQL/Valkey are at host.docker.internal.
+#   - Image vfx-rps:dev (stock vfx + bundled rps.wasm) loaded into kind:
+#       kind load docker-image vfx-rps:dev --name vfx-local
+#   - TLS secret loaded:
+#       kubectl create secret tls vfx-local-tls \
+#         --cert=deploy/local/certs/dev-cert.pem \
+#         --key=deploy/local/certs/dev-key.pem
+#
+# Install:
+#   helm install vfx ./deploy/helm/vfx --values deploy/local/values-agones.yaml
+
+image:
+  repository: vfx-rps
+  tag: dev
+  pullPolicy: IfNotPresent # image is preloaded into kind; never pull from a registry
+
+externalDatabase:
+  enabled: true
+  url: postgres://vfx:dev@host.docker.internal:5432/vfx?sslmode=disable
+
+externalValkey:
+  enabled: true
+  url: redis://host.docker.internal:6379
+
+jwtSecret: dev-only-do-not-use-in-production
+
+agones:
+  enabled: true
+  healthPeriodSeconds: 5
+
+gateway:
+  replicas: 1
+  service:
+    type: NodePort
+
+room:
+  replicas: 2
+  gameMode: rps
+  pluginName: /opt/vfx/plugins/rps.wasm
+  tls:
+    existingSecretName: vfx-local-tls

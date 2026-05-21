@@ -10,7 +10,11 @@ import (
 )
 
 const (
-	defaultMigrationsDir = "file://schema/db/migrations"
+	// defaultMigrationsDir points at where the Docker image stores the
+	// migrations (see Dockerfile), so `vfx migrate` works out of the box
+	// in a container. Running it from a source checkout needs
+	// --dir file://schema/db/migrations (or just use `mise run db-migrate`).
+	defaultMigrationsDir = "file:///etc/vfx/migrations"
 	atlasBinary          = "atlas"
 )
 
