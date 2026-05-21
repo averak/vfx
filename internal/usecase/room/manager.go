@@ -7,10 +7,18 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	pluginv1 "github.com/averak/vfx/gen/go/plugin/v1"
 	"github.com/averak/vfx/internal/domain/plugin"
 )
+
+// tracer is the room usecase instrumentation scope; spans are no-ops
+// until tracing.Setup installs an exporter.
+var tracer = otel.Tracer("github.com/averak/vfx/internal/usecase/room")
 
 // Manager tracks the room daemon's currently active matches. The
 // WebTransport handler calls FindOrCreate when a player connects so
@@ -58,8 +66,19 @@ func (mgr *Manager) FindOrCreate(ctx context.Context, matchID uuid.UUID, players
 		return existing, nil
 	}
 
+	// Span covers the cold-start cost of a match: instantiating the
+	// plugin and running its Init. It is a child of the connecting
+	// session's span when tracing is on.
+	ctx, span := tracer.Start(ctx, "room.match.create", trace.WithAttributes(
+		attribute.String("vfx.match_id", matchID.String()),
+		attribute.Int("vfx.player_count", len(players)),
+	))
+	defer span.End()
+
 	pl, err := mgr.factory.Create(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "plugin create failed")
 		mgr.mu.Unlock()
 		return nil, err
 	}
@@ -70,6 +89,8 @@ func (mgr *Manager) FindOrCreate(ctx context.Context, matchID uuid.UUID, players
 	}
 	initResp, err := pl.Init(ctx, initReq)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "plugin init failed")
 		if closeErr := pl.Close(); closeErr != nil {
 			mgr.logger.Warn("manager: close after init failure", "err", closeErr)
 		}

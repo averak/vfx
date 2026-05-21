@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/averak/vfx/internal/bootstrap"
 	"github.com/averak/vfx/internal/domain/plugin"
+	"github.com/averak/vfx/internal/infra/tracing"
 )
 
 func newRoomCmd(registry *plugin.Registry) *cobra.Command {
@@ -29,6 +31,18 @@ func newRoomCmd(registry *plugin.Registry) *cobra.Command {
 
 func runRoom(ctx context.Context, registry *plugin.Registry) error {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	shutdownTracing, err := tracing.Setup(ctx, "vfx-room")
+	if err != nil {
+		return fmt.Errorf("room tracing: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if shutdownErr := shutdownTracing(shutdownCtx); shutdownErr != nil {
+			logger.Warn("room tracing shutdown", "err", shutdownErr)
+		}
+	}()
 
 	container, cleanup, err := bootstrap.NewRoom(ctx, registry, logger)
 	if err != nil {

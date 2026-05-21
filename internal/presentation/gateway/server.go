@@ -8,9 +8,11 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 
 	"connectrpc.com/connect"
+	"connectrpc.com/otelconnect"
 
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
@@ -19,10 +21,22 @@ import (
 )
 
 // NewHandler returns the root HTTP handler for the gateway process.
-func NewHandler(c *bootstrap.Gateway) http.Handler {
+func NewHandler(c *bootstrap.Gateway) (http.Handler, error) {
 	mux := http.NewServeMux()
 
+	// Tracing comes from the global tracer provider installed by
+	// tracing.Setup; with no OTLP endpoint configured that provider is a
+	// no-op, so this interceptor is effectively free. Metrics stay on the
+	// vfx-owned Prometheus path, so otelconnect is asked for spans only.
+	otelInterceptor, err := otelconnect.NewInterceptor(otelconnect.WithoutMetrics())
+	if err != nil {
+		return nil, fmt.Errorf("gateway: otel interceptor: %w", err)
+	}
+
+	// The tracing interceptor is outermost so its span wraps the auth,
+	// clock, and metrics work done by the inner interceptors.
 	interceptors := connect.WithInterceptors(
+		otelInterceptor,
 		interceptor.Metrics(c.Metrics),
 		interceptor.Clock(),
 		interceptor.Auth(c.Signer),
@@ -55,7 +69,7 @@ func NewHandler(c *bootstrap.Gateway) http.Handler {
 	// leak metrics from transitive dependencies we did not vet.
 	mux.Handle("/metrics", c.Metrics.Handler())
 
-	return mux
+	return mux, nil
 }
 
 // EnableHTTP2 turns on HTTP/2 (both encrypted and unencrypted) on the

@@ -56,7 +56,7 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 
 ### Observability
 
-- [ ] OpenTelemetry traces from `gateway` and `room` (W3C Trace Context propagated end-to-end).
+- [x] OpenTelemetry traces from `gateway` (Connect interceptor) and `room` (session and match-create spans). Opt-in via `OTEL_EXPORTER_OTLP_ENDPOINT`; off by default so single-node deployments pay nothing.
 - [x] Prometheus-compatible `/metrics` endpoint (gateway today; room daemon HTTP/1.1 sidecar pending).
 - [x] Health (`/healthz`) and readiness (`/readyz` with PostgreSQL ping) probes on the gateway.
 

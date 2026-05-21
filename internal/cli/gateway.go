@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/averak/vfx/internal/bootstrap"
+	"github.com/averak/vfx/internal/infra/tracing"
 	"github.com/averak/vfx/internal/presentation/gateway"
 )
 
@@ -32,15 +33,31 @@ func newGatewayCmd() *cobra.Command {
 func runGateway(ctx context.Context) error {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
+	shutdownTracing, err := tracing.Setup(ctx, "vfx-gateway")
+	if err != nil {
+		return fmt.Errorf("gateway tracing: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if shutdownErr := shutdownTracing(shutdownCtx); shutdownErr != nil {
+			logger.Warn("gateway tracing shutdown", "err", shutdownErr)
+		}
+	}()
+
 	container, cleanup, err := bootstrap.NewGateway(ctx)
 	if err != nil {
 		return fmt.Errorf("gateway bootstrap: %w", err)
 	}
 	defer cleanup()
 
+	handler, err := gateway.NewHandler(container)
+	if err != nil {
+		return fmt.Errorf("gateway handler: %w", err)
+	}
 	srv := &http.Server{
 		Addr:              container.Config.ListenAddr,
-		Handler:           gateway.NewHandler(container),
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	gateway.EnableHTTP2(srv)

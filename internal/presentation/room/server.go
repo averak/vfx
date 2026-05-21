@@ -19,11 +19,20 @@ import (
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 	"github.com/quic-go/webtransport-go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/averak/vfx/internal/infra/config"
 	"github.com/averak/vfx/internal/infra/token"
 	usecaseroom "github.com/averak/vfx/internal/usecase/room"
 )
+
+// tracer is the room presentation layer's instrumentation scope. It
+// resolves through the global tracer provider, so spans are no-ops
+// until tracing.Setup installs an exporter.
+var tracer = otel.Tracer("github.com/averak/vfx/internal/presentation/room")
 
 // Server hosts the WebTransport endpoint for a single room daemon.
 type Server struct {
@@ -162,14 +171,26 @@ func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
 	// actual transport lifetime — use that everywhere downstream.
 	sessionCtx := session.Context()
 
+	// One span per connected session, covering its whole lifetime.
+	// Started on sessionCtx so the match-creation span nests under it.
+	sessionCtx, span := tracer.Start(sessionCtx, "room.session", trace.WithAttributes(
+		attribute.String("vfx.match_id", matchID.String()),
+		attribute.String("vfx.player_id", claims.PlayerID.String()),
+	))
+	defer span.End()
+
 	match, err := s.manager.FindOrCreate(sessionCtx, matchID, roster)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "match unavailable")
 		s.logger.Error("room: match unavailable", "err", err)
 		return
 	}
 
 	playerIO := newPlayerSession(claims.PlayerID, matchID, session, s.logger)
 	if err := match.Join(claims.PlayerID, playerIO); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "join failed")
 		s.logger.Warn("room: join failed", "err", err)
 		return
 	}
