@@ -8,10 +8,12 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
+	github.com/planetscale/vtprotobuf v0.6.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/quic-go/quic-go v0.59.1
 	github.com/quic-go/webtransport-go v0.10.0
 	github.com/spf13/cobra v1.10.2
+	github.com/tetratelabs/wazero v1.11.0
 	github.com/valkey-io/valkey-go v1.0.75
 	google.golang.org/protobuf v1.36.11
 )

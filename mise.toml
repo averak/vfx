@@ -83,6 +83,17 @@ run = [
 run = "buf format -w"
 
 # ============================================================================
+# WASM plugins
+# ============================================================================
+
+# Compile the rock-paper-scissors example plugin to WebAssembly.
+# Requires TinyGo on PATH (https://tinygo.org/getting-started/install/);
+# it is not yet in the mise registry so it is installed out of band.
+[tasks.build-rps-wasm]
+description = "Build the RPS example plugin to WASM (TinyGo)"
+run = "tinygo build -o bin/rps.wasm -buildmode=c-shared -target=wasip1 ./examples/rps/plugin/cmd/wasm"
+
+# ============================================================================
 # Database
 # ============================================================================
 

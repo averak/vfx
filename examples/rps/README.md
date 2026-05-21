@@ -106,10 +106,41 @@ The match ends when one player reaches two round wins, or when three
 rounds have been played. `OnGameEnd` runs once and persists the final
 roster + per-player rank.
 
-## Why Go-native and not WASM (yet)
+## Run as a sandboxed WASM plugin
 
-The same `plugin.Plugin` interface will be satisfied by a wazero-backed
-loader in Phase 2 that reads a `.wasm` file produced by TinyGo. The
-RPS rules in `plugin/plugin.go` are deliberately pure Go with no host
-function calls so the same source can be compiled to WASM unchanged
-once that path is in place.
+The same game logic compiles to WebAssembly and runs in the room's
+wazero sandbox — no custom binary required, just the vanilla `vfx room`
+pointed at a `.wasm` file.
+
+```bash
+# Build the plugin to WASM (requires TinyGo on PATH).
+mise run build-rps-wasm        # → bin/rps.wasm
+
+# Run the stock vfx room with the WASM plugin.
+export VFX_JWT_SECRET="dev-only-do-not-use-in-production"
+export VFX_ROOM_TLS_CERT="$PWD/deploy/local/certs/dev-cert.pem"
+export VFX_ROOM_TLS_KEY="$PWD/deploy/local/certs/dev-key.pem"
+export VFX_ROOM_PLUGIN_PATH="$PWD/bin/rps.wasm"
+go run ./cmd/vfx room
+```
+
+Then run the two `rps-cli` players exactly as above. The match plays
+out identically — the rules are the same `Game` type, compiled once for
+the host (vfx-rps) and once to WASM (TinyGo).
+
+### How the two paths share code
+
+| Layer | File | Used by |
+| --- | --- | --- |
+| Rules | `plugin/game.go` (`Game`) | both |
+| Host adapter | `plugin/plugin.go` (`Factory`) | `vfx-rps` (Go-native) |
+| WASM entry | `plugin/cmd/wasm/main.go` | `bin/rps.wasm` (wazero) |
+
+`Game` has no host-function calls and no goroutines, so the exact same
+source runs natively and inside the sandbox. The guest SDK
+(`sdk/plugin/go`) bridges it to the WASM ABI; the host loader
+(`internal/infra/plugin/wazerohost`) drives it from the room.
+
+The plugin proto messages cross the WASM boundary using vtprotobuf's
+reflection-free `MarshalVT` / `UnmarshalVT` — protobuf-go's reflection
+codec cannot run under TinyGo.

@@ -35,13 +35,13 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
   - [ ] Valkey-backed queue (multi-gateway)
   - [ ] Tier-based matching (rating / region relaxation)
   - [ ] Agones Allocator integration
-- [x] `vfx room`: WebTransport server, plugin host (Go-native), tick loop, match orchestrator. Agones SDK and wazero deferred to Phase 2.
+- [x] `vfx room`: WebTransport server, tick loop, match orchestrator, and both plugin hosts — Go-native (registry) and WASM (wazero). Agones SDK integration deferred to Phase 2.
 - [ ] `vfx admin`: minimal HTTP API (web UI deferred to later phase).
 - [x] `vfx migrate`: thin wrapper around atlas (apply / status / down).
 
 ### SDK
 
-- [ ] `sdk/plugin/go`: Plugin SDK targeting TinyGo → WASM (Phase 2, needs the wazero loader).
+- [x] `sdk/plugin/go`: guest SDK targeting TinyGo → WASM, loaded by the room's wazero host. Uses vtprotobuf for a reflection-free codec.
 - [x] `sdk/client/go`: Client SDK (auth + match + WebTransport); rps-cli is built on it.
 - [x] `sdk/client/ts`: TypeScript client SDK (connect-web + browser WebTransport), in-repo, not published.
 
@@ -51,7 +51,7 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
   - [x] Plugin (Go-native): round resolution, best-of-3 state, end-to-end verified.
   - [x] CLI client (Go): built on the Go SDK.
   - [x] Web client (TypeScript): built on the TS SDK, Vite dev server.
-  - [ ] TinyGo build of the same plugin → WASM (Phase 2 with wazero).
+  - [x] TinyGo build of the same plugin → WASM, run in the room's wazero sandbox.
   - [ ] Helm values overlay (needs a vfx-rps image build).
 
 ### Observability
