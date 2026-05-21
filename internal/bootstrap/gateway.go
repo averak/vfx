@@ -72,16 +72,17 @@ func (m matchmakerMetrics) SetQueueDepth(gameMode string, depth int) {
 	m.reg.QueueDepth.WithLabelValues(gameMode).Set(float64(depth))
 }
 
-// newMatchQueue picks the matchmaking queue from config: in-memory
-// (single process) or Valkey-backed (shared across gateway replicas).
-func newMatchQueue(cfg *config.Gateway, valkeyClient valkeygo.Client) (domainmatch.Queue, error) {
-	switch cfg.MatchQueue {
+// newMatchQueue picks the matchmaking queue by mode: in-memory (single
+// process) or Valkey-backed (shared across gateway replicas, and the one
+// the admin API reads to report queue depth).
+func newMatchQueue(mode string, valkeyClient valkeygo.Client) (domainmatch.Queue, error) {
+	switch mode {
 	case "valkey":
 		return matchqueue.NewValkey(valkeyClient), nil
 	case "", "inmem":
 		return matchqueue.NewInMem(), nil
 	default:
-		return nil, fmt.Errorf("bootstrap: unknown match queue %q (want \"inmem\" or \"valkey\")", cfg.MatchQueue)
+		return nil, fmt.Errorf("bootstrap: unknown match queue %q (want \"inmem\" or \"valkey\")", mode)
 	}
 }
 
@@ -135,7 +136,7 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	)
 	authHandler := gatewayauthhandler.New(authUC)
 
-	matchQueue, err := newMatchQueue(cfg, valkeyClient)
+	matchQueue, err := newMatchQueue(cfg.MatchQueue, valkeyClient)
 	if err != nil {
 		valkeyClient.Close()
 		pool.Close()
