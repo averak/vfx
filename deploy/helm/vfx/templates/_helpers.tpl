@@ -30,3 +30,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{ include "vfx.fullname" . }}-jwt
 {{- end -}}
 {{- end -}}
+
+{{- define "vfx.gatewayServiceAccountName" -}}
+{{ include "vfx.fullname" . }}-gateway
+{{- end -}}

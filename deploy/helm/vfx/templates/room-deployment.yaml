@@ -1,4 +1,4 @@
-{{- if .Values.room.enabled }}
+{{- if and .Values.room.enabled (not .Values.agones.enabled) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

@@ -1,4 +1,7 @@
-{{- if .Values.room.enabled }}
+{{- /* Agones rooms are reached on dynamically allocated host ports, not
+through a ClusterIP Service, so the Service exists only in the plain
+Deployment mode. */}}
+{{- if and .Values.room.enabled (not .Values.agones.enabled) }}
 apiVersion: v1
 kind: Service
 metadata:

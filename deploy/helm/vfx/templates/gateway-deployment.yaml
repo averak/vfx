@@ -26,6 +26,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
+      {{- if .Values.agones.enabled }}
+      serviceAccountName: {{ include "vfx.gatewayServiceAccountName" . }}
+      {{- end }}
       containers:
         - name: gateway
           image: {{ include "vfx.image" . }}
@@ -43,6 +46,12 @@ spec:
                 secretKeyRef:
                   name: {{ include "vfx.jwtSecretName" . }}
                   key: jwt-secret
+            {{- if .Values.agones.enabled }}
+            - name: VFX_ALLOCATOR
+              value: "agones"
+            - name: VFX_AGONES_NAMESPACE
+              value: {{ .Values.agones.namespace | default .Release.Namespace | quote }}
+            {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.gateway.service.port }}

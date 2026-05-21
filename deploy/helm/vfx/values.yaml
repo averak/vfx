@@ -42,11 +42,22 @@ gateway:
   podAnnotations: {}
   podLabels: {}
 
-# room is the WebTransport tier. Phase 1 ships as a Deployment; once
-# Agones integration lands the chart will template a Fleet instead.
+# agones, when enabled, runs the room tier as an Agones Fleet (instead
+# of a plain Deployment) and switches the gateway to the Agones
+# allocator, granting it RBAC to create GameServerAllocations. Requires
+# Agones installed in the cluster. Leave disabled for a plain K8s or
+# single-node deployment.
+agones:
+  enabled: false
+  namespace: "" # Namespace the gateway allocates in; defaults to the release namespace.
+  healthPeriodSeconds: 5 # Agones marks a GameServer unhealthy without a ping within this window.
+
+# room is the WebTransport tier. With agones.enabled it is templated as
+# an Agones Fleet; otherwise as a plain Deployment.
 room:
   enabled: true
   replicas: 3
+  gameMode: rps # Stamped as the vfx.dev/game-mode label so the allocator can select this Fleet.
   pluginName: "" # When empty the room boots with the first registered plugin.
   tickRateHz: 30
   resources:

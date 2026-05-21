@@ -1,0 +1,73 @@
+{{- if and .Values.room.enabled .Values.agones.enabled }}
+apiVersion: agones.dev/v1
+kind: Fleet
+metadata:
+  name: {{ include "vfx.fullname" . }}-room
+  labels:
+    {{- include "vfx.labels" . | nindent 4 }}
+    app.kubernetes.io/component: room
+spec:
+  replicas: {{ .Values.room.replicas }}
+  template:
+    metadata:
+      labels:
+        {{- include "vfx.labels" . | nindent 8 }}
+        app.kubernetes.io/component: room
+        vfx.dev/game-mode: {{ .Values.room.gameMode | quote }}
+        {{- with .Values.room.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      # Dynamic port policy: Agones assigns a host port and reports it
+      # back through the allocation, which the gateway hands to clients.
+      # WebTransport is HTTP/3 over QUIC, so the protocol is UDP.
+      ports:
+        - name: webtransport
+          portPolicy: Dynamic
+          containerPort: {{ .Values.room.service.port }}
+          protocol: UDP
+      health:
+        periodSeconds: {{ .Values.agones.healthPeriodSeconds }}
+      template:
+        metadata:
+          {{- with .Values.room.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        spec:
+          containers:
+            - name: room
+              image: {{ include "vfx.image" . }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args: ["room"]
+              env:
+                - name: VFX_ROOM_LISTEN_ADDR
+                  value: ":{{ .Values.room.service.port }}"
+                - name: VFX_ROOM_AGONES_ENABLED
+                  value: "true"
+                - name: VFX_JWT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "vfx.jwtSecretName" . }}
+                      key: jwt-secret
+                - name: VFX_ROOM_TLS_CERT
+                  value: /etc/vfx/tls/{{ .Values.room.tls.certFile }}
+                - name: VFX_ROOM_TLS_KEY
+                  value: /etc/vfx/tls/{{ .Values.room.tls.keyFile }}
+                - name: VFX_ROOM_TICK_RATE_HZ
+                  value: {{ .Values.room.tickRateHz | quote }}
+                {{- with .Values.room.pluginName }}
+                - name: VFX_ROOM_PLUGIN_PATH
+                  value: {{ . | quote }}
+                {{- end }}
+              volumeMounts:
+                - name: tls
+                  mountPath: /etc/vfx/tls
+                  readOnly: true
+              resources:
+                {{- toYaml .Values.room.resources | nindent 16 }}
+          volumes:
+            - name: tls
+              secret:
+                secretName: {{ required "room.tls.existingSecretName is required (cert + key)" .Values.room.tls.existingSecretName }}
+{{- end }}
