@@ -19,10 +19,24 @@ import (
 // the same game_mode are waiting, pair them up. Rating/region/party
 // hints on Ticket are recorded but not yet used for filtering or tier
 // relaxation; that lands when the rock-paper-scissors example demands it.
+// Metrics is the subset of telemetry the matchmaker emits. It is an
+// interface so the usecase layer stays free of the concrete Prometheus
+// registry; bootstrap supplies an adapter, tests use the no-op default.
+type Metrics interface {
+	MatchAllocated()
+	SetQueueDepth(gameMode string, depth int)
+}
+
+type noopMetrics struct{}
+
+func (noopMetrics) MatchAllocated()           {}
+func (noopMetrics) SetQueueDepth(string, int) {}
+
 type Matchmaker struct {
 	queue     match.Queue
 	allocator match.Allocator
 	signer    *token.Signer
+	metrics   Metrics
 
 	interval        time.Duration
 	sessionTokenTTL time.Duration
@@ -36,6 +50,9 @@ type Config struct {
 	SessionTokenTTL time.Duration
 	PlayersPerMatch int
 	GameModes       []string
+
+	// Metrics is optional; when nil the matchmaker records nothing.
+	Metrics Metrics
 }
 
 // NewMatchmaker constructs a Matchmaker. GameModes lists the modes the
@@ -47,10 +64,14 @@ func NewMatchmaker(queue match.Queue, allocator match.Allocator, signer *token.S
 	if cfg.Interval == 0 {
 		cfg.Interval = 200 * time.Millisecond
 	}
+	if cfg.Metrics == nil {
+		cfg.Metrics = noopMetrics{}
+	}
 	return &Matchmaker{
 		queue:           queue,
 		allocator:       allocator,
 		signer:          signer,
+		metrics:         cfg.Metrics,
 		interval:        cfg.Interval,
 		sessionTokenTTL: cfg.SessionTokenTTL,
 		playersPerMatch: cfg.PlayersPerMatch,
@@ -91,6 +112,7 @@ func (m *Matchmaker) processMode(ctx context.Context, mode string) error {
 		if err != nil {
 			return err
 		}
+		m.metrics.SetQueueDepth(mode, len(pending))
 		if len(pending) < m.playersPerMatch {
 			return nil
 		}
@@ -144,6 +166,7 @@ func (m *Matchmaker) pair(ctx context.Context, mode string, tickets []*match.Tic
 		//nolint:errcheck // Best-effort notification; subscriber may have dropped.
 		_ = m.queue.Publish(ctx, t.ID, match.EventMatched{Assignment: assignment})
 	}
+	m.metrics.MatchAllocated()
 	return nil
 }
 

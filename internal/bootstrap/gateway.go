@@ -55,6 +55,21 @@ type Gateway struct {
 	MatchHandler *gatewaymatchhandler.Handler
 }
 
+// matchmakerMetrics adapts the Prometheus registry to the
+// usecasematch.Metrics interface, keeping the usecase layer free of a
+// concrete metrics dependency.
+type matchmakerMetrics struct {
+	reg *metrics.Registry
+}
+
+func (m matchmakerMetrics) MatchAllocated() {
+	m.reg.MatchesAllocated.Inc()
+}
+
+func (m matchmakerMetrics) SetQueueDepth(gameMode string, depth int) {
+	m.reg.QueueDepth.WithLabelValues(gameMode).Set(float64(depth))
+}
+
 // NewGateway constructs and validates the gateway container. The
 // returned cleanup function closes long-lived resources and must be
 // called before the process exits.
@@ -74,6 +89,8 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 		pool.Close()
 		return nil, nil, fmt.Errorf("bootstrap: %w", err)
 	}
+
+	metricsReg := metrics.NewRegistry()
 
 	session := db.NewSession(pool)
 	signer := token.NewSigner(cfg.JWTSecret)
@@ -98,6 +115,7 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 		SessionTokenTTL: cfg.SessionTokenTTL,
 		PlayersPerMatch: 2,
 		GameModes:       []string{"rps"},
+		Metrics:         matchmakerMetrics{reg: metricsReg},
 	})
 
 	cleanup := func() {
@@ -109,7 +127,7 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 		Config:           cfg,
 		Pool:             pool,
 		Valkey:           valkeyClient,
-		Metrics:          metrics.NewRegistry(),
+		Metrics:          metricsReg,
 		Session:          session,
 		Signer:           signer,
 		PlayerRepo:       playerRepo,

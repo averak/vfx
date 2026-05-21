@@ -19,16 +19,19 @@ import (
 type Registry struct {
 	*prometheus.Registry
 
-	// Gateway counters.
-	LoginAttempts    *prometheus.CounterVec
-	TicketsCreated   prometheus.Counter
-	TicketsActive    prometheus.Gauge
-	MatchesAllocated prometheus.Counter
+	// RPC-level metrics, recorded generically by the metrics
+	// interceptor for every Connect call.
+	RPCRequests *prometheus.CounterVec   // labels: method, code
+	RPCDuration *prometheus.HistogramVec // labels: method
 
-	// Room counters.
+	// Matchmaking metrics, recorded by the matchmaker worker.
+	MatchesAllocated prometheus.Counter
+	QueueDepth       *prometheus.GaugeVec // labels: game_mode
+
+	// Room metrics, recorded by the room daemon (exposed once the room
+	// grows an HTTP probe sidecar).
 	RoomMatchesActive prometheus.Gauge
 	RoomTickDuration  prometheus.Histogram
-	RoomFrameSent     *prometheus.CounterVec
 }
 
 // NewRegistry builds a fresh registry pre-loaded with the standard Go
@@ -42,25 +45,32 @@ func NewRegistry() *Registry {
 
 	r := &Registry{Registry: reg}
 
-	r.LoginAttempts = prometheus.NewCounterVec(
+	r.RPCRequests = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "vfx_gateway_login_attempts_total",
-			Help: "Login attempts at the gateway, labelled by credential kind and outcome.",
+			Name: "vfx_rpc_requests_total",
+			Help: "Connect RPC calls, labelled by fully-qualified method and result code.",
 		},
-		[]string{"credential", "outcome"},
+		[]string{"method", "code"},
 	)
-	r.TicketsCreated = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "vfx_gateway_tickets_created_total",
-		Help: "Total matchmaking tickets accepted by the gateway.",
-	})
-	r.TicketsActive = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "vfx_gateway_tickets_active",
-		Help: "Tickets currently waiting in the matchmaker queue.",
-	})
+	r.RPCDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "vfx_rpc_request_duration_seconds",
+			Help:    "Connect RPC handler latency, labelled by method.",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"method"},
+	)
 	r.MatchesAllocated = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "vfx_matchmaker_matches_allocated_total",
 		Help: "Successful match allocations by the matchmaker worker.",
 	})
+	r.QueueDepth = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "vfx_matchmaker_queue_depth",
+			Help: "Tickets currently waiting in the matchmaker queue, by game mode.",
+		},
+		[]string{"game_mode"},
+	)
 
 	r.RoomMatchesActive = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "vfx_room_matches_active",
@@ -71,22 +81,14 @@ func NewRegistry() *Registry {
 		Help:    "Wall-clock duration of plugin OnTick invocations.",
 		Buckets: prometheus.ExponentialBucketsRange(0.00005, 0.5, 12),
 	})
-	r.RoomFrameSent = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "vfx_room_frames_sent_total",
-			Help: "Frames sent from the room to a player, labelled by kind.",
-		},
-		[]string{"kind"},
-	)
 
 	reg.MustRegister(
-		r.LoginAttempts,
-		r.TicketsCreated,
-		r.TicketsActive,
+		r.RPCRequests,
+		r.RPCDuration,
 		r.MatchesAllocated,
+		r.QueueDepth,
 		r.RoomMatchesActive,
 		r.RoomTickDuration,
-		r.RoomFrameSent,
 	)
 	return r
 }

@@ -23,6 +23,7 @@ func NewHandler(c *bootstrap.Gateway) http.Handler {
 	mux := http.NewServeMux()
 
 	interceptors := connect.WithInterceptors(
+		interceptor.Metrics(c.Metrics),
 		interceptor.Clock(),
 		interceptor.Auth(c.Signer),
 	)
