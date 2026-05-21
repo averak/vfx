@@ -42,6 +42,11 @@ type Gateway struct {
 	// address.
 	RoomEndpoint string `env:"VFX_ROOM_ENDPOINT" envDefault:"localhost:7777"`
 
+	// MatchQueue selects the matchmaking queue backend: "inmem" (the
+	// default, single-process) or "valkey" (shared across gateway
+	// replicas, required for horizontal scaling).
+	MatchQueue string `env:"VFX_MATCH_QUEUE" envDefault:"inmem"`
+
 	// Allocator selects how rooms are reserved: "stub" (the default,
 	// single fixed endpoint for local/compose runs) or "agones" (creates
 	// a GameServerAllocation per match against the in-cluster API).

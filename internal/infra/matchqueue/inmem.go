@@ -28,6 +28,7 @@ type ticketEntry struct {
 	ticket   *match.Ticket
 	latest   match.Event
 	finished bool
+	claimed  bool
 }
 
 // Verify the contract.
@@ -113,7 +114,7 @@ func (q *InMem) Pending(_ context.Context, gameMode string) ([]*match.Ticket, er
 
 	out := make([]*match.Ticket, 0)
 	for _, e := range q.tickets {
-		if e.finished {
+		if e.finished || e.claimed {
 			continue
 		}
 		if e.ticket.GameMode != gameMode {
@@ -124,6 +125,25 @@ func (q *InMem) Pending(_ context.Context, gameMode string) ([]*match.Ticket, er
 	// Older tickets first so the matchmaker is FIFO-ish.
 	sortByCreatedAt(out)
 	return out, nil
+}
+
+// Claim marks the tickets as taken, removing them from the pending pool.
+// All-or-nothing: if any ticket is already claimed or finished, none are
+// claimed and it returns false.
+func (q *InMem) Claim(_ context.Context, _ string, ticketIDs []uuid.UUID) (bool, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	for _, id := range ticketIDs {
+		e, ok := q.tickets[id]
+		if !ok || e.finished || e.claimed {
+			return false, nil
+		}
+	}
+	for _, id := range ticketIDs {
+		q.tickets[id].claimed = true
+	}
+	return true, nil
 }
 
 func (q *InMem) Publish(_ context.Context, ticketID uuid.UUID, event match.Event) error {
@@ -146,7 +166,7 @@ func (q *InMem) Depth(_ context.Context, gameMode string) (int32, error) {
 func (q *InMem) countPendingLocked(gameMode string) int32 {
 	var n int32
 	for _, e := range q.tickets {
-		if e.finished {
+		if e.finished || e.claimed {
 			continue
 		}
 		if e.ticket.GameMode == gameMode {

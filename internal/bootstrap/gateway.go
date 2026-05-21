@@ -72,6 +72,19 @@ func (m matchmakerMetrics) SetQueueDepth(gameMode string, depth int) {
 	m.reg.QueueDepth.WithLabelValues(gameMode).Set(float64(depth))
 }
 
+// newMatchQueue picks the matchmaking queue from config: in-memory
+// (single process) or Valkey-backed (shared across gateway replicas).
+func newMatchQueue(cfg *config.Gateway, valkeyClient valkeygo.Client) (domainmatch.Queue, error) {
+	switch cfg.MatchQueue {
+	case "valkey":
+		return matchqueue.NewValkey(valkeyClient), nil
+	case "", "inmem":
+		return matchqueue.NewInMem(), nil
+	default:
+		return nil, fmt.Errorf("bootstrap: unknown match queue %q (want \"inmem\" or \"valkey\")", cfg.MatchQueue)
+	}
+}
+
 // newAllocator picks the room allocator from config: the stub (single
 // fixed endpoint, for compose/local) or Agones (a GameServerAllocation
 // per match against the in-cluster API).
@@ -122,7 +135,12 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	)
 	authHandler := gatewayauthhandler.New(authUC)
 
-	matchQueue := matchqueue.NewInMem()
+	matchQueue, err := newMatchQueue(cfg, valkeyClient)
+	if err != nil {
+		valkeyClient.Close()
+		pool.Close()
+		return nil, nil, err
+	}
 	matchAllocator, err := newAllocator(cfg)
 	if err != nil {
 		valkeyClient.Close()

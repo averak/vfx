@@ -209,6 +209,22 @@ func compatible(seed, other *match.Ticket, ratingWindow float64, ignoreRegion bo
 }
 
 func (m *Matchmaker) pair(ctx context.Context, mode string, tickets []*match.Ticket) error {
+	// Reserve the whole group atomically so a second gateway's matchmaker
+	// cannot pair any of these tickets into a different match. If the
+	// claim loses the race, abandon this grouping; the next tick re-reads
+	// the pending pool without the tickets the winner took.
+	ids := make([]uuid.UUID, len(tickets))
+	for i, t := range tickets {
+		ids[i] = t.ID
+	}
+	claimed, err := m.queue.Claim(ctx, mode, ids)
+	if err != nil {
+		return err
+	}
+	if !claimed {
+		return nil
+	}
+
 	allocation, err := m.allocator.Allocate(ctx, mode, len(tickets))
 	if err != nil {
 		// Notify each ticket and let the player retry.

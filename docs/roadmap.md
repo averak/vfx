@@ -33,7 +33,7 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
   - [x] MatchService (CreateTicket/WatchTicket/CancelTicket; GetCurrentMatch served from the Valkey assignment store for reconnect / multi-replica recovery)
   - [x] Matchmaker worker (in-memory queue, pair-up policy; stub allocator for local, Agones allocator for clusters; assignments persisted to Valkey)
   - [x] Agones Allocator integration (GameServerAllocation via the in-cluster API, selected with VFX_ALLOCATOR=agones). Verified on kind: matchmaking allocates a Ready GameServer and hands its address:port to clients.
-  - [ ] Valkey-backed queue (multi-gateway)
+  - [x] Valkey-backed queue (multi-gateway): tickets in a per-mode sorted set, events over pub/sub, atomic Lua Claim so concurrent matchmakers never double-match. Selected with VFX_MATCH_QUEUE=valkey; in-memory remains the default.
   - [x] Tier-based matching: rating-window pairing that widens with wait time, region enforced until a relaxation deadline. Tickets without rating/region skip the respective check (so the rps sample still pairs instantly).
 - [x] `vfx room`: WebTransport server, tick loop, match orchestrator, and both plugin hosts — Go-native (registry) and WASM (wazero). Agones game-server SDK (Ready/Health/Shutdown) wired in, gated by VFX_ROOM_AGONES_ENABLED.
 - [ ] `vfx admin`: minimal HTTP API (web UI deferred to later phase).

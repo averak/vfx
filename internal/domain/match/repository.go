@@ -33,6 +33,14 @@ type Queue interface {
 	// this to find candidates.
 	Pending(ctx context.Context, gameMode string) ([]*Ticket, error)
 
+	// Claim atomically removes the given tickets from the pending pool,
+	// reserving them for the caller. It returns true only if every ticket
+	// was still pending; if any was already claimed by a concurrent
+	// matchmaker (another gateway replica), it claims none and returns
+	// false, so the caller abandons the grouping and retries. This is
+	// what makes matchmaking safe to run on more than one gateway.
+	Claim(ctx context.Context, gameMode string, ticketIDs []uuid.UUID) (bool, error)
+
 	// Publish broadcasts an event to subscribers of the given ticket.
 	// The matchmaker uses this to signal Matched; the handler uses it
 	// to signal Failed.
