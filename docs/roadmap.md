@@ -36,7 +36,7 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
   - [x] Valkey-backed queue (multi-gateway): tickets in a per-mode sorted set, events over pub/sub, atomic Lua Claim so concurrent matchmakers never double-match. Selected with VFX_MATCH_QUEUE=valkey; in-memory remains the default.
   - [x] Tier-based matching: rating-window pairing that widens with wait time, region enforced until a relaxation deadline. Tickets without rating/region skip the respective check (so the rps sample still pairs instantly).
 - [x] `vfx room`: WebTransport server, tick loop, match orchestrator, and both plugin hosts — Go-native (registry) and WASM (wazero). Agones game-server SDK (Ready/Health/Shutdown) wired in, gated by VFX_ROOM_AGONES_ENABLED.
-- [ ] `vfx admin`: minimal HTTP API (web UI deferred to later phase).
+- [x] `vfx admin`: minimal read-only HTTP/JSON ops API (player lookup, queue depth, health probes), deployable via the chart's optional admin tier. Web UI deferred to a later phase.
 - [x] `vfx migrate`: thin wrapper around atlas (apply / status / down).
 
 ### SDK

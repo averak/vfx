@@ -1,0 +1,31 @@
+package config
+
+import (
+	"fmt"
+
+	"github.com/caarlos0/env/v11"
+)
+
+// Admin holds the configuration for the operations API. It runs behind
+// a separate auth boundary from the player-facing gateway and exposes
+// read-only operational endpoints.
+type Admin struct {
+	ListenAddr string `env:"VFX_ADMIN_LISTEN_ADDR" envDefault:":8090"`
+
+	DatabaseURL string `env:"DATABASE_URL,required,notEmpty"`
+	ValkeyURL   string `env:"VALKEY_URL,notEmpty"     envDefault:"redis://localhost:6379"`
+
+	// MatchQueue must match the gateway's setting so the admin reads the
+	// same queue the matchmaker writes; only "valkey" is meaningful
+	// across processes ("inmem" would show an empty, process-local queue).
+	MatchQueue string `env:"VFX_MATCH_QUEUE" envDefault:"inmem"`
+}
+
+// LoadAdmin reads the admin configuration from the environment.
+func LoadAdmin() (*Admin, error) {
+	var cfg Admin
+	if err := env.Parse(&cfg); err != nil {
+		return nil, fmt.Errorf("config: %w", err)
+	}
+	return &cfg, nil
+}

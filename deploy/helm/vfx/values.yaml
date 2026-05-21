@@ -42,6 +42,25 @@ gateway:
   podAnnotations: {}
   podLabels: {}
 
+# admin is the read-only operations API (player/queue views). Disabled
+# by default; deploy it behind a separate auth boundary from the gateway.
+admin:
+  enabled: false
+  replicas: 1
+  matchQueue: valkey # The admin reads the shared queue; only "valkey" is meaningful cross-process.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: "1"
+      memory: 256Mi
+  service:
+    type: ClusterIP
+    port: 8090
+  podAnnotations: {}
+  podLabels: {}
+
 # agones, when enabled, runs the room tier as an Agones Fleet (instead
 # of a plain Deployment) and switches the gateway to the Agones
 # allocator, granting it RBAC to create GameServerAllocations. Requires

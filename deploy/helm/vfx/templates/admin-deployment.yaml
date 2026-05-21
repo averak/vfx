@@ -1,0 +1,61 @@
+{{- if .Values.admin.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vfx.fullname" . }}-admin
+  labels:
+    {{- include "vfx.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin
+spec:
+  replicas: {{ .Values.admin.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "vfx.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: admin
+  template:
+    metadata:
+      labels:
+        {{- include "vfx.labels" . | nindent 8 }}
+        app.kubernetes.io/component: admin
+        {{- with .Values.admin.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.admin.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      containers:
+        - name: admin
+          image: {{ include "vfx.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["admin"]
+          env:
+            - name: VFX_ADMIN_LISTEN_ADDR
+              value: ":{{ .Values.admin.service.port }}"
+            - name: DATABASE_URL
+              value: {{ required "externalDatabase.url is required" .Values.externalDatabase.url | quote }}
+            - name: VALKEY_URL
+              value: {{ required "externalValkey.url is required" .Values.externalValkey.url | quote }}
+            - name: VFX_MATCH_QUEUE
+              value: {{ .Values.admin.matchQueue | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.admin.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.admin.resources | nindent 12 }}
+{{- end }}
