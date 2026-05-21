@@ -3,6 +3,7 @@ package match
 import (
 	"context"
 	"log/slog"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -43,6 +44,10 @@ type Matchmaker struct {
 	sessionTokenTTL time.Duration
 	playersPerMatch int
 	candidateModes  []string
+
+	baseRatingWindow         float64
+	ratingWindowGrowthPerSec float64
+	regionRelaxAfter         time.Duration
 }
 
 // Config groups the matchmaker's tuning knobs.
@@ -51,6 +56,16 @@ type Config struct {
 	SessionTokenTTL time.Duration
 	PlayersPerMatch int
 	GameModes       []string
+
+	// Tier-based matching. Two tickets may pair when their ratings are
+	// within a window that starts at BaseRatingWindow and widens by
+	// RatingWindowGrowthPerSec for every second the oldest of them has
+	// waited. Region is enforced until that ticket has waited
+	// RegionRelaxAfter, after which cross-region pairing is allowed.
+	// Tickets without a rating or region skip the corresponding check.
+	BaseRatingWindow         float64
+	RatingWindowGrowthPerSec float64
+	RegionRelaxAfter         time.Duration
 
 	// Assignments persists each paired player's assignment so it can be
 	// recovered via GetCurrentMatch. When nil, assignments are only
@@ -76,16 +91,28 @@ func NewMatchmaker(queue match.Queue, allocator match.Allocator, signer *token.S
 	if cfg.Assignments == nil {
 		cfg.Assignments = noopAssignmentStore{}
 	}
+	if cfg.BaseRatingWindow == 0 {
+		cfg.BaseRatingWindow = 100
+	}
+	if cfg.RatingWindowGrowthPerSec == 0 {
+		cfg.RatingWindowGrowthPerSec = 50
+	}
+	if cfg.RegionRelaxAfter == 0 {
+		cfg.RegionRelaxAfter = 15 * time.Second
+	}
 	return &Matchmaker{
-		queue:           queue,
-		allocator:       allocator,
-		signer:          signer,
-		assignments:     cfg.Assignments,
-		metrics:         cfg.Metrics,
-		interval:        cfg.Interval,
-		sessionTokenTTL: cfg.SessionTokenTTL,
-		playersPerMatch: cfg.PlayersPerMatch,
-		candidateModes:  cfg.GameModes,
+		queue:                    queue,
+		allocator:                allocator,
+		signer:                   signer,
+		assignments:              cfg.Assignments,
+		metrics:                  cfg.Metrics,
+		interval:                 cfg.Interval,
+		sessionTokenTTL:          cfg.SessionTokenTTL,
+		playersPerMatch:          cfg.PlayersPerMatch,
+		candidateModes:           cfg.GameModes,
+		baseRatingWindow:         cfg.BaseRatingWindow,
+		ratingWindowGrowthPerSec: cfg.RatingWindowGrowthPerSec,
+		regionRelaxAfter:         cfg.RegionRelaxAfter,
 	}
 }
 
@@ -117,6 +144,7 @@ func (m *Matchmaker) tick(ctx context.Context, logger *slog.Logger) {
 }
 
 func (m *Matchmaker) processMode(ctx context.Context, mode string) error {
+	now := clock.Now(ctx)
 	for {
 		pending, err := m.queue.Pending(ctx, mode)
 		if err != nil {
@@ -126,11 +154,58 @@ func (m *Matchmaker) processMode(ctx context.Context, mode string) error {
 		if len(pending) < m.playersPerMatch {
 			return nil
 		}
-		batch := pending[:m.playersPerMatch]
+		batch := m.selectBatch(now, pending)
+		if batch == nil {
+			// The longest-waiting ticket has no compatible group yet; its
+			// tier widens on later ticks, so stop scanning this mode now.
+			return nil
+		}
 		if err := m.pair(ctx, mode, batch); err != nil {
 			return err
 		}
 	}
+}
+
+// selectBatch picks a compatible group of playersPerMatch tickets, or
+// nil if none can be formed yet. pending is oldest-first; the group is
+// seeded with the longest-waiting ticket so its (most-relaxed) tier
+// governs who it can pair with, which keeps the oldest ticket from
+// starving.
+func (m *Matchmaker) selectBatch(now time.Time, pending []*match.Ticket) []*match.Ticket {
+	seed := pending[0]
+	waited := now.Sub(seed.CreatedAt)
+	window := m.baseRatingWindow + m.ratingWindowGrowthPerSec*waited.Seconds()
+	ignoreRegion := waited >= m.regionRelaxAfter
+
+	group := make([]*match.Ticket, 0, m.playersPerMatch)
+	group = append(group, seed)
+	for _, t := range pending[1:] {
+		if len(group) == m.playersPerMatch {
+			break
+		}
+		if compatible(seed, t, window, ignoreRegion) {
+			group = append(group, t)
+		}
+	}
+	if len(group) < m.playersPerMatch {
+		return nil
+	}
+	return group
+}
+
+// compatible reports whether other may join seed's group under the
+// current tier. A missing rating or region on either ticket skips that
+// dimension's check rather than blocking the match.
+func compatible(seed, other *match.Ticket, ratingWindow float64, ignoreRegion bool) bool {
+	if !ignoreRegion && seed.Region != nil && other.Region != nil && *seed.Region != *other.Region {
+		return false
+	}
+	if seed.Rating != nil && other.Rating != nil {
+		if math.Abs(*seed.Rating-*other.Rating) > ratingWindow {
+			return false
+		}
+	}
+	return true
 }
 
 func (m *Matchmaker) pair(ctx context.Context, mode string, tickets []*match.Ticket) error {
