@@ -182,6 +182,11 @@ func (q *InMem) publishLocked(ticketID uuid.UUID, event match.Event) {
 	}
 }
 
+// detach removes a subscriber on context cancellation and closes its
+// channel so the handler's range loop unblocks. If a terminal event
+// already removed and closed the channel via publishLocked, target is no
+// longer in the slice, so we leave it alone and avoid a double close.
+// Both paths run under q.mu, so the find-then-close is race-free.
 func (q *InMem) detach(ticketID uuid.UUID, target chan match.Event) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -190,6 +195,7 @@ func (q *InMem) detach(ticketID uuid.UUID, target chan match.Event) {
 	for i, ch := range subs {
 		if ch == target {
 			q.subscribers[ticketID] = append(subs[:i], subs[i+1:]...)
+			close(ch)
 			return
 		}
 	}
