@@ -27,9 +27,16 @@
 // the module's linear memory. The guest exports:
 //
 //	vfx_alloc(size u32) u32          // reserve a request buffer, return ptr
-//	vfx_init(ptr, len u32) u64       // -> packed(ptr<<32 | len) of InitResponse
-//	vfx_on_tick(ptr, len u32) u64    // -> packed OnTickResponse
-//	vfx_on_game_end(ptr, len u32) u64// -> packed OnGameEndResponse
+//	vfx_init(ptr, len u32) u64       // -> packed result frame
+//	vfx_on_tick(ptr, len u32) u64    // -> packed result frame
+//	vfx_on_game_end(ptr, len u32) u64// -> packed result frame
+//
+// Each lifecycle export returns packed(ptr<<32 | len) pointing at a
+// result frame: a one-byte status (statusOK / statusErr) followed by a
+// payload. On statusOK the payload is the marshalled response message;
+// on statusErr it is a UTF-8 error string. The frame is never empty
+// (it always carries at least the status byte), so a zero return is
+// reserved for a host-detected fault.
 //
 // Calls are strictly sequential (one match, one tick at a time), so a
 // single request buffer and a single response buffer — both kept alive
@@ -80,52 +87,74 @@ func vfxAlloc(size uint32) uint32 {
 	return bytesPtr(reqBuf)
 }
 
+// Result frame status bytes. Kept in sync with the host
+// (internal/infra/plugin/wazerohost).
+const (
+	statusOK  = 0
+	statusErr = 1
+)
+
 //go:wasmexport vfx_init
 func vfxInit(_ uint32, length uint32) uint64 {
 	game = factory()
 	req := &pluginv1.InitRequest{}
 	if err := req.UnmarshalVT(reqBuf[:length]); err != nil {
-		return 0
+		return fail("unmarshal InitRequest: " + err.Error())
 	}
 	resp, err := game.Init(req)
 	if err != nil {
-		return 0
+		return fail(err.Error())
 	}
-	return marshalResp(resp)
+	return ok(resp)
 }
 
 //go:wasmexport vfx_on_tick
 func vfxOnTick(_ uint32, length uint32) uint64 {
 	req := &pluginv1.OnTickRequest{}
 	if err := req.UnmarshalVT(reqBuf[:length]); err != nil {
-		return 0
+		return fail("unmarshal OnTickRequest: " + err.Error())
 	}
 	resp, err := game.OnTick(req)
 	if err != nil {
-		return 0
+		return fail(err.Error())
 	}
-	return marshalResp(resp)
+	return ok(resp)
 }
 
 //go:wasmexport vfx_on_game_end
 func vfxOnGameEnd(_ uint32, length uint32) uint64 {
 	req := &pluginv1.OnGameEndRequest{}
 	if err := req.UnmarshalVT(reqBuf[:length]); err != nil {
-		return 0
+		return fail("unmarshal OnGameEndRequest: " + err.Error())
 	}
 	resp, err := game.OnGameEnd(req)
 	if err != nil {
-		return 0
+		return fail(err.Error())
 	}
-	return marshalResp(resp)
+	return ok(resp)
 }
 
-func marshalResp(m vtMessage) uint64 {
+// ok marshals m into an OK result frame; a marshal failure degrades to
+// an error frame so the host never silently sees a half-written buffer.
+func ok(m vtMessage) uint64 {
 	out, err := m.MarshalVT()
 	if err != nil {
-		return 0
+		return fail("marshal response: " + err.Error())
 	}
-	respBuf = out
+	return frame(statusOK, out)
+}
+
+func fail(msg string) uint64 {
+	return frame(statusErr, []byte(msg))
+}
+
+// frame writes a status byte followed by payload into respBuf and packs
+// its pointer and length. respBuf is held as a package global so the
+// guest's GC cannot reclaim it before the host reads it back.
+func frame(status byte, payload []byte) uint64 {
+	respBuf = make([]byte, len(payload)+1)
+	respBuf[0] = status
+	copy(respBuf[1:], payload)
 	return pack(bytesPtr(respBuf), uint32(len(respBuf)))
 }
 

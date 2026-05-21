@@ -24,6 +24,12 @@ import (
 	"github.com/averak/vfx/internal/domain/plugin"
 )
 
+// statusOK is the result-frame status byte for a successful call; any
+// other value marks an error frame whose payload is a UTF-8 message.
+// Kept in sync with the guest SDK (sdk/plugin/go), which returns
+// packed(ptr<<32 | len) pointing at the frame.
+const statusOK = 0
+
 // Factory compiles a WASM module once and instantiates a fresh copy per
 // match.
 type Factory struct {
@@ -156,16 +162,22 @@ func (p *wasmPlugin) call(ctx context.Context, fn api.Function, req, out proto.M
 	respPtr := uint32(packed >> 32)
 	respLen := uint32(packed) //nolint:gosec // 32-bit wasm length.
 	if respLen == 0 {
-		// A zero-length response means the guest reported an error or
-		// produced nothing; treat an empty proto as the result.
-		return nil
+		// The guest always returns at least a status byte; a zero-length
+		// frame means it trapped or never wrote one.
+		return errors.New("wazerohost: guest returned an empty frame")
 	}
 
-	respBytes, ok := p.memory.Read(respPtr, respLen)
+	frame, ok := p.memory.Read(respPtr, respLen)
 	if !ok {
 		return errors.New("wazerohost: failed reading response from guest memory")
 	}
-	if err := proto.Unmarshal(respBytes, out); err != nil {
+	// frame = [status byte][payload]. statusErr carries a UTF-8 message
+	// instead of a marshalled response.
+	status, payload := frame[0], frame[1:]
+	if status != statusOK {
+		return fmt.Errorf("wazerohost: plugin returned an error: %s", payload)
+	}
+	if err := proto.Unmarshal(payload, out); err != nil {
 		return fmt.Errorf("wazerohost: unmarshal response: %w", err)
 	}
 	return nil
