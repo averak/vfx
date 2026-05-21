@@ -21,14 +21,11 @@ plugins:
     out: gen/go
     opt: paths=source_relative
 
-  # TypeScript: client SDK
-  - remote: buf.build/bufbuild/es
-    out: sdk/client/ts/src/gen
-    opt:
-      - target=ts
-      - import_extension=js
-
-  - remote: buf.build/connectrpc/es
+  # TypeScript: client SDK.
+  # protobuf-es v2 emits the service descriptor directly into *_pb.ts,
+  # so connect-es v2 needs no separate codegen plugin — the client is
+  # built with createClient(ServiceDesc, transport).
+  - remote: buf.build/bufbuild/es:v2.12.0
     out: sdk/client/ts/src/gen
     opt:
       - target=ts
