@@ -70,6 +70,12 @@ jobs:
             exit 1
           fi
 
+      - name: typecheck TypeScript client SDK
+        working-directory: sdk/client/ts
+        run: |
+          mise exec -- npm ci
+          mise exec -- npm run typecheck
+
   test:
     name: test
     runs-on: ubuntu-latest

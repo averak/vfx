@@ -18,7 +18,8 @@ examples/rps/
 ├── plugin/                  # Game logic (satisfies plugin.Plugin)
 ├── cmd/
 │   ├── vfx-rps/             # Custom vfx binary: registers the plugin
-│   └── rps-cli/             # CLI client for testing / integration tests
+│   └── rps-cli/             # CLI client (Go SDK) for testing
+├── client-web/              # Browser client (TypeScript SDK + Vite)
 └── README.md
 ```
 
@@ -62,6 +63,35 @@ go run ./examples/rps/cmd/rps-cli --device bob   --nickname Bob   --auto
 
 `--auto` picks R/P/S at random every ~800 ms. Drop the flag and type
 choices interactively into the CLI's stdin.
+
+## Run the web client
+
+The browser client under `client-web/` uses the TypeScript SDK
+(`sdk/client/ts`) and the browser-native WebTransport API.
+
+```bash
+cd examples/rps/client-web
+npm install
+npm run dev   # serves on http://localhost:5173
+```
+
+Open two browser tabs to play a match against yourself.
+
+**Certificate caveat.** Browser WebTransport requires a certificate the
+browser trusts. The self-signed RSA pair used by the CLI quickstart is
+*not* eligible for the WebTransport hash-pinning API (that needs an
+ECDSA cert with short validity). The simplest path is
+[`mkcert`](https://github.com/FiloSottile/mkcert), which installs a
+local CA your browser trusts:
+
+```bash
+mkcert -install
+mkcert -cert-file deploy/local/certs/dev-cert.pem \
+       -key-file  deploy/local/certs/dev-key.pem \
+       localhost 127.0.0.1
+```
+
+Restart `vfx-rps room` after regenerating the certificate.
 
 ## How the plugin works
 

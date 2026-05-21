@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>vfx · rock-paper-scissors</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        line-height: 1.5;
+      }
+      body {
+        max-width: 40rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      button {
+        font-size: 1.5rem;
+        padding: 0.5rem 1rem;
+        margin-right: 0.5rem;
+        cursor: pointer;
+      }
+      #choices {
+        margin: 1rem 0;
+      }
+      pre {
+        background: #f4f4f4;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        overflow-x: auto;
+      }
+      #log {
+        color: #555;
+        font-size: 0.875rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>vfx · rock-paper-scissors</h1>
+    <p id="status">Connecting…</p>
+
+    <div id="choices" hidden>
+      <button data-choice="R">🪨 Rock</button>
+      <button data-choice="P">📄 Paper</button>
+      <button data-choice="S">✂️ Scissors</button>
+    </div>
+
+    <h2>Game state</h2>
+    <pre id="state">(waiting for first round)</pre>
+
+    <h2>Log</h2>
+    <pre id="log"></pre>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
