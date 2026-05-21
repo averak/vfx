@@ -41,18 +41,18 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 
 ### SDK
 
-- [ ] `sdk/plugin/go`: Plugin SDK targeting TinyGo → WASM.
-- [ ] `sdk/client/go`: Client SDK used by integration tests and CLI tools.
-- [ ] `sdk/client/ts`: TypeScript client, in-repo, not yet published to any registry.
+- [ ] `sdk/plugin/go`: Plugin SDK targeting TinyGo → WASM (Phase 2, needs the wazero loader).
+- [x] `sdk/client/go`: Client SDK (auth + match + WebTransport); rps-cli is built on it.
+- [x] `sdk/client/ts`: TypeScript client SDK (connect-web + browser WebTransport), in-repo, not published.
 
 ### Example
 
-- [ ] `examples/rps/`: Rock-paper-scissors (best of 3) as the canonical Phase 1 sample.
+- [x] `examples/rps/`: Rock-paper-scissors (best of 3) as the canonical Phase 1 sample.
   - [x] Plugin (Go-native): round resolution, best-of-3 state, end-to-end verified.
-  - [x] CLI client (Go): used by integration tests.
+  - [x] CLI client (Go): built on the Go SDK.
+  - [x] Web client (TypeScript): built on the TS SDK, Vite dev server.
   - [ ] TinyGo build of the same plugin → WASM (Phase 2 with wazero).
-  - [ ] Web client (TypeScript): used for demos and screenshots.
-  - [ ] Helm values + README.
+  - [ ] Helm values overlay (needs a vfx-rps image build).
 
 ### Observability
 
