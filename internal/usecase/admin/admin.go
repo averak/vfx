@@ -9,22 +9,17 @@ import (
 
 	"github.com/averak/vfx/internal/domain/match"
 	"github.com/averak/vfx/internal/domain/player"
+	"github.com/averak/vfx/internal/usecase/tx"
 )
 
-// Transactor runs work inside a read-only transaction.
-// The admin API never mutates, so it needs only RO; the implementation puts the transaction on the context the repository reads from.
-type Transactor interface {
-	RO(ctx context.Context, fn func(context.Context) error) error
-}
-
 type Usecase struct {
-	tx         Transactor
+	tx         tx.Reader
 	playerRepo player.Repository
 	queue      match.Queue
 }
 
-func New(tx Transactor, playerRepo player.Repository, queue match.Queue) *Usecase {
-	return &Usecase{tx: tx, playerRepo: playerRepo, queue: queue}
+func New(transactor tx.Reader, playerRepo player.Repository, queue match.Queue) *Usecase {
+	return &Usecase{tx: transactor, playerRepo: playerRepo, queue: queue}
 }
 
 func (u *Usecase) GetPlayer(ctx context.Context, id uuid.UUID) (*player.Player, error) {

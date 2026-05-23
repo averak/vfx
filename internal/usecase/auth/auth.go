@@ -14,13 +14,8 @@ import (
 
 	"github.com/averak/vfx/internal/domain/player"
 	"github.com/averak/vfx/internal/stdx/clock"
+	"github.com/averak/vfx/internal/usecase/tx"
 )
-
-// Transactor runs work inside a read-write transaction.
-// The usecase owns the boundary; the implementation in infra/db puts the transaction on the context the repositories read from.
-type Transactor interface {
-	RW(ctx context.Context, fn func(context.Context) error) error
-}
 
 // TokenIssuer mints the credentials a login produces.
 // It is a port, so the usecase depends on the capability rather than the crypto in infra.
@@ -31,7 +26,7 @@ type TokenIssuer interface {
 }
 
 type Usecase struct {
-	tx               Transactor
+	tx               tx.ReadWriter
 	playerRepo       player.Repository
 	refreshTokenRepo player.RefreshTokenRepository
 	tokens           TokenIssuer
@@ -40,7 +35,7 @@ type Usecase struct {
 }
 
 func New(
-	tx Transactor,
+	transactor tx.ReadWriter,
 	playerRepo player.Repository,
 	refreshTokenRepo player.RefreshTokenRepository,
 	tokens TokenIssuer,
@@ -48,7 +43,7 @@ func New(
 	refreshTokenTTL time.Duration,
 ) *Usecase {
 	return &Usecase{
-		tx:               tx,
+		tx:               transactor,
 		playerRepo:       playerRepo,
 		refreshTokenRepo: refreshTokenRepo,
 		tokens:           tokens,
