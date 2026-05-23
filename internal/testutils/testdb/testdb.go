@@ -42,7 +42,7 @@ func Pool(t *testing.T) *pgxpool.Pool {
 	if err != nil {
 		t.Fatalf("testdb: open pool: %v", err)
 	}
-	if err := pool.Ping(t.Context()); err != nil {
+	if err = pool.Ping(t.Context()); err != nil {
 		pool.Close()
 		t.Fatalf("testdb: ping: %v", err)
 	}
