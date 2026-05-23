@@ -76,6 +76,13 @@ jobs:
           mise exec -- npm ci
           mise exec -- npm run typecheck
 
+      - name: helm chart smoke
+        run: |
+          base="--set externalDatabase.url=postgres://ci --set externalValkey.url=redis://ci --set jwtSecret=ci --set room.tls.existingSecretName=vfx-tls"
+          mise exec -- helm lint deploy/helm/vfx
+          mise exec -- helm template vfx deploy/helm/vfx $base >/dev/null
+          mise exec -- helm template vfx deploy/helm/vfx $base --set agones.enabled=true --set admin.enabled=true >/dev/null
+
   test:
     name: test
     runs-on: ubuntu-latest
