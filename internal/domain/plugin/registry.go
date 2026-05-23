@@ -5,8 +5,7 @@ import (
 	"sync"
 )
 
-// Registry holds the plugin factories baked into a vfx room binary.
-// Plugins register at process start (typically from an init function) and are looked up by name from configuration.
+// Registry holds the plugin factories baked into a room binary, registered at startup and looked up by name.
 type Registry struct {
 	mu        sync.RWMutex
 	factories map[string]Factory
@@ -38,7 +37,6 @@ func (r *Registry) Lookup(name string) (Factory, error) {
 	return f, nil
 }
 
-// Names lists every registered plugin, for diagnostics.
 func (r *Registry) Names() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

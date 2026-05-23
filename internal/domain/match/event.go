@@ -20,7 +20,7 @@ type EventMatched struct {
 
 func (EventMatched) isEvent() {}
 
-// EventFailed is terminal: timeout, cancel, or internal error.
+// EventFailed is terminal.
 type EventFailed struct {
 	Reason  string
 	Message string

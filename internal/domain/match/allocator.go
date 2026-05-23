@@ -6,15 +6,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// RoomAllocation is the matchmaker's view of a freshly reserved room.
-// The usecase layers the session token on top, since only it knows the player and TTL; the Allocator only knows where the room runs.
+// RoomAllocation deliberately carries no session token: only the usecase knows the player and TTL, so it adds the token on top of what the Allocator returns.
 type RoomAllocation struct {
 	MatchID  uuid.UUID
 	Endpoint string
 }
 
-// Allocator reserves a room for an upcoming match.
-// The stub points every match at one fixed endpoint (local/compose); the Agones implementation reserves a GameServer per match in a cluster.
 type Allocator interface {
 	Allocate(ctx context.Context, gameMode string, playerCount int) (*RoomAllocation, error)
 }

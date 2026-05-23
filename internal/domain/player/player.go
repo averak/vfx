@@ -1,5 +1,4 @@
 // Package player is the player aggregate.
-// It owns the Player entity, its identity links to authentication providers, and the repository contract used to persist them.
 package player
 
 import (
@@ -12,14 +11,13 @@ import (
 )
 
 // MaxNicknameLength bounds a nickname in runes.
-// The limit is an enterprise rule: a valid Player's display name is intrinsic to the Player, independent of any transport or storage that happens to carry it.
+// Validating it here, rather than at the handler, keeps a valid display name intrinsic to the Player.
 const MaxNicknameLength = 32
 
-// ErrInvalidNickname rejects a nickname that is present but blank or longer than MaxNicknameLength.
+// ErrInvalidNickname rejects a present nickname that is blank or longer than MaxNicknameLength.
 var ErrInvalidNickname = errors.New("player: invalid nickname")
 
-// Player is the core game profile.
-// A single Player can carry multiple Identity rows (anonymous device today, OAuth providers later).
+// Player can carry multiple Identity rows (anonymous device today, OAuth providers later).
 type Player struct {
 	ID        uuid.UUID
 	Nickname  *string
@@ -27,8 +25,7 @@ type Player struct {
 	UpdatedAt time.Time
 }
 
-// New constructs a Player ready for first insertion.
-// A nil nickname leaves the player unnamed; a non-nil one must satisfy the nickname invariant.
+// New accepts a nil nickname (the player is unnamed); a non-nil one must satisfy the nickname invariant.
 func New(id uuid.UUID, nickname *string, now time.Time) (*Player, error) {
 	if err := validateNickname(nickname); err != nil {
 		return nil, err
@@ -41,8 +38,7 @@ func New(id uuid.UUID, nickname *string, now time.Time) (*Player, error) {
 	}, nil
 }
 
-// SetNickname updates the nickname and refreshes UpdatedAt.
-// A nil nickname clears the field; a non-nil one must satisfy the nickname invariant.
+// SetNickname clears the nickname when nickname is nil; a non-nil one must satisfy the nickname invariant.
 func (p *Player) SetNickname(nickname *string, now time.Time) error {
 	if err := validateNickname(nickname); err != nil {
 		return err
@@ -52,7 +48,6 @@ func (p *Player) SetNickname(nickname *string, now time.Time) error {
 	return nil
 }
 
-// validateNickname enforces the nickname invariant: nil is allowed, but a present nickname must be non-blank and at most MaxNicknameLength runes.
 func validateNickname(nickname *string) error {
 	if nickname == nil {
 		return nil

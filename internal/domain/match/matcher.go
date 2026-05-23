@@ -2,8 +2,6 @@ package match
 
 import "time"
 
-// MatchingPolicy parameterises matchmaking fairness.
-// The thresholds are operational (from config); the rules that interpret them are domain rules.
 type MatchingPolicy struct {
 	BaseRatingWindow         float64       // rating gap two fresh tickets may have
 	RatingWindowGrowthPerSec float64       // window growth per second the oldest ticket has waited
@@ -18,7 +16,6 @@ func DefaultMatchingPolicy() MatchingPolicy {
 	}
 }
 
-// withDefaults fills zero fields so callers configure only what they care about.
 func (p MatchingPolicy) withDefaults() MatchingPolicy {
 	d := DefaultMatchingPolicy()
 	if p.BaseRatingWindow == 0 {
@@ -33,14 +30,12 @@ func (p MatchingPolicy) withDefaults() MatchingPolicy {
 	return p
 }
 
-// Matcher is the matchmaking domain service: it owns pairing eligibility and tier relaxation.
-// The usecase only orchestrates around the group it returns (claim, allocate, notify) and makes no matching decisions itself.
 type Matcher struct {
 	policy          MatchingPolicy
 	playersPerMatch int
 }
 
-// NewMatcher builds a Matcher. playersPerMatch below 1 falls back to 2.
+// NewMatcher treats a playersPerMatch below 1 as 2.
 func NewMatcher(playersPerMatch int, policy MatchingPolicy) *Matcher {
 	if playersPerMatch < 1 {
 		playersPerMatch = 2

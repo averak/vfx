@@ -20,10 +20,10 @@ type Ticket struct {
 	PlayerID uuid.UUID
 	GameMode string
 
-	Rating       *float64          // optional; drives rating-window matching
-	Region       *string           // optional; drives region matching
-	PartyMembers []uuid.UUID       // optional; future grouping
-	Attributes   map[string]string // optional; plugin-specific hints
+	Rating       *float64
+	Region       *string
+	PartyMembers []uuid.UUID
+	Attributes   map[string]string
 
 	CreatedAt time.Time
 }
@@ -43,9 +43,7 @@ func NewTicket(id, playerID uuid.UUID, gameMode string, now time.Time) (*Ticket,
 	}, nil
 }
 
-// CompatibleWith reports whether other may be matched with t.
-// A ticket missing a rating or region skips that dimension rather than blocking the match.
-// The window and ignoreRegion inputs come from the tier policy (Matcher), which knows how long the tickets have waited.
+// CompatibleWith treats a missing rating or region as "skip that dimension", not as a mismatch.
 func (t *Ticket) CompatibleWith(other *Ticket, ratingWindow float64, ignoreRegion bool) bool {
 	if !ignoreRegion && t.Region != nil && other.Region != nil && *t.Region != *other.Region {
 		return false

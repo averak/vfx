@@ -20,8 +20,7 @@ type Plugin interface {
 	Close() error
 }
 
-// Factory produces fresh Plugin instances.
-// It may hold expensive shared resources (a wazero compiled module, say), so the room daemon reuses one Factory for its whole lifetime.
+// Factory may hold expensive shared resources (a wazero compiled module, say), so the room daemon reuses one for its whole lifetime.
 type Factory interface {
 	Name() string
 	// Create returns a Plugin sharing no state with previous instances; closing it must release everything it held.
