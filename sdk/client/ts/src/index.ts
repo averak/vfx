@@ -30,8 +30,9 @@ import {
   TitleStorageService,
   type FileMetadata,
 } from "./gen/vfx/v1/storage/storage_service_pb.js";
+import { LeaderboardService, type RankEntry } from "./gen/vfx/v1/leaderboard/leaderboard_service_pb.js";
 
-export type { Player, Frame, FileMetadata };
+export type { Player, Frame, FileMetadata, RankEntry };
 
 /** Options for constructing a VfxClient. */
 export interface VfxClientOptions {
@@ -45,6 +46,7 @@ export class VfxClient {
   private readonly match: Client<typeof MatchService>;
   private readonly playerData: Client<typeof PlayerDataStorageService>;
   private readonly titleStorage: Client<typeof TitleStorageService>;
+  private readonly leaderboard: Client<typeof LeaderboardService>;
   // The same fetch is used for the direct object-store transfers (PUT/GET on signed URLs), which do not go through the Connect transport.
   private readonly fetchImpl: typeof globalThis.fetch;
   private accessToken = "";
@@ -59,6 +61,7 @@ export class VfxClient {
     this.match = createClient(MatchService, transport);
     this.playerData = createClient(PlayerDataStorageService, transport);
     this.titleStorage = createClient(TitleStorageService, transport);
+    this.leaderboard = createClient(LeaderboardService, transport);
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
@@ -157,6 +160,28 @@ export class VfxClient {
   async readTitleFile(filename: string): Promise<Uint8Array> {
     const resp = await this.titleStorage.readFile({ filename }, { headers: this.authHeaders() });
     return this.getObject(resp.downloadUrl);
+  }
+
+  /** Submit a score; resolves with the player's resulting entry and whether it improved their best (keep-best). */
+  async submitScore(leaderboardId: string, score: bigint): Promise<{ entry?: RankEntry; improved: boolean }> {
+    const resp = await this.leaderboard.submitScore({ leaderboardId, score }, { headers: this.authHeaders() });
+    return { entry: resp.entry, improved: resp.improved };
+  }
+
+  async listRanks(leaderboardId: string, offset = 0, limit = 0): Promise<RankEntry[]> {
+    const resp = await this.leaderboard.listRanks({ leaderboardId, offset, limit }, { headers: this.authHeaders() });
+    return resp.entries;
+  }
+
+  /** The authenticated player's rank, or the given player's when playerId is set. */
+  async getPlayerRank(leaderboardId: string, playerId?: string): Promise<RankEntry | undefined> {
+    const resp = await this.leaderboard.getPlayerRank({ leaderboardId, playerId }, { headers: this.authHeaders() });
+    return resp.entry;
+  }
+
+  async listRanksAroundPlayer(leaderboardId: string, radius: number): Promise<RankEntry[]> {
+    const resp = await this.leaderboard.listRanksAroundPlayer({ leaderboardId, radius }, { headers: this.authHeaders() });
+    return resp.entries;
   }
 
   private async putObject(

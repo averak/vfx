@@ -7,10 +7,12 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	valkeygo "github.com/valkey-io/valkey-go"
 
+	domainleaderboard "github.com/averak/vfx/internal/domain/leaderboard"
 	domainmatch "github.com/averak/vfx/internal/domain/match"
 	"github.com/averak/vfx/internal/domain/player"
 	"github.com/averak/vfx/internal/infra/allocator"
@@ -25,9 +27,11 @@ import (
 	"github.com/averak/vfx/internal/infra/token"
 	"github.com/averak/vfx/internal/infra/valkey"
 	gatewayauthhandler "github.com/averak/vfx/internal/presentation/gateway/auth"
+	gatewayleaderboardhandler "github.com/averak/vfx/internal/presentation/gateway/leaderboard"
 	gatewaymatchhandler "github.com/averak/vfx/internal/presentation/gateway/match"
 	gatewaystoragehandler "github.com/averak/vfx/internal/presentation/gateway/storage"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
+	usecaseleaderboard "github.com/averak/vfx/internal/usecase/leaderboard"
 	usecasematch "github.com/averak/vfx/internal/usecase/match"
 	usecasestorage "github.com/averak/vfx/internal/usecase/storage"
 )
@@ -60,6 +64,10 @@ type Gateway struct {
 	StorageUsecase           *usecasestorage.Usecase
 	PlayerDataStorageHandler *gatewaystoragehandler.PlayerDataHandler
 	TitleStorageHandler      *gatewaystoragehandler.TitleHandler
+
+	LeaderboardRepo    domainleaderboard.Repository
+	LeaderboardUsecase *usecaseleaderboard.Usecase
+	LeaderboardHandler *gatewayleaderboardhandler.Handler
 }
 
 // matchmakerMetrics adapts the Prometheus registry to the usecasematch.Metrics interface, keeping the usecase layer free of a concrete metrics dependency.
@@ -195,6 +203,21 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 		titleHandler = gatewaystoragehandler.NewTitleHandler(storageUC)
 	}
 
+	leaderboardDefs, err := parseLeaderboards(cfg.Leaderboards)
+	if err != nil {
+		blobCleanup()
+		valkeyClient.Close()
+		pool.Close()
+		return nil, nil, err
+	}
+	leaderboardRepo := repository.NewLeaderboard()
+	leaderboardUC := usecaseleaderboard.New(session, session, leaderboardRepo, leaderboardDefs, usecaseleaderboard.Config{
+		DefaultLimit: cfg.LeaderboardDefaultLimit,
+		MaxLimit:     cfg.LeaderboardMaxLimit,
+		MaxRadius:    cfg.LeaderboardMaxRadius,
+	})
+	leaderboardHandler := gatewayleaderboardhandler.New(leaderboardUC)
+
 	cleanup := func() {
 		blobCleanup()
 		valkeyClient.Close()
@@ -222,5 +245,32 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 		StorageUsecase:           storageUC,
 		PlayerDataStorageHandler: playerDataHandler,
 		TitleStorageHandler:      titleHandler,
+
+		LeaderboardRepo:    leaderboardRepo,
+		LeaderboardUsecase: leaderboardUC,
+		LeaderboardHandler: leaderboardHandler,
 	}, cleanup, nil
+}
+
+// parseLeaderboards turns the config specs ("id" or "id:asc"/"id:desc") into definitions; a bare id defaults to descending (higher is better).
+func parseLeaderboards(specs []string) (map[string]domainleaderboard.Leaderboard, error) {
+	defs := make(map[string]domainleaderboard.Leaderboard, len(specs))
+	for _, spec := range specs {
+		id, order, _ := strings.Cut(spec, ":")
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		var sortOrder domainleaderboard.SortOrder
+		switch strings.TrimSpace(order) {
+		case "", "desc":
+			sortOrder = domainleaderboard.Descending
+		case "asc":
+			sortOrder = domainleaderboard.Ascending
+		default:
+			return nil, fmt.Errorf("bootstrap: leaderboard %q has unknown order %q (want \"asc\" or \"desc\")", id, order)
+		}
+		defs[id] = domainleaderboard.Leaderboard{ID: id, SortOrder: sortOrder}
+	}
+	return defs, nil
 }

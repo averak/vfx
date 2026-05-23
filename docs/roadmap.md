@@ -71,7 +71,7 @@ Goal: feature breadth comparable to mature game backends.
 
 - [ ] OIDC providers: Google, Apple (anonymous device already shipped).
 - [x] Storage API — player data (owner-scoped) and title storage (operator-published, tag-gated); bytes in object storage via signed URLs, metadata in PostgreSQL.
-- [ ] Leaderboard.
+- [x] Leaderboard — config-defined boards (asc/desc), keep-best scores, ranked/around-player queries.
 - [ ] Friends / Groups / Parties.
 - [ ] Chat (channels, DMs).
 - [ ] Admin web UI, embedded via `go:embed`.

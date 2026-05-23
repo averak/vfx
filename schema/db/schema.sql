@@ -150,3 +150,24 @@ CREATE TABLE title_files (
 
 CREATE INDEX idx_title_files_tags
   ON title_files USING GIN (tags);
+
+-- ============================================================================
+-- leaderboard_entries
+--   One row per (leaderboard, player): the player's best score so far.
+--   leaderboard_id is an operator-defined key (validated against config, not stored as its own table); sort order lives in config too.
+--   Ranking ties break by updated_at (the player who reached the score first ranks higher), which also makes the order total so a counted rank matches a paginated one.
+-- ============================================================================
+
+CREATE TABLE leaderboard_entries (
+  id             UUID         PRIMARY KEY,
+  leaderboard_id TEXT         NOT NULL,
+  player_id      UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  score          BIGINT       NOT NULL,
+  created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  UNIQUE (leaderboard_id, player_id)
+);
+
+-- Serves both the ranked scans (ORDER BY score, updated_at) and the count-of-better-scores rank query, scoped per leaderboard.
+CREATE INDEX idx_leaderboard_entries_ranking
+  ON leaderboard_entries (leaderboard_id, score, updated_at);

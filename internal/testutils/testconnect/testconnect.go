@@ -14,8 +14,10 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
+	"github.com/averak/vfx/gen/go/vfx/v1/leaderboard/leaderboardconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/storage/storageconnect"
+	domainleaderboard "github.com/averak/vfx/internal/domain/leaderboard"
 	domainstorage "github.com/averak/vfx/internal/domain/storage"
 	"github.com/averak/vfx/internal/infra/assignmentstore"
 	"github.com/averak/vfx/internal/infra/connectrpc/interceptor"
@@ -24,13 +26,21 @@ import (
 	"github.com/averak/vfx/internal/infra/repository"
 	"github.com/averak/vfx/internal/infra/token"
 	gatewayauthhandler "github.com/averak/vfx/internal/presentation/gateway/auth"
+	gatewayleaderboardhandler "github.com/averak/vfx/internal/presentation/gateway/leaderboard"
 	gatewaymatchhandler "github.com/averak/vfx/internal/presentation/gateway/match"
 	gatewaystoragehandler "github.com/averak/vfx/internal/presentation/gateway/storage"
 	"github.com/averak/vfx/internal/testutils/fakeblob"
 	"github.com/averak/vfx/internal/testutils/testdb"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
+	usecaseleaderboard "github.com/averak/vfx/internal/usecase/leaderboard"
 	usecasematch "github.com/averak/vfx/internal/usecase/match"
 	usecasestorage "github.com/averak/vfx/internal/usecase/storage"
+)
+
+// Leaderboard ids the harness defines: a descending (high-score) and an ascending (best-time) board.
+const (
+	LeaderboardDesc = "global"
+	LeaderboardAsc  = "besttime"
 )
 
 const jwtSecret = "test-secret"
@@ -42,10 +52,11 @@ const (
 )
 
 type Server struct {
-	Auth       authconnect.AuthServiceClient
-	Match      matchconnect.MatchServiceClient
-	PlayerData storageconnect.PlayerDataStorageServiceClient
-	Title      storageconnect.TitleStorageServiceClient
+	Auth        authconnect.AuthServiceClient
+	Match       matchconnect.MatchServiceClient
+	PlayerData  storageconnect.PlayerDataStorageServiceClient
+	Title       storageconnect.TitleStorageServiceClient
+	Leaderboard leaderboardconnect.LeaderboardServiceClient
 
 	// Blob is the in-memory object store behind the storage services; tests Put an object to simulate a finished upload before CommitFile.
 	Blob *fakeblob.Store
@@ -104,17 +115,25 @@ func New(t *testing.T) *Server {
 	titlePath, titleHandler := storageconnect.NewTitleStorageServiceHandler(gatewaystoragehandler.NewTitleHandler(storageUC), interceptors)
 	mux.Handle(titlePath, titleHandler)
 
+	leaderboardUC := usecaseleaderboard.New(session, session, repository.NewLeaderboard(), map[string]domainleaderboard.Leaderboard{
+		LeaderboardDesc: {ID: LeaderboardDesc, SortOrder: domainleaderboard.Descending},
+		LeaderboardAsc:  {ID: LeaderboardAsc, SortOrder: domainleaderboard.Ascending},
+	}, usecaseleaderboard.Config{DefaultLimit: 20, MaxLimit: 100, MaxRadius: 50})
+	leaderboardPath, leaderboardHandler := leaderboardconnect.NewLeaderboardServiceHandler(gatewayleaderboardhandler.New(leaderboardUC), interceptors)
+	mux.Handle(leaderboardPath, leaderboardHandler)
+
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
 	return &Server{
-		Auth:       authconnect.NewAuthServiceClient(srv.Client(), srv.URL),
-		Match:      matchconnect.NewMatchServiceClient(srv.Client(), srv.URL),
-		PlayerData: storageconnect.NewPlayerDataStorageServiceClient(srv.Client(), srv.URL),
-		Title:      storageconnect.NewTitleStorageServiceClient(srv.Client(), srv.URL),
-		Blob:       blob,
-		session:    session,
-		httpServer: srv,
+		Auth:        authconnect.NewAuthServiceClient(srv.Client(), srv.URL),
+		Match:       matchconnect.NewMatchServiceClient(srv.Client(), srv.URL),
+		PlayerData:  storageconnect.NewPlayerDataStorageServiceClient(srv.Client(), srv.URL),
+		Title:       storageconnect.NewTitleStorageServiceClient(srv.Client(), srv.URL),
+		Leaderboard: leaderboardconnect.NewLeaderboardServiceClient(srv.Client(), srv.URL),
+		Blob:        blob,
+		session:     session,
+		httpServer:  srv,
 	}
 }
 

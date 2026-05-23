@@ -73,6 +73,13 @@ type Gateway struct {
 
 	StorageMaxBytesPerPlayer uint64 `env:"VFX_STORAGE_MAX_BYTES_PER_PLAYER" envDefault:"10485760"` // 10 MiB
 	StorageMaxFilesPerPlayer int    `env:"VFX_STORAGE_MAX_FILES_PER_PLAYER" envDefault:"64"`
+
+	// Leaderboards lists the available leaderboards as "id" or "id:asc"/"id:desc" (bare id defaults to desc, higher-is-better).
+	// Submitting to or querying an unlisted id is rejected, so leaderboards are fixed at deploy time like game modes.
+	Leaderboards            []string `env:"VFX_LEADERBOARDS"               envSeparator:","`
+	LeaderboardDefaultLimit int      `env:"VFX_LEADERBOARD_DEFAULT_LIMIT"  envDefault:"20"`
+	LeaderboardMaxLimit     int      `env:"VFX_LEADERBOARD_MAX_LIMIT"      envDefault:"100"`
+	LeaderboardMaxRadius    int      `env:"VFX_LEADERBOARD_MAX_RADIUS"     envDefault:"50"`
 }
 
 func LoadGateway() (*Gateway, error) {

@@ -24,6 +24,7 @@ import (
 
 	authv1 "github.com/averak/vfx/gen/go/vfx/v1/auth"
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
+	"github.com/averak/vfx/gen/go/vfx/v1/leaderboard/leaderboardconnect"
 	matchv1 "github.com/averak/vfx/gen/go/vfx/v1/match"
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/storage/storageconnect"
@@ -39,6 +40,7 @@ type Client struct {
 	match        matchconnect.MatchServiceClient
 	playerData   storageconnect.PlayerDataStorageServiceClient
 	titleStorage storageconnect.TitleStorageServiceClient
+	leaderboard  leaderboardconnect.LeaderboardServiceClient
 
 	accessToken  string
 	refreshToken string
@@ -63,6 +65,7 @@ func New(gatewayURL string, opts ...Option) *Client {
 	c.match = matchconnect.NewMatchServiceClient(c.httpClient, gatewayURL)
 	c.playerData = storageconnect.NewPlayerDataStorageServiceClient(c.httpClient, gatewayURL)
 	c.titleStorage = storageconnect.NewTitleStorageServiceClient(c.httpClient, gatewayURL)
+	c.leaderboard = leaderboardconnect.NewLeaderboardServiceClient(c.httpClient, gatewayURL)
 	return c
 }
 

@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package vfx.v1.leaderboard;
+
+import "google/protobuf/timestamp.proto";
+
+// LeaderboardService はスコアランキングを提供する。
+//
+// leaderboard_id は運営がデプロイ時に定義した識別子 (例: "global", "weekly")。未定義の id は NotFound。
+// 各 leaderboard は昇順/降順が固定で、スコアは keep-best (より良い値のときだけ更新) で記録される。
+service LeaderboardService {
+  // SubmitScore はスコアを投入し、更新後の本人の rank とベストスコアを返す。
+  // keep-best のため、既存ベストより悪いスコアは記録されず、その場合も現在のベストと rank を返す。
+  rpc SubmitScore(SubmitScoreRequest) returns (SubmitScoreResponse);
+
+  // ListRanks は上位エントリを offset/limit で返す。
+  rpc ListRanks(ListRanksRequest) returns (ListRanksResponse);
+
+  // GetPlayerRank は本人 (player_id 未指定) または指定プレイヤーの rank を返す。
+  // 未エントリの場合は NotFound。
+  rpc GetPlayerRank(GetPlayerRankRequest) returns (GetPlayerRankResponse);
+
+  // ListRanksAroundPlayer は本人を中心に前後 radius 件を返す (自分の順位前後を見せる用途)。
+  rpc ListRanksAroundPlayer(ListRanksAroundPlayerRequest) returns (ListRanksAroundPlayerResponse);
+}
+
+// RankEntry は 1 エントリの順位・プレイヤー・スコア。
+message RankEntry {
+  // 1 始まり。同点は先に到達した方 (updated_at が早い方) が上位。
+  int64 rank = 1;
+
+  string player_id = 2;
+
+  // 表示名。未設定のプレイヤーもいる。
+  optional string nickname = 3;
+
+  int64 score = 4;
+
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message SubmitScoreRequest {
+  string leaderboard_id = 1;
+  int64 score = 2;
+}
+
+message SubmitScoreResponse {
+  // 更新後 (または据え置き後) の本人エントリ。
+  RankEntry entry = 1;
+
+  // 投入スコアが既存ベストを更新したか。false なら据え置き。
+  bool improved = 2;
+}
+
+message ListRanksRequest {
+  string leaderboard_id = 1;
+  int32 offset = 2;
+
+  // 取得件数。0 はサーバ既定値、上限はサーバ側でクランプされる。
+  int32 limit = 3;
+}
+
+message ListRanksResponse {
+  repeated RankEntry entries = 1;
+}
+
+message GetPlayerRankRequest {
+  string leaderboard_id = 1;
+
+  // 未指定なら認証中のプレイヤー。
+  optional string player_id = 2;
+}
+
+message GetPlayerRankResponse {
+  RankEntry entry = 1;
+}
+
+message ListRanksAroundPlayerRequest {
+  string leaderboard_id = 1;
+
+  // 本人の前後に何件ずつ含めるか。
+  int32 radius = 2;
+}
+
+message ListRanksAroundPlayerResponse {
+  repeated RankEntry entries = 1;
+}
