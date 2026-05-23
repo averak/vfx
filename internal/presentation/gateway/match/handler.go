@@ -23,7 +23,6 @@ type Handler struct {
 
 var _ matchconnect.MatchServiceHandler = (*Handler)(nil)
 
-// New constructs the MatchService handler.
 func New(uc *usecasematch.Usecase) *Handler {
 	return &Handler{uc: uc}
 }

@@ -1,10 +1,7 @@
 // Package admin is the operations API's HTTP entry point.
 //
-// Unlike the player-facing gateway (Connect RPC), the admin API is a
-// small plain-HTTP/JSON surface: it is an internal operations tool, not
-// a typed client contract, and a future web UI will consume the same
-// JSON. It is read-only and expected to sit behind a separate auth
-// boundary (network policy, ingress auth) provided by the deployment.
+// Unlike the player-facing gateway (Connect RPC), the admin API is a small plain-HTTP/JSON surface: it is an internal operations tool, not a typed client contract, and a future web UI will consume the same JSON.
+// It is read-only and expected to sit behind a separate auth boundary (network policy, ingress auth) provided by the deployment.
 package admin
 
 import (
@@ -21,9 +18,8 @@ import (
 	usecaseadmin "github.com/averak/vfx/internal/usecase/admin"
 )
 
-// NewHandler builds the admin HTTP handler. When authToken is non-empty,
-// every /api request must present it as a bearer token; the health
-// probes stay open so orchestrators reach them without credentials.
+// NewHandler builds the admin HTTP handler.
+// When authToken is non-empty, every /api request must present it as a bearer token; the health probes stay open so orchestrators reach them without credentials.
 func NewHandler(uc *usecaseadmin.Usecase, pool *pgxpool.Pool, authToken string) http.Handler {
 	mux := http.NewServeMux()
 
@@ -73,10 +69,9 @@ func NewHandler(uc *usecaseadmin.Usecase, pool *pgxpool.Pool, authToken string) 
 	return mux
 }
 
-// requireToken wraps h with a bearer-token check. An empty configured
-// token disables the check (the deployment's network boundary is then
-// the only guard). The compare is constant-time to avoid leaking the
-// token through timing.
+// requireToken wraps h with a bearer-token check.
+// An empty configured token disables the check (the deployment's network boundary is then the only guard).
+// The compare is constant-time to avoid leaking the token through timing.
 func requireToken(token string, h http.HandlerFunc) http.HandlerFunc {
 	if token == "" {
 		return h

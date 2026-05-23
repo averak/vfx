@@ -1,9 +1,7 @@
 // Package room is the room daemon's HTTP entry point.
 //
 // The daemon serves a single path, /room/{match_id}, over WebTransport.
-// A client connects with the session token issued by the gateway in
-// the Authorization header. After the handshake, datagrams flow into
-// the match orchestrator for that match id.
+// A client connects with the session token the gateway issued in the Authorization header, and after the handshake datagrams flow into the match orchestrator for that match id.
 package room
 
 import (
@@ -29,9 +27,8 @@ import (
 	usecaseroom "github.com/averak/vfx/internal/usecase/room"
 )
 
-// tracer is the room presentation layer's instrumentation scope. It
-// resolves through the global tracer provider, so spans are no-ops
-// until tracing.Setup installs an exporter.
+// tracer is the room presentation layer's instrumentation scope.
+// It resolves through the global tracer provider, so spans are no-ops until tracing.Setup installs an exporter.
 var tracer = otel.Tracer("github.com/averak/vfx/internal/presentation/room")
 
 // Server hosts the WebTransport endpoint for a single room daemon.
@@ -43,7 +40,6 @@ type Server struct {
 	wt      *webtransport.Server
 }
 
-// NewServer wires the WebTransport server.
 func NewServer(cfg *config.Room, signer *token.Signer, manager *usecaseroom.Manager, logger *slog.Logger) (*Server, error) {
 	cert, err := tls.LoadX509KeyPair(cfg.TLSCertFile, cfg.TLSKeyFile)
 	if err != nil {
@@ -74,15 +70,13 @@ func NewServer(cfg *config.Room, signer *token.Signer, manager *usecaseroom.Mana
 			EnableStreamResetPartialDelivery: true,
 		},
 	}
-	// Hands H3 the SETTINGS frame, datagram toggle, and ConnContext hook
-	// that webtransport.Server.Upgrade needs to find the QUIC conn.
+	// Hands H3 the SETTINGS frame, datagram toggle, and ConnContext hook that webtransport.Server.Upgrade needs to find the QUIC conn.
 	webtransport.ConfigureHTTP3Server(h3)
 
 	s.wt = &webtransport.Server{
 		H3: h3,
 		CheckOrigin: func(_ *http.Request) bool {
-			// Accept any origin; a deployment restricts this to the known
-			// client domains once they are configured.
+			// Accept any origin; a deployment restricts this to the known client domains once they are configured.
 			return true
 		},
 	}
@@ -111,9 +105,8 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	}
 }
 
-// handleRoom accepts the WebTransport handshake and bridges the player
-// to the match orchestrator. The URL path encodes the match id; the
-// Authorization header carries the session token.
+// handleRoom accepts the WebTransport handshake and bridges the player to the match orchestrator.
+// The URL path encodes the match id; the Authorization header carries the session token.
 func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
 	matchIDStr := strings.TrimPrefix(r.URL.Path, "/room/")
 	if matchIDStr == "" {
@@ -165,10 +158,8 @@ func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
 		roster = []uuid.UUID{claims.PlayerID}
 	}
 
-	// The HTTP request context fires Done as soon as net/http considers
-	// the response sent, which for a WebTransport Upgrade happens
-	// immediately. The session keeps its own context that mirrors the
-	// actual transport lifetime — use that everywhere downstream.
+	// The HTTP request context fires Done as soon as net/http considers the response sent, which for a WebTransport Upgrade happens immediately.
+	// The session keeps its own context that mirrors the actual transport lifetime; use that everywhere downstream.
 	sessionCtx := session.Context()
 
 	// One span per connected session, covering its whole lifetime.

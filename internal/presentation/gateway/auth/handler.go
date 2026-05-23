@@ -1,8 +1,7 @@
 // Package auth exposes the AuthService Connect handler.
 //
-// The handler owns the proto-to-domain translation and the mapping
-// from domain sentinel errors to Connect error codes. Business rules
-// stay in the usecase package; this file is intentionally mechanical.
+// The handler owns the proto-to-domain translation and the mapping from domain sentinel errors to Connect error codes.
+// Business rules stay in the usecase package; this file is intentionally mechanical.
 package auth
 
 import (
@@ -25,12 +24,11 @@ type Handler struct {
 
 var _ authconnect.AuthServiceHandler = (*Handler)(nil)
 
-// New wires the handler with its usecase.
 func New(uc *usecaseauth.Usecase) *Handler {
 	return &Handler{uc: uc}
 }
 
-// Login dispatches by credential kind. Only anonymous is supported.
+// Login dispatches by credential kind; only anonymous is supported.
 func (h *Handler) Login(ctx context.Context, req *connect.Request[authv1.LoginRequest]) (*connect.Response[authv1.LoginResponse], error) {
 	anon := req.Msg.GetAnonymous()
 	if anon == nil {
@@ -108,9 +106,8 @@ func (h *Handler) UpdateProfile(ctx context.Context, req *connect.Request[authv1
 	}), nil
 }
 
-// toConnectError maps domain sentinel errors to Connect's standard
-// codes. Anything else falls through as Internal so unexpected failures
-// stay loud.
+// toConnectError maps domain sentinel errors to Connect's standard codes.
+// Anything else falls through as Internal so unexpected failures stay loud.
 func toConnectError(err error) error {
 	switch {
 	case errors.Is(err, player.ErrPlayerNotFound):

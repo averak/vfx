@@ -7,7 +7,6 @@ import (
 	"github.com/averak/vfx/internal/domain/player"
 )
 
-// toPlayerPb converts a domain Player to the proto representation.
 func toPlayerPb(p *player.Player) *authv1.Player {
 	return &authv1.Player{
 		Id:        p.ID.String(),
