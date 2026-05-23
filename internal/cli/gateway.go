@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/averak/vfx/internal/bootstrap"
+	"github.com/averak/vfx/internal/infra/leaderlock"
 	"github.com/averak/vfx/internal/infra/tracing"
 	"github.com/averak/vfx/internal/presentation/gateway"
 )
@@ -74,7 +75,15 @@ func runGateway(ctx context.Context) error {
 	matchmakerCtx, stopMatchmaker := context.WithCancel(ctx)
 	defer stopMatchmaker()
 	go func() {
-		if err := container.Matchmaker.Run(matchmakerCtx); err != nil {
+		// Only the leader replica runs the matchmaker loop; the rest stand
+		// by. Correctness across a brief leadership overlap is guaranteed
+		// by the queue's atomic Claim, so this is a work-dedup optimisation.
+		err := leaderlock.Run(matchmakerCtx, container.Valkey, leaderlock.Config{
+			Key:    "vfx:matchmaker:leader",
+			TTL:    container.Config.MatchmakerLeaderTTL,
+			Logger: logger,
+		}, container.Matchmaker.Run)
+		if err != nil && !errors.Is(err, context.Canceled) {
 			logger.Error("matchmaker exited", "err", err)
 		}
 	}()

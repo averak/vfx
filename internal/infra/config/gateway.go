@@ -36,6 +36,12 @@ type Gateway struct {
 	// MatchmakerInterval is how often the worker scans the queue.
 	MatchmakerInterval time.Duration `env:"VFX_MATCHMAKER_INTERVAL" envDefault:"200ms"`
 
+	// MatchmakerLeaderTTL is the Valkey lease TTL for matchmaker leader
+	// election: only the replica holding the lease runs the matchmaker
+	// loop, so replicas don't all scan the shared queue. On leader death
+	// the lease expires within this window and another replica takes over.
+	MatchmakerLeaderTTL time.Duration `env:"VFX_MATCHMAKER_LEADER_TTL" envDefault:"15s"`
+
 	// GameModes lists the modes the matchmaker scans; PlayersPerMatch is
 	// how many tickets form one match. These default to the rps sample
 	// but are config-driven so the engine is not game-specific.
