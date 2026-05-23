@@ -1,10 +1,7 @@
 // Package main is the vanilla vfx binary entry point.
 //
-// It registers no plugins, so `vfx gateway`, `vfx admin`, and
-// `vfx migrate` work out of the box, but `vfx room` reports that no
-// plugin is available. To host a game, build a custom binary that
-// calls cli.NewRootCmd with the plugin Factory registered (see the
-// example under examples/<game>/cmd/).
+// It registers no plugins, so `vfx gateway`, `vfx admin`, and `vfx migrate` work out of the box, but `vfx room` reports that no plugin is available.
+// To host a game, build a custom binary that calls cli.NewRootCmd with the plugin Factory registered (see the example under examples/<game>/cmd/).
 package main
 
 import (
