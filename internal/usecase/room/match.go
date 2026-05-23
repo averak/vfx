@@ -1,9 +1,7 @@
 // Package room is the room daemon's match orchestrator.
 //
-// One Match value owns one in-progress game: its set of players, the
-// plugin instance running its rules, the tick loop, and the I/O fan-in
-// / fan-out between the WebTransport sessions and the plugin. The
-// daemon holds a Registry of active Matches keyed by match id.
+// One Match value owns one in-progress game: its players, the plugin instance running its rules, the tick loop, and the I/O fan-in/fan-out between the WebTransport sessions and the plugin.
+// The Manager holds the active Matches, keyed by match id.
 package room
 
 import (
@@ -24,15 +22,13 @@ import (
 )
 
 // PlayerIO is the side of the WebTransport session the match sees.
-// Real sessions implement it with the wt connection; tests use a
-// channel-backed fake.
+// Real sessions implement it with the wt connection; tests use a channel-backed fake.
 type PlayerIO interface {
-	// SendFrame delivers a Frame to the client. Implementations may
-	// drop frames when the underlying transport is congested.
+	// SendFrame delivers a Frame to the client.
+	// Implementations may drop frames when the underlying transport is congested.
 	SendFrame(frame *realtimev1.Frame) error
 
-	// Close signals the player's session to terminate, typically
-	// because the match itself is ending.
+	// Close signals the player's session to terminate, typically because the match itself is ending.
 	Close()
 }
 
@@ -58,8 +54,8 @@ type matchPlayer struct {
 	io PlayerIO
 }
 
-// NewMatch constructs a Match. The Plugin must already be initialised
-// (via Run, below); Match treats it as a pure tick processor.
+// NewMatch constructs a Match.
+// The Plugin must already be initialised; Match treats it as a pure tick processor.
 func NewMatch(id uuid.UUID, p plugin.Plugin, tickRateHz uint32, logger *slog.Logger, metrics Metrics) *Match {
 	if metrics == nil {
 		metrics = noopMetrics{}
@@ -77,8 +73,8 @@ func NewMatch(id uuid.UUID, p plugin.Plugin, tickRateHz uint32, logger *slog.Log
 	}
 }
 
-// Join attaches a player's I/O to the match. It is safe to call from a
-// WebTransport handler goroutine while the tick loop is running.
+// Join attaches a player's I/O to the match.
+// It is safe to call from a WebTransport handler goroutine while the tick loop is running.
 func (m *Match) Join(playerID uuid.UUID, io PlayerIO) error {
 	m.mu.Lock()
 	if _, exists := m.players[playerID]; exists {
@@ -95,17 +91,15 @@ func (m *Match) Join(playerID uuid.UUID, io PlayerIO) error {
 		},
 	}:
 	default:
-		// If the event channel is full we drop the join notice; the
-		// next tick will still expose the player by virtue of any
-		// inputs they submit. Recording the drop helps diagnose
-		// stalls.
+		// If the event channel is full we drop the join notice; the next tick still exposes the player via any inputs they submit.
+		// Recording the drop helps diagnose stalls.
 		m.logger.Warn("match: dropped join event", "player_id", playerID)
 	}
 	return nil
 }
 
-// Leave detaches the player. The plugin sees a PlayerLeft event on the
-// next tick.
+// Leave detaches the player.
+// The plugin sees a PlayerLeft event on the next tick.
 func (m *Match) Leave(playerID uuid.UUID, reason string) {
 	m.mu.Lock()
 	p, ok := m.players[playerID]
@@ -129,10 +123,8 @@ func (m *Match) Leave(playerID uuid.UUID, reason string) {
 	}
 }
 
-// SubmitInput records a player action for the next tick. Inputs land
-// on a buffered channel so a fast client cannot block the tick loop;
-// when the buffer fills, inputs are dropped and the client must
-// recover on the next snapshot.
+// SubmitInput records a player action for the next tick.
+// Inputs land on a buffered channel so a fast client cannot block the tick loop; when the buffer fills, inputs are dropped and the client recovers on the next snapshot.
 func (m *Match) SubmitInput(playerID uuid.UUID, clientTick uint32, payload []byte) {
 	action := &pluginv1.PlayerAction{
 		PlayerId:   playerID.String(),
@@ -147,8 +139,8 @@ func (m *Match) SubmitInput(playerID uuid.UUID, clientTick uint32, payload []byt
 	}
 }
 
-// Run starts the tick loop. It returns when the plugin signals
-// game_ended or when ctx is cancelled.
+// Run starts the tick loop.
+// It returns when the plugin signals game_ended or when ctx is cancelled.
 func (m *Match) Run(ctx context.Context) error {
 	defer close(m.done)
 	defer func() {
@@ -182,8 +174,7 @@ func (m *Match) Run(ctx context.Context) error {
 	}
 }
 
-// tick drains buffered inputs and network events, runs the plugin
-// OnTick, then broadcasts the resulting state/events to players.
+// tick drains buffered inputs and network events, runs the plugin OnTick, then broadcasts the resulting state and events to players.
 func (m *Match) tick(ctx context.Context) (bool, error) {
 	now := time.Now().UTC()
 
@@ -231,9 +222,8 @@ func (m *Match) finalise(ctx context.Context) {
 		m.logger.Error("match: OnGameEnd failed", "err", err)
 	}
 
-	// Tell clients the match is over before closing their sessions. This
-	// is a SystemEvent, so SendFrame delivers it reliably over a stream;
-	// the OnGameEnd result (final ranks) rides along as the payload.
+	// Tell clients the match is over before closing their sessions.
+	// This is a SystemEvent, so SendFrame delivers it reliably over a stream; the OnGameEnd result (final ranks) rides along as the payload.
 	var payload []byte
 	if resp != nil {
 		if data, mErr := proto.Marshal(resp); mErr == nil {
@@ -307,8 +297,7 @@ func (m *Match) dispatchEvent(ev *pluginv1.OutboundEvent) {
 	}
 }
 
-// Done returns a channel that is closed when the match has fully shut
-// down. Useful for the daemon's registry to clean up entries.
+// Done returns a channel that is closed when the match has fully shut down.
 func (m *Match) Done() <-chan struct{} { return m.done }
 
 func drainActions(ch chan *pluginv1.PlayerAction) []*pluginv1.PlayerAction {
@@ -337,8 +326,7 @@ func drainEvents(ch chan *pluginv1.NetworkEvent) []*pluginv1.NetworkEvent {
 
 func tickInterval(rateHz uint32) time.Duration {
 	if rateHz == 0 {
-		// 0 means event-driven; we still wake up periodically so we
-		// notice queued events without spinning.
+		// 0 means event-driven; we still wake up periodically to notice queued events without spinning.
 		return 50 * time.Millisecond
 	}
 	return time.Second / time.Duration(rateHz)

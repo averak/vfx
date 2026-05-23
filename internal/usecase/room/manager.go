@@ -16,19 +16,13 @@ import (
 	"github.com/averak/vfx/internal/domain/plugin"
 )
 
-// tracer is the room usecase instrumentation scope; spans are no-ops
-// until tracing.Setup installs an exporter.
+// tracer is the room usecase instrumentation scope; spans are no-ops until tracing.Setup installs an exporter.
 var tracer = otel.Tracer("github.com/averak/vfx/internal/usecase/room")
 
-// Manager tracks the room daemon's currently active matches. The
-// WebTransport handler calls FindOrCreate when a player connects so
-// the first arrival lazily creates the match, and subsequent arrivals
-// join the same one.
+// Manager tracks the room daemon's active matches.
+// The WebTransport handler calls FindOrCreate when a player connects, so the first arrival lazily creates the match and later arrivals join the same one.
 //
-// The manager owns a long-lived context (the daemon's context) that is
-// passed to every Match.Run goroutine; this prevents a player's HTTP
-// request cancellation from tearing down a match that other players
-// are still part of.
+// The manager owns a long-lived context (the daemon's) that it passes to every Match.Run goroutine, so a player's HTTP request cancellation cannot tear down a match other players are still in.
 type Manager struct {
 	logger    *slog.Logger
 	factory   plugin.Factory
@@ -40,10 +34,9 @@ type Manager struct {
 	matches map[uuid.UUID]*Match
 }
 
-// NewManager constructs a Manager wired to a Factory. The supplied ctx
-// outlives every Match the manager creates; cancel it (typically at
-// daemon shutdown) to tear them all down. metrics may be nil, in which
-// case nothing is recorded.
+// NewManager constructs a Manager wired to a Factory.
+// The supplied ctx outlives every Match the manager creates; cancel it (typically at daemon shutdown) to tear them all down.
+// A nil metrics records nothing.
 func NewManager(ctx context.Context, factory plugin.Factory, logger *slog.Logger, metrics Metrics) *Manager {
 	if metrics == nil {
 		metrics = noopMetrics{}
@@ -62,9 +55,8 @@ func NewManager(ctx context.Context, factory plugin.Factory, logger *slog.Logger
 // Close cancels every running match. Safe to call multiple times.
 func (mgr *Manager) Close() { mgr.cancelAll() }
 
-// FindOrCreate returns the active Match for matchID, creating one if
-// needed. Creation is serialised under the manager lock so two
-// simultaneous joins for a new match still see the same instance.
+// FindOrCreate returns the active Match for matchID, creating one if needed.
+// Creation is serialised under the manager lock so two simultaneous joins for a new match still see the same instance.
 func (mgr *Manager) FindOrCreate(ctx context.Context, matchID uuid.UUID, players []uuid.UUID) (*Match, error) {
 	mgr.mu.Lock()
 	if existing, ok := mgr.matches[matchID]; ok {
@@ -72,9 +64,8 @@ func (mgr *Manager) FindOrCreate(ctx context.Context, matchID uuid.UUID, players
 		return existing, nil
 	}
 
-	// Span covers the cold-start cost of a match: instantiating the
-	// plugin and running its Init. It is a child of the connecting
-	// session's span when tracing is on.
+	// Span covers the cold-start cost of a match: instantiating the plugin and running its Init.
+	// It is a child of the connecting session's span when tracing is on.
 	ctx, span := tracer.Start(ctx, "room.match.create", trace.WithAttributes(
 		attribute.String("vfx.match_id", matchID.String()),
 		attribute.Int("vfx.player_count", len(players)),
@@ -108,9 +99,7 @@ func (mgr *Manager) FindOrCreate(ctx context.Context, matchID uuid.UUID, players
 	mgr.matches[matchID] = match
 	mgr.metrics.IncActiveMatches()
 
-	// match.Run uses the manager's long-lived ctx, never the caller's
-	// request ctx — a player disconnecting must not tear down the
-	// whole match for everyone else.
+	// match.Run uses the manager's long-lived ctx, never the caller's request ctx: a player disconnecting must not tear down the whole match for everyone else.
 	go func() {
 		if err := match.Run(mgr.matchCtx); err != nil && !errors.Is(err, context.Canceled) {
 			mgr.logger.Error("match run failed", "match_id", matchID, "err", err)
@@ -137,8 +126,7 @@ func (mgr *Manager) Get(matchID uuid.UUID) (*Match, bool) {
 	return m, ok
 }
 
-// Count returns the number of matches currently running. Useful as a
-// metric source and in health probes.
+// Count returns the number of matches currently running.
 func (mgr *Manager) Count() int {
 	mgr.mu.Lock()
 	defer mgr.mu.Unlock()

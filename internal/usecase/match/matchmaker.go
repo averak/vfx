@@ -11,17 +11,8 @@ import (
 	"github.com/averak/vfx/internal/stdx/clock"
 )
 
-// Matchmaker is the long-running worker that pairs queued tickets and
-// reserves rooms via the Allocator.
-//
-// It pairs tickets by game mode using the domain Matcher (rating window
-// that widens with wait time, region relaxed after a deadline). The
-// queue's atomic Claim keeps pairing safe when the matchmaker runs on
-// more than one replica.
-
-// Metrics is the subset of telemetry the matchmaker emits. It is an
-// interface so the usecase layer stays free of the concrete Prometheus
-// registry; bootstrap supplies an adapter, tests use the no-op default.
+// Metrics is the subset of telemetry the matchmaker emits.
+// It is an interface so the usecase stays free of the concrete Prometheus registry: bootstrap supplies an adapter, tests use the no-op default.
 type Metrics interface {
 	MatchAllocated()
 	SetQueueDepth(gameMode string, depth int)
@@ -32,13 +23,15 @@ type noopMetrics struct{}
 func (noopMetrics) MatchAllocated()           {}
 func (noopMetrics) SetQueueDepth(string, int) {}
 
-// SessionSigner mints the per-match session token a paired player uses
-// to connect to its room. A port, so the usecase depends on the
-// capability rather than the concrete signer in infra.
+// SessionSigner mints the per-match session token a paired player uses to connect to its room.
+// A port, so the usecase depends on the capability rather than the concrete signer in infra.
 type SessionSigner interface {
 	SignSession(playerID uuid.UUID, matchID string, matchPlayers []string, now time.Time, ttl time.Duration) (string, error)
 }
 
+// Matchmaker is the long-running worker that pairs queued tickets and reserves rooms via the Allocator.
+//
+// Pairing decisions belong to the domain Matcher; the queue's atomic Claim keeps them safe when the matchmaker runs on more than one replica.
 type Matchmaker struct {
 	queue       match.Queue
 	allocator   match.Allocator
@@ -52,34 +45,29 @@ type Matchmaker struct {
 	candidateModes  []string
 }
 
-// Config groups the matchmaker's tuning knobs.
 type Config struct {
 	Interval        time.Duration
 	SessionTokenTTL time.Duration
 	PlayersPerMatch int
 	GameModes       []string
 
-	// Tier-based matching. Two tickets may pair when their ratings are
-	// within a window that starts at BaseRatingWindow and widens by
-	// RatingWindowGrowthPerSec for every second the oldest of them has
-	// waited. Region is enforced until that ticket has waited
-	// RegionRelaxAfter, after which cross-region pairing is allowed.
+	// Tier-based matching: two tickets may pair when their ratings are within a window that starts at BaseRatingWindow and widens by RatingWindowGrowthPerSec for every second the oldest has waited.
+	// Region is enforced until that ticket has waited RegionRelaxAfter, after which cross-region pairing is allowed.
 	// Tickets without a rating or region skip the corresponding check.
 	BaseRatingWindow         float64
 	RatingWindowGrowthPerSec float64
 	RegionRelaxAfter         time.Duration
 
-	// Assignments persists each paired player's assignment so it can be
-	// recovered via GetCurrentMatch. When nil, assignments are only
-	// delivered over the live WatchTicket stream.
+	// Assignments persists each paired player's assignment so it can be recovered via GetCurrentMatch.
+	// When nil, assignments are delivered only over the live WatchTicket stream.
 	Assignments match.AssignmentStore
 
 	// Metrics is optional; when nil the matchmaker records nothing.
 	Metrics Metrics
 }
 
-// NewMatchmaker constructs a Matchmaker. GameModes lists the modes the
-// worker will scan each tick; an empty list disables matchmaking.
+// NewMatchmaker constructs a Matchmaker.
+// GameModes lists the modes the worker scans each tick; an empty list disables matchmaking.
 func NewMatchmaker(queue match.Queue, allocator match.Allocator, signer SessionSigner, cfg Config) *Matchmaker {
 	if cfg.PlayersPerMatch == 0 {
 		cfg.PlayersPerMatch = 2
@@ -93,9 +81,8 @@ func NewMatchmaker(queue match.Queue, allocator match.Allocator, signer SessionS
 	if cfg.Assignments == nil {
 		cfg.Assignments = noopAssignmentStore{}
 	}
-	// The matching rules and their tier thresholds are a domain concern;
-	// the usecase only supplies the configured policy and then orchestrates
-	// around the groups the Matcher returns.
+	// The matching rules and their tier thresholds are a domain concern.
+	// The usecase only supplies the configured policy, then orchestrates around the groups the Matcher returns.
 	matcher := match.NewMatcher(cfg.PlayersPerMatch, match.MatchingPolicy{
 		BaseRatingWindow:         cfg.BaseRatingWindow,
 		RatingWindowGrowthPerSec: cfg.RatingWindowGrowthPerSec,
@@ -152,12 +139,10 @@ func (m *Matchmaker) processMode(ctx context.Context, mode string) error {
 		if len(pending) < m.matcher.PlayersPerMatch() {
 			return nil
 		}
-		// The domain Matcher decides who pairs; the usecase just acts on
-		// the group it returns.
+		// The domain Matcher decides who pairs; the usecase just acts on the group it returns.
 		group := m.matcher.SelectGroup(now, pending)
 		if group == nil {
-			// No compatible group yet; tiers widen on later ticks, so stop
-			// scanning this mode now.
+			// No compatible group yet; tiers widen on later ticks, so stop scanning this mode now.
 			return nil
 		}
 		if err := m.pair(ctx, mode, group); err != nil {
@@ -167,10 +152,8 @@ func (m *Matchmaker) processMode(ctx context.Context, mode string) error {
 }
 
 func (m *Matchmaker) pair(ctx context.Context, mode string, tickets []*match.Ticket) error {
-	// Reserve the whole group atomically so a second gateway's matchmaker
-	// cannot pair any of these tickets into a different match. If the
-	// claim loses the race, abandon this grouping; the next tick re-reads
-	// the pending pool without the tickets the winner took.
+	// Reserve the whole group atomically so a second gateway's matchmaker cannot pair any of these tickets into a different match.
+	// If the claim loses the race, abandon this grouping; the next tick re-reads the pending pool without the tickets the winner took.
 	ids := make([]uuid.UUID, len(tickets))
 	for i, t := range tickets {
 		ids[i] = t.ID
@@ -225,12 +208,8 @@ func (m *Matchmaker) pair(ctx context.Context, mode string, tickets []*match.Tic
 			ExpiresAt:    expiresAt,
 		}
 
-		// Persist before publishing so a client that reads the live
-		// Matched event and immediately calls GetCurrentMatch (e.g. after
-		// a reconnect) cannot race ahead of the store. If the persist
-		// fails we must NOT tell the player it matched — it would hold a
-		// token it could never recover via GetCurrentMatch — so we fail
-		// this player instead.
+		// Persist before publishing so a client that reads the live Matched event and immediately calls GetCurrentMatch (e.g. after a reconnect) cannot race ahead of the store.
+		// If the persist fails we must NOT tell the player it matched, since it would hold a token it could never recover via GetCurrentMatch, so we fail this player instead.
 		if storeErr := m.assignments.Put(ctx, t.PlayerID, assignment, m.sessionTokenTTL); storeErr != nil {
 			logger.Error("failed to persist assignment", "player_id", t.PlayerID, "err", storeErr)
 			//nolint:errcheck // Best-effort notification; the match is already failing for this player.
@@ -245,8 +224,8 @@ func (m *Matchmaker) pair(ctx context.Context, mode string, tickets []*match.Tic
 		_ = m.queue.Publish(ctx, t.ID, match.EventMatched{Assignment: assignment})
 		paired++
 	}
-	// Only count a fully formed match: every player got a token and a
-	// persisted assignment. A partial failure is not an allocation.
+	// Only count a fully formed match: every player got a token and a persisted assignment.
+	// A partial failure is not an allocation.
 	if paired == len(tickets) {
 		m.metrics.MatchAllocated()
 	}

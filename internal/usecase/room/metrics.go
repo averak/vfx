@@ -2,12 +2,10 @@ package room
 
 import "time"
 
-// Metrics is the telemetry the room orchestrator emits. It is an
-// interface so the usecase layer stays free of the concrete Prometheus
-// registry; bootstrap supplies an adapter, tests use the no-op default.
+// Metrics is the telemetry the room orchestrator emits.
+// It is an interface so the usecase stays free of the concrete Prometheus registry: bootstrap supplies an adapter, tests use the no-op default.
 type Metrics interface {
-	// IncActiveMatches / DecActiveMatches track the number of matches
-	// currently running in this daemon.
+	// IncActiveMatches and DecActiveMatches track the number of matches currently running in this daemon.
 	IncActiveMatches()
 	DecActiveMatches()
 
