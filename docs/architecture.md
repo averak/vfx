@@ -274,6 +274,20 @@ Running PostgreSQL via `compose.yml` rather than inside the kind cluster:
 - Survives cluster recreation, so iteration on application code does not wipe data.
 - Makes direct inspection (`psql`) and debugging straightforward.
 
+### Room data-plane reachability
+
+The control plane (gateway, Connect RPC over HTTP/2) sits behind an L7 load balancer like any stateless service. The data plane is different: a client must reach the *specific* room hosting its match, over UDP (QUIC), so it cannot go through an L7 HTTP load balancer.
+
+How a client reaches its room:
+
+1. The matchmaker allocates a GameServer (`Allocator.Allocate`), and Agones reports that GameServer's externally reachable `address` and dynamically assigned `port`.
+2. The gateway returns exactly that `address:port` to the client as the match endpoint.
+3. The client opens a WebTransport (HTTP/3 over QUIC, UDP) session straight to it — bypassing the L7 load balancer.
+
+In a cloud cluster the GameServer's address is the node's external IP and the port is the Agones-assigned host port (default range 7000–8000). Operators expose that range: a node port range through the cloud firewall, or a UDP-capable network load balancer that preserves the port. The host port is dynamic precisely so many rooms can share a node without colliding.
+
+**kind limitation.** kind runs the cluster inside Docker, so a GameServer binds an in-cluster IP (e.g. `172.x`) that is not reachable from the host. The control plane is fully exercisable on kind — allocation flips a GameServer to `Allocated` and its `address:port` is handed back — but the actual WebTransport data plane is not reachable from a host-side client. The data plane is instead verified on the compose setup (a single local room), and the design above is what production clusters use. Forcing a static host port (`portPolicy: Static`) with a matching kind `extraPortMappings` entry can expose one room for manual testing, but that diverges from the dynamic-port model real deployments rely on.
+
 ## Matchmaking
 
 Matchmaking is implemented inside the gateway as a worker goroutine. It is intentionally a small piece of code rather than a separate dependency.
