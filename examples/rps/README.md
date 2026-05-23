@@ -7,8 +7,8 @@ The canonical sample game for vfx.
 - Anonymous login via the gateway's `AuthService`.
 - Ticket-based matchmaking through `MatchService.CreateTicket` and the `WatchTicket` server stream.
 - Allocation of a room by the matchmaker worker (stub allocator).
-- WebTransport handshake with a short-lived signed session token.
-- A `plugin.Plugin` implementation hosted by the room daemon (Go-native today; a TinyGo → WASM build will replace it once the wazero loader lands).
+- WebTransport handshake authenticated by a `ClientHello` carrying a short-lived signed session token (works for native and browser clients).
+- The same game logic hosted two ways: linked into the `vfx-rps` binary as a Go-native `plugin.Plugin`, or compiled to WASM (`mise run build-rps-wasm`) and loaded by the wazero host.
 - State deltas streamed back to clients as JSON-encoded game state.
 
 ## Layout
