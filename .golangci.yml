@@ -14,6 +14,7 @@ linters:
     - unused
     - bodyclose
     - copyloopvar
+    - depguard
     - dupl
     - errorlint
     - exhaustive
@@ -60,6 +61,53 @@ linters:
           disabled: true
     exhaustive:
       default-signifies-exhaustive: true
+    depguard:
+      # Enforce the Clean Architecture dependency rule mechanically: the
+      # domain depends on nothing inward of it and on no infrastructure
+      # technology; the usecase layer depends on the ports it defines, not
+      # on infra adapters. (Tests are excluded below — they legitimately
+      # wire concrete adapters.)
+      rules:
+        domain:
+          files:
+            - "**/internal/domain/**"
+          deny:
+            - pkg: github.com/averak/vfx/internal/usecase
+              desc: domain must not depend on the application layer
+            - pkg: github.com/averak/vfx/internal/infra
+              desc: domain must not depend on infrastructure
+            - pkg: github.com/averak/vfx/internal/presentation
+              desc: domain must not depend on the delivery layer
+            - pkg: github.com/averak/vfx/internal/bootstrap
+              desc: domain must not depend on the composition root
+            - pkg: github.com/jackc/pgx
+              desc: no persistence technology in the domain
+            - pkg: github.com/valkey-io/valkey-go
+              desc: no cache technology in the domain
+            - pkg: github.com/prometheus
+              desc: no metrics technology in the domain
+            - pkg: agones.dev
+              desc: no orchestrator technology in the domain
+            - pkg: connectrpc.com
+              desc: no transport technology in the domain
+            - pkg: github.com/quic-go
+              desc: no transport technology in the domain
+            - pkg: go.opentelemetry.io
+              desc: no telemetry technology in the domain
+        usecase:
+          files:
+            - "**/internal/usecase/**"
+          deny:
+            - pkg: github.com/averak/vfx/internal/infra
+              desc: usecase depends on the ports it defines, not infra adapters
+            - pkg: github.com/averak/vfx/internal/presentation
+              desc: usecase must not depend on the delivery layer
+            - pkg: github.com/averak/vfx/internal/bootstrap
+              desc: usecase must not depend on the composition root
+            - pkg: github.com/jackc/pgx
+              desc: usecase must not touch persistence technology directly
+            - pkg: github.com/valkey-io/valkey-go
+              desc: usecase must not touch cache technology directly
   exclusions:
     rules:
       - path: _test\.go
@@ -68,6 +116,7 @@ linters:
           - gosec
           - errcheck
           - exhaustive
+          - depguard
       - path: gen/
         linters:
           - all
