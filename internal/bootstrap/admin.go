@@ -51,7 +51,7 @@ func NewAdmin(ctx context.Context) (*Admin, func(), error) {
 	}
 
 	uc := usecaseadmin.New(db.NewSession(pool), repository.NewPlayer(), matchQueue)
-	handler := adminhandler.NewHandler(uc, pool)
+	handler := adminhandler.NewHandler(uc, pool, cfg.AuthToken)
 
 	cleanup := func() {
 		valkeyClient.Close()

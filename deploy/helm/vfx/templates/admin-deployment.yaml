@@ -40,6 +40,10 @@ spec:
               value: {{ required "externalValkey.url is required" .Values.externalValkey.url | quote }}
             - name: VFX_MATCH_QUEUE
               value: {{ .Values.admin.matchQueue | quote }}
+            {{- with .Values.admin.authToken }}
+            - name: VFX_ADMIN_AUTH_TOKEN
+              value: {{ . | quote }}
+            {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.admin.service.port }}

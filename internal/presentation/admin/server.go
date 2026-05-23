@@ -8,6 +8,7 @@
 package admin
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -20,8 +21,10 @@ import (
 	usecaseadmin "github.com/averak/vfx/internal/usecase/admin"
 )
 
-// NewHandler builds the admin HTTP handler.
-func NewHandler(uc *usecaseadmin.Usecase, pool *pgxpool.Pool) http.Handler {
+// NewHandler builds the admin HTTP handler. When authToken is non-empty,
+// every /api request must present it as a bearer token; the health
+// probes stay open so orchestrators reach them without credentials.
+func NewHandler(uc *usecaseadmin.Usecase, pool *pgxpool.Pool, authToken string) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -35,7 +38,7 @@ func NewHandler(uc *usecaseadmin.Usecase, pool *pgxpool.Pool) http.Handler {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	mux.HandleFunc("GET /api/players/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/players/{id}", requireToken(authToken, func(w http.ResponseWriter, r *http.Request) {
 		id, err := uuid.Parse(r.PathValue("id"))
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "invalid player id")
@@ -55,9 +58,9 @@ func NewHandler(uc *usecaseadmin.Usecase, pool *pgxpool.Pool) http.Handler {
 			Nickname:  p.Nickname,
 			CreatedAt: p.CreatedAt,
 		})
-	})
+	}))
 
-	mux.HandleFunc("GET /api/matchmaking/{game_mode}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/matchmaking/{game_mode}", requireToken(authToken, func(w http.ResponseWriter, r *http.Request) {
 		mode := r.PathValue("game_mode")
 		depth, err := uc.QueueDepth(r.Context(), mode)
 		if err != nil {
@@ -65,9 +68,28 @@ func NewHandler(uc *usecaseadmin.Usecase, pool *pgxpool.Pool) http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, queueView{GameMode: mode, QueueDepth: depth})
-	})
+	}))
 
 	return mux
+}
+
+// requireToken wraps h with a bearer-token check. An empty configured
+// token disables the check (the deployment's network boundary is then
+// the only guard). The compare is constant-time to avoid leaking the
+// token through timing.
+func requireToken(token string, h http.HandlerFunc) http.HandlerFunc {
+	if token == "" {
+		return h
+	}
+	want := []byte("Bearer " + token)
+	return func(w http.ResponseWriter, r *http.Request) {
+		got := []byte(r.Header.Get("Authorization"))
+		if subtle.ConstantTimeCompare(got, want) != 1 {
+			writeError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		h(w, r)
+	}
 }
 
 type playerView struct {

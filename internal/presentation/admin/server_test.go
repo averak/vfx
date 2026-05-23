@@ -18,9 +18,14 @@ import (
 
 func newServer(t *testing.T) *httptest.Server {
 	t.Helper()
+	return newServerWithToken(t, "")
+}
+
+func newServerWithToken(t *testing.T, token string) *httptest.Server {
+	t.Helper()
 	pool := testdb.Pool(t)
 	uc := usecaseadmin.New(db.NewSession(pool), repository.NewPlayer(), matchqueue.NewInMem())
-	srv := httptest.NewServer(adminhandler.NewHandler(uc, pool))
+	srv := httptest.NewServer(adminhandler.NewHandler(uc, pool, token))
 	t.Cleanup(srv.Close)
 	return srv
 }
@@ -85,5 +90,41 @@ func TestAdmin_QueueDepth(t *testing.T) {
 	}
 	if body.QueueDepth != 0 {
 		t.Errorf("queue_depth = %d, want 0 (empty in-mem queue)", body.QueueDepth)
+	}
+}
+
+func TestAdmin_AuthRequiredWhenTokenSet(t *testing.T) {
+	srv := newServerWithToken(t, "s3cret")
+	get := func(authHeader string) int {
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/api/matchmaking/rps", http.NoBody)
+		if authHeader != "" {
+			req.Header.Set("Authorization", authHeader)
+		}
+		resp, err := srv.Client().Do(req)
+		if err != nil {
+			t.Fatalf("GET: %v", err)
+		}
+		_ = resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	if got := get(""); got != http.StatusUnauthorized {
+		t.Errorf("no token: status = %d, want 401", got)
+	}
+	if got := get("Bearer wrong"); got != http.StatusUnauthorized {
+		t.Errorf("wrong token: status = %d, want 401", got)
+	}
+	if got := get("Bearer s3cret"); got != http.StatusOK {
+		t.Errorf("correct token: status = %d, want 200", got)
+	}
+
+	// Probes stay open even with a token configured.
+	resp, err := srv.Client().Get(srv.URL + "/healthz")
+	if err != nil {
+		t.Fatalf("GET /healthz: %v", err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("/healthz with token configured: status = %d, want 200", resp.StatusCode)
 	}
 }

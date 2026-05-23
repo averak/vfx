@@ -53,6 +53,10 @@ admin:
   enabled: false
   replicas: 1
   matchQueue: valkey # The admin reads the shared queue; only "valkey" is meaningful cross-process.
+  # authToken guards the /api endpoints with a bearer token. Empty leaves
+  # them open (rely on network policy then). For production set it via a
+  # values file or --set-string, ideally sourced from a sealed secret.
+  authToken: ""
   resources:
     requests:
       cpu: 50m

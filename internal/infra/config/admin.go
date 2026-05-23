@@ -19,6 +19,12 @@ type Admin struct {
 	// same queue the matchmaker writes; only "valkey" is meaningful
 	// across processes ("inmem" would show an empty, process-local queue).
 	MatchQueue string `env:"VFX_MATCH_QUEUE" envDefault:"inmem"`
+
+	// AuthToken, when set, is required as a bearer token on every
+	// non-probe request. Empty leaves the API open (suitable only when a
+	// network boundary already restricts access); operators should set it
+	// on any shared cluster.
+	AuthToken string `env:"VFX_ADMIN_AUTH_TOKEN"`
 }
 
 // LoadAdmin reads the admin configuration from the environment.
