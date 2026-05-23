@@ -236,7 +236,7 @@ func (u *Usecase) UpdateProfile(ctx context.Context, playerID uuid.UUID, nicknam
 				return err
 			}
 		}
-		if err := u.playerRepo.UpdateNickname(ctx, p); err != nil {
+		if err := u.playerRepo.Save(ctx, p); err != nil {
 			return err
 		}
 		updated = p

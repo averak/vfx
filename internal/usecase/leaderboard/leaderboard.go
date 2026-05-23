@@ -5,7 +5,6 @@ package leaderboard
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 
@@ -52,25 +51,15 @@ func (u *Usecase) SubmitScore(ctx context.Context, leaderboardID string, playerI
 
 	var improved bool
 	err = u.rw.RW(ctx, func(ctx context.Context) error {
-		current, getErr := u.repo.GetEntry(ctx, leaderboardID, playerID)
-		switch {
-		case getErr == nil:
-			improved = lb.Beats(score, current.Score)
-		case errors.Is(getErr, domainleaderboard.ErrEntryNotFound):
-			improved = true // a first score is always recorded
-		default:
-			return getErr
-		}
-		if improved {
-			return u.repo.SaveEntry(ctx, leaderboardID, playerID, score, now)
-		}
-		return nil
+		var submitErr error
+		improved, submitErr = u.repo.Submit(ctx, lb, playerID, score, now)
+		return submitErr
 	})
 	if err != nil {
 		return nil, false, err
 	}
 
-	// Read the rank after the write. Two simultaneous submits by the same player can race here (read-modify-write), but that only risks a stale best that the next submit corrects, which is acceptable for a leaderboard.
+	// The rank is read after the write commits; the keep-best itself is applied atomically by Submit, so concurrent submits cannot lose a better score.
 	ranked, err := u.rankOf(ctx, lb, playerID)
 	if err != nil {
 		return nil, false, err

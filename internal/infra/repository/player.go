@@ -43,32 +43,13 @@ func (Player) Save(ctx context.Context, p *player.Player) error {
 	if err != nil {
 		return err
 	}
-	_, err = dbgen.New(tx).CreatePlayer(ctx, dbgen.CreatePlayerParams{
+	_, err = dbgen.New(tx).UpsertPlayer(ctx, dbgen.UpsertPlayerParams{
 		ID:        p.ID,
 		Nickname:  p.Nickname,
 		CreatedAt: toTimestamptz(p.CreatedAt),
 		UpdatedAt: toTimestamptz(p.UpdatedAt),
 	})
 	return err
-}
-
-func (Player) UpdateNickname(ctx context.Context, p *player.Player) error {
-	tx, err := db.Tx(ctx)
-	if err != nil {
-		return err
-	}
-	_, err = dbgen.New(tx).UpdatePlayerNickname(ctx, dbgen.UpdatePlayerNicknameParams{
-		ID:        p.ID,
-		Nickname:  p.Nickname,
-		UpdatedAt: toTimestamptz(p.UpdatedAt),
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return player.ErrPlayerNotFound
-		}
-		return err
-	}
-	return nil
 }
 
 func (Player) FindPlayerByIdentity(ctx context.Context, provider player.Provider, providerUID string) (*player.Player, error) {

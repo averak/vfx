@@ -33,19 +33,12 @@ type Leaderboard struct {
 }
 
 // Beats reports whether score a ranks strictly better than b under this leaderboard's order.
-// It is the rule behind keep-best: a submission is recorded only when it beats the player's current score.
+// It states the keep-best rule; the repository enforces it atomically via a conditional upsert whose WHERE clause mirrors this method, so concurrent submits never lose a better score without taking a lock.
 func (l Leaderboard) Beats(a, b int64) bool {
 	if l.SortOrder == Ascending {
 		return a < b
 	}
 	return a > b
-}
-
-// Entry is a player's recorded score on a leaderboard.
-type Entry struct {
-	PlayerID  uuid.UUID
-	Score     int64
-	UpdatedAt time.Time
 }
 
 // RankedEntry is a read model: an entry with its computed 1-based rank and the player's display name.

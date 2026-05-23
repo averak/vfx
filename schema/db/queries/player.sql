@@ -2,16 +2,13 @@
 SELECT * FROM players
 WHERE id = $1;
 
--- name: CreatePlayer :one
+-- Player is the aggregate root, so it is persisted whole: one upsert serves both creation and profile updates, rather than per-field update queries.
+-- name: UpsertPlayer :one
 INSERT INTO players (id, nickname, created_at, updated_at)
 VALUES ($1, $2, $3, $4)
-RETURNING *;
-
--- name: UpdatePlayerNickname :one
-UPDATE players
-SET nickname = $2,
-    updated_at = $3
-WHERE id = $1
+ON CONFLICT (id) DO UPDATE
+SET nickname = EXCLUDED.nickname,
+    updated_at = EXCLUDED.updated_at
 RETURNING *;
 
 -- name: FindPlayerByIdentity :one

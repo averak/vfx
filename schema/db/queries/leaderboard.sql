@@ -1,13 +1,22 @@
--- name: GetLeaderboardEntry :one
-SELECT * FROM leaderboard_entries
-WHERE leaderboard_id = $1 AND player_id = $2;
-
--- name: UpsertLeaderboardEntry :exec
+-- Keep-best, applied atomically by the database so concurrent submits cannot lose a better score (no row lock, no read-modify-write).
+-- The WHERE mirrors leaderboard.Leaderboard.Beats for the descending (higher-is-better) order.
+-- :execrows returns 1 when the score was inserted or improved, 0 when an equal-or-worse score left the row unchanged (so a resubmit is idempotent).
+-- name: UpsertLeaderboardEntryDesc :execrows
 INSERT INTO leaderboard_entries (id, leaderboard_id, player_id, score, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $5)
 ON CONFLICT (leaderboard_id, player_id) DO UPDATE
 SET score = EXCLUDED.score,
-    updated_at = EXCLUDED.updated_at;
+    updated_at = EXCLUDED.updated_at
+WHERE EXCLUDED.score > leaderboard_entries.score;
+
+-- Ascending (lower-is-better) keep-best; mirror of the descending variant.
+-- name: UpsertLeaderboardEntryAsc :execrows
+INSERT INTO leaderboard_entries (id, leaderboard_id, player_id, score, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $5)
+ON CONFLICT (leaderboard_id, player_id) DO UPDATE
+SET score = EXCLUDED.score,
+    updated_at = EXCLUDED.updated_at
+WHERE EXCLUDED.score < leaderboard_entries.score;
 
 -- name: TopRanksDesc :many
 SELECT e.player_id, p.nickname, e.score, e.updated_at

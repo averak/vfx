@@ -1,6 +1,7 @@
 package leaderboard_test
 
 import (
+	"sync"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -115,6 +116,33 @@ func TestListRanks_OrdersByScore(t *testing.T) {
 		if e.GetScore() != wantScores[i] || e.GetRank() != int64(i+1) {
 			t.Errorf("entry %d = (rank %d, score %d), want (rank %d, score %d)", i, e.GetRank(), e.GetScore(), i+1, wantScores[i])
 		}
+	}
+}
+
+// Concurrent submits of different scores must keep the maximum (no lost update); the keep-best is applied atomically by the conditional upsert.
+func TestSubmitScore_ConcurrentKeepsMax(t *testing.T) {
+	srv := testconnect.New(t)
+	token := login(t, srv, "concurrent")
+
+	const n = 12
+	var wg sync.WaitGroup
+	for i := 1; i <= n; i++ {
+		wg.Add(1)
+		go func(score int64) {
+			defer wg.Done()
+			_, _ = srv.Leaderboard.SubmitScore(t.Context(),
+				testconnect.Authorize(connect.NewRequest(&leaderboardv1.SubmitScoreRequest{LeaderboardId: testconnect.LeaderboardDesc, Score: score}), token))
+		}(int64(i))
+	}
+	wg.Wait()
+
+	resp, err := srv.Leaderboard.GetPlayerRank(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&leaderboardv1.GetPlayerRankRequest{LeaderboardId: testconnect.LeaderboardDesc}), token))
+	if err != nil {
+		t.Fatalf("GetPlayerRank: %v", err)
+	}
+	if got := resp.Msg.GetEntry().GetScore(); got != n {
+		t.Errorf("best after concurrent submits = %d, want %d (a better score was lost)", got, n)
 	}
 }
 

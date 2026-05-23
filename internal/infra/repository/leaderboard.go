@@ -22,33 +22,32 @@ func NewLeaderboard() *Leaderboard {
 	return &Leaderboard{}
 }
 
-func (Leaderboard) GetEntry(ctx context.Context, leaderboardID string, playerID uuid.UUID) (*leaderboard.Entry, error) {
+func (Leaderboard) Submit(ctx context.Context, lb leaderboard.Leaderboard, playerID uuid.UUID, score int64, now time.Time) (bool, error) {
 	tx, err := db.Tx(ctx)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	row, err := dbgen.New(tx).GetLeaderboardEntry(ctx, dbgen.GetLeaderboardEntryParams{LeaderboardID: leaderboardID, PlayerID: playerID})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, leaderboard.ErrEntryNotFound
-		}
-		return nil, err
+	q := dbgen.New(tx)
+	// A fresh id is used only when the row is new; ON CONFLICT keeps the existing row's id and created_at.
+	// affected is 1 on insert or improvement, 0 when the conditional WHERE left an equal-or-worse score in place.
+	if lb.SortOrder == leaderboard.Ascending {
+		affected, ascErr := q.UpsertLeaderboardEntryAsc(ctx, dbgen.UpsertLeaderboardEntryAscParams{
+			ID:            uuid.New(),
+			LeaderboardID: lb.ID,
+			PlayerID:      playerID,
+			Score:         score,
+			CreatedAt:     toTimestamptz(now),
+		})
+		return affected > 0, ascErr
 	}
-	return &leaderboard.Entry{PlayerID: row.PlayerID, Score: row.Score, UpdatedAt: row.UpdatedAt.Time}, nil
-}
-
-func (Leaderboard) SaveEntry(ctx context.Context, leaderboardID string, playerID uuid.UUID, score int64, now time.Time) error {
-	tx, err := db.Tx(ctx)
-	if err != nil {
-		return err
-	}
-	return dbgen.New(tx).UpsertLeaderboardEntry(ctx, dbgen.UpsertLeaderboardEntryParams{
+	affected, err := q.UpsertLeaderboardEntryDesc(ctx, dbgen.UpsertLeaderboardEntryDescParams{
 		ID:            uuid.New(),
-		LeaderboardID: leaderboardID,
+		LeaderboardID: lb.ID,
 		PlayerID:      playerID,
 		Score:         score,
 		CreatedAt:     toTimestamptz(now),
 	})
+	return affected > 0, err
 }
 
 func (Leaderboard) RankOf(ctx context.Context, lb leaderboard.Leaderboard, playerID uuid.UUID) (*leaderboard.RankedEntry, error) {

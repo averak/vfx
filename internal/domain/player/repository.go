@@ -20,8 +20,9 @@ var (
 // This keeps the domain interface free of any persistence-technology type.
 type Repository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*Player, error)
+
+	// Save persists the whole Player aggregate (create or update); there is no per-field update, so a caller mutates the Player via its methods and saves it back.
 	Save(ctx context.Context, p *Player) error
-	UpdateNickname(ctx context.Context, p *Player) error
 
 	FindPlayerByIdentity(ctx context.Context, provider Provider, providerUID string) (*Player, error)
 	SaveIdentity(ctx context.Context, i *Identity) error

@@ -7,14 +7,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// Repository persists leaderboard entries and answers ranking queries.
+// Repository persists leaderboard scores and answers ranking queries.
 // Ranking is order-aware, so methods take the Leaderboard (for its SortOrder) rather than just an id.
 type Repository interface {
-	// GetEntry returns ErrEntryNotFound when the player has no score on the leaderboard.
-	GetEntry(ctx context.Context, leaderboardID string, playerID uuid.UUID) (*Entry, error)
-
-	// SaveEntry upserts the player's score unconditionally; the caller has already applied the keep-best rule via Leaderboard.Beats.
-	SaveEntry(ctx context.Context, leaderboardID string, playerID uuid.UUID, score int64, now time.Time) error
+	// Submit applies the keep-best rule atomically (a single conditional upsert, no row lock or read-modify-write) and reports whether the player's best improved.
+	// improved is false when an equal-or-worse score left the existing best unchanged, which makes a resubmit idempotent.
+	Submit(ctx context.Context, lb Leaderboard, playerID uuid.UUID, score int64, now time.Time) (improved bool, err error)
 
 	// RankOf returns the player's ranked entry, or ErrEntryNotFound.
 	RankOf(ctx context.Context, lb Leaderboard, playerID uuid.UUID) (*RankedEntry, error)
