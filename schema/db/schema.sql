@@ -1,9 +1,8 @@
 -- vfx PostgreSQL schema (declarative source of truth).
 --
--- This file describes the desired state of the database. Migrations are
--- generated from the diff between this file and the applied migration
--- history using `atlas migrate diff`. Edit schema.sql, then run the
--- mise task `db-diff <name>` to produce a new migration.
+-- This file describes the desired state of the database.
+-- Migrations are generated from the diff between this file and the applied migration history using `atlas migrate diff`.
+-- Edit schema.sql, then run the mise task `db-diff <name>` to produce a new migration.
 --
 -- Conventions:
 --   - All primary keys are UUID, supplied by the application (never SERIAL).
@@ -13,9 +12,8 @@
 
 -- ============================================================================
 -- players
---   Core player record. One per game profile. A player can carry multiple
---   identities across providers (anonymous → linked Google, etc.) by the
---   player_identities table below.
+--   Core player record, one per game profile.
+--   A player can carry multiple identities across providers (anonymous → linked Google, etc.) via the player_identities table below.
 -- ============================================================================
 
 CREATE TABLE players (
@@ -50,9 +48,8 @@ CREATE INDEX idx_player_identities_player_id
 
 -- ============================================================================
 -- refresh_tokens
---   Long-lived tokens used to mint new access tokens. Raw token strings
---   are never stored; token_hash holds SHA-256 of the token bytes so a
---   database leak cannot be used directly to impersonate players.
+--   Long-lived tokens used to mint new access tokens.
+--   Raw token strings are never stored; token_hash holds SHA-256 of the token bytes so a database leak cannot be used directly to impersonate players.
 -- ============================================================================
 
 CREATE TABLE refresh_tokens (
@@ -72,8 +69,8 @@ CREATE INDEX idx_refresh_tokens_expires_at
 
 -- ============================================================================
 -- matches
---   Persisted record of every match. final_state holds opaque bytes that
---   the plugin returned from OnGameEnd; format is plugin-specific.
+--   Persisted record of every match.
+--   final_state holds the opaque bytes the plugin returned from OnGameEnd; the format is plugin-specific.
 -- ============================================================================
 
 CREATE TABLE matches (
@@ -97,8 +94,7 @@ CREATE INDEX idx_matches_created_at
 
 -- ============================================================================
 -- match_players
---   Many-to-many between matches and players, with the per-player result
---   (rank, optional plugin-defined stats) captured at game end.
+--   Many-to-many between matches and players, with the per-player result (rank, optional plugin-defined stats) captured at game end.
 -- ============================================================================
 
 CREATE TABLE match_players (

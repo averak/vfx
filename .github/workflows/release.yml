@@ -26,8 +26,7 @@ jobs:
 
       - name: derive version
         id: version
-        # Strip the leading "v" so 1.2.3 is the canonical version used by
-        # both the image tag and the chart.
+        # Strip the leading "v" so 1.2.3 is the canonical version used by both the image tag and the chart.
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: install mise + tools
@@ -37,8 +36,7 @@ jobs:
           cache: true
 
       - name: regenerate code
-        # gen/go and internal/infra/dbgen are gitignored, so the image
-        # builder needs them produced into the context first.
+        # gen/go and internal/infra/dbgen are gitignored, so the image builder needs them produced into the context first.
         run: mise run gen
 
       - uses: docker/setup-qemu-action@v3
@@ -97,8 +95,7 @@ jobs:
               --username "${{ github.actor }}" --password-stdin
 
       - name: package chart
-        # The chart's image defaults to .Chart.AppVersion, so stamping both
-        # version and appVersion keeps the chart and image in lockstep.
+        # The chart's image defaults to .Chart.AppVersion, so stamping both version and appVersion keeps the chart and image in lockstep.
         run: |
           mise exec -- helm package deploy/helm/vfx \
             --version "${{ steps.version.outputs.version }}" \

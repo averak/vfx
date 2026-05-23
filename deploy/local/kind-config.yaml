@@ -3,10 +3,8 @@
 # Usage:
 #   kind create cluster --config deploy/local/kind-config.yaml --name vfx-local
 #
-# The cluster forwards a couple of TCP ports for the gateway and a UDP
-# range wide enough to host a dozen concurrent rooms. host.docker.internal
-# is reachable from inside the cluster so workloads can talk to a
-# compose-managed PostgreSQL / Valkey on the host.
+# The cluster forwards a couple of TCP ports for the gateway and a UDP range wide enough to host a dozen concurrent rooms.
+# host.docker.internal is reachable from inside the cluster so workloads can talk to a compose-managed PostgreSQL / Valkey on the host.
 
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -22,9 +20,8 @@ nodes:
       - containerPort: 30443
         hostPort: 8443
         protocol: TCP
-      # Room daemon WebTransport (UDP for QUIC). A range so we can run
-      # several room replicas without colliding on the host port. Adjust
-      # the upper bound if you need more concurrent rooms.
+      # Room daemon WebTransport (UDP for QUIC).
+      # A range so we can run several room replicas without colliding on the host port; adjust the upper bound if you need more concurrent rooms.
       - containerPort: 31700
         hostPort: 7777
         protocol: UDP

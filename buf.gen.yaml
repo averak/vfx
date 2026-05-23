@@ -22,8 +22,7 @@ plugins:
     opt: paths=source_relative
 
   # vtprotobuf adds reflection-free MarshalVT / UnmarshalVT methods.
-  # The WASM plugin guest (TinyGo) uses these because TinyGo cannot run
-  # protobuf-go's reflection-based codec (reflect.NewAt panics).
+  # The WASM plugin guest (TinyGo) uses these because TinyGo cannot run protobuf-go's reflection-based codec (reflect.NewAt panics).
   - remote: buf.build/community/planetscale-vtprotobuf
     out: gen/go
     opt:
@@ -31,9 +30,7 @@ plugins:
       - features=marshal+unmarshal+size
 
   # TypeScript: client SDK.
-  # protobuf-es v2 emits the service descriptor directly into *_pb.ts,
-  # so connect-es v2 needs no separate codegen plugin — the client is
-  # built with createClient(ServiceDesc, transport).
+  # protobuf-es v2 emits the service descriptor directly into *_pb.ts, so connect-es v2 needs no separate codegen plugin; the client is built with createClient(ServiceDesc, transport).
   - remote: buf.build/bufbuild/es:v2.12.0
     out: sdk/client/ts/src/gen
     opt:

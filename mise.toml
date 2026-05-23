@@ -12,8 +12,8 @@ node = "22.20.0"
 atlas = "1.2.0"
 "go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "2.12.2"
 "go:mvdan.cc/gofumpt" = "0.7.0"
-# TinyGo は plugin SDK ビルド時に必要。https://tinygo.org/getting-started/install/ から
-# 入れるか、後日 mise バックエンド (aqua/asdf) で再追加する。
+# TinyGo は plugin SDK ビルド時に必要。
+# https://tinygo.org/getting-started/install/ から入れるか、後日 mise バックエンド (aqua/asdf) で再追加する。
 # tinygo = "0.41.1"
 helm = "4.2.0"
 kubectl = "1.36.1"
@@ -30,8 +30,8 @@ KUBECONFIG = "{{config_root}}/.kube/config"
 KIND_CLUSTER_NAME = "vfx-local"
 GOFLAGS = "-buildvcs=false"
 
-# Local dev secret only. Production deployments MUST override this via
-# their secret manager (Kubernetes Secret, AWS Secrets Manager, etc.).
+# Local dev secret only.
+# Production deployments MUST override this via their secret manager (Kubernetes Secret, AWS Secrets Manager, etc.).
 VFX_JWT_SECRET = "dev-only-do-not-use-in-production"
 
 # ============================================================================
@@ -87,8 +87,7 @@ run = "buf format -w"
 # ============================================================================
 
 # Compile the rock-paper-scissors example plugin to WebAssembly.
-# Requires TinyGo on PATH (https://tinygo.org/getting-started/install/);
-# it is not yet in the mise registry so it is installed out of band.
+# Requires TinyGo on PATH (https://tinygo.org/getting-started/install/); it is not yet in the mise registry, so it is installed out of band.
 [tasks.build-rps-wasm]
 description = "Build the RPS example plugin to WASM (TinyGo)"
 run = "tinygo build -o bin/rps.wasm -buildmode=c-shared -target=wasip1 ./examples/rps/plugin/cmd/wasm"

@@ -51,10 +51,8 @@ linters:
         - rangeValCopy
     revive:
       rules:
-        # `exported` requires every exported symbol to carry its own
-        # comment. We document interfaces in domain/ but leave
-        # implementations in infra/ uncommented because the contract is
-        # already on the interface — duplicating it just drifts.
+        # `exported` requires every exported symbol to carry its own comment.
+        # We document interfaces in domain/ but leave implementations in infra/ uncommented, because the contract is already on the interface and duplicating it just drifts.
         - name: exported
           disabled: true
         - name: unused-parameter
@@ -62,11 +60,9 @@ linters:
     exhaustive:
       default-signifies-exhaustive: true
     depguard:
-      # Enforce the Clean Architecture dependency rule mechanically: the
-      # domain depends on nothing inward of it and on no infrastructure
-      # technology; the usecase layer depends on the ports it defines, not
-      # on infra adapters. (Tests are excluded below — they legitimately
-      # wire concrete adapters.)
+      # Enforce the Clean Architecture dependency rule mechanically.
+      # The domain depends on nothing inward of it and on no infrastructure technology; the usecase layer depends on the ports it defines, not on infra adapters.
+      # Tests are excluded below, since they legitimately wire concrete adapters.
       rules:
         domain:
           files:

@@ -1,16 +1,14 @@
 # Default values for vfx.
 #
-# Override with `helm install vfx ./deploy/helm/vfx --values <file>` or
-# `--set key=value` flags.
+# Override with `helm install vfx ./deploy/helm/vfx --values <file>` or `--set key=value` flags.
 
 image:
   repository: ghcr.io/averak/vfx
   tag: "" # Defaults to .Chart.AppVersion when unset.
   pullPolicy: IfNotPresent
 
-# externalDatabase points at a PostgreSQL outside the chart. When
-# enabled the chart will not provision its own database; the operator
-# is responsible for the URL working from the cluster.
+# externalDatabase points at a PostgreSQL outside the chart.
+# When enabled the chart will not provision its own database; the operator is responsible for the URL working from the cluster.
 externalDatabase:
   enabled: true
   url: "" # e.g. postgres://vfx:secret@db.example.com:5432/vfx
@@ -20,8 +18,8 @@ externalValkey:
   enabled: true
   url: "" # e.g. redis://valkey.example.com:6379
 
-# jwtSecret is loaded into a Kubernetes Secret. Override via
-# --set-string jwtSecret=... or, better, supply your own secret name.
+# jwtSecret is loaded into a Kubernetes Secret.
+# Override via --set-string jwtSecret=... or, better, supply your own secret name.
 jwtSecret: ""
 existingJwtSecretName: "" # When set, the chart binds VFX_JWT_SECRET to this Secret instead of creating one.
 
@@ -29,8 +27,8 @@ existingJwtSecretName: "" # When set, the chart binds VFX_JWT_SECRET to this Sec
 gateway:
   enabled: true
   replicas: 2
-  # Matchmaking shape. gameModes should include the room's gameMode so
-  # the allocator can find a Fleet for each mode.
+  # Matchmaking shape.
+  # gameModes should include the room's gameMode so the allocator can find a Fleet for each mode.
   gameModes:
     - rps
   playersPerMatch: 2
@@ -47,15 +45,15 @@ gateway:
   podAnnotations: {}
   podLabels: {}
 
-# admin is the read-only operations API (player/queue views). Disabled
-# by default; deploy it behind a separate auth boundary from the gateway.
+# admin is the read-only operations API (player/queue views).
+# Disabled by default; deploy it behind a separate auth boundary from the gateway.
 admin:
   enabled: false
   replicas: 1
   matchQueue: valkey # The admin reads the shared queue; only "valkey" is meaningful cross-process.
-  # authToken guards the /api endpoints with a bearer token. Empty leaves
-  # them open (rely on network policy then). For production set it via a
-  # values file or --set-string, ideally sourced from a sealed secret.
+  # authToken guards the /api endpoints with a bearer token.
+  # Empty leaves them open (rely on network policy then).
+  # For production set it via a values file or --set-string, ideally sourced from a sealed secret.
   authToken: ""
   resources:
     requests:
@@ -70,18 +68,16 @@ admin:
   podAnnotations: {}
   podLabels: {}
 
-# agones, when enabled, runs the room tier as an Agones Fleet (instead
-# of a plain Deployment) and switches the gateway to the Agones
-# allocator, granting it RBAC to create GameServerAllocations. Requires
-# Agones installed in the cluster. Leave disabled for a plain K8s or
-# single-node deployment.
+# agones, when enabled, runs the room tier as an Agones Fleet (instead of a plain Deployment) and switches the gateway to the Agones allocator, granting it RBAC to create GameServerAllocations.
+# Requires Agones installed in the cluster.
+# Leave disabled for a plain K8s or single-node deployment.
 agones:
   enabled: false
   namespace: "" # Namespace the gateway allocates in; defaults to the release namespace.
   healthPeriodSeconds: 5 # Agones marks a GameServer unhealthy without a ping within this window.
 
-# room is the WebTransport tier. With agones.enabled it is templated as
-# an Agones Fleet; otherwise as a plain Deployment.
+# room is the WebTransport tier.
+# With agones.enabled it is templated as an Agones Fleet; otherwise as a plain Deployment.
 room:
   enabled: true
   replicas: 3
@@ -106,8 +102,7 @@ room:
   podAnnotations: {}
   podLabels: {}
 
-# migrate runs as a Helm pre-install / pre-upgrade hook so schema is
-# applied before the gateway starts.
+# migrate runs as a Helm pre-install / pre-upgrade hook so schema is applied before the gateway starts.
 migrate:
   enabled: true
   backoffLimit: 3

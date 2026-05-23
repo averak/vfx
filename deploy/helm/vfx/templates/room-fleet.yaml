@@ -18,8 +18,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      # Dynamic port policy: Agones assigns a host port and reports it
-      # back through the allocation, which the gateway hands to clients.
+      # Dynamic port policy: Agones assigns a host port and reports it back through the allocation, which the gateway hands to clients.
       # WebTransport is HTTP/3 over QUIC, so the protocol is UDP.
       ports:
         - name: webtransport
