@@ -1,7 +1,6 @@
 // Package match orchestrates the MatchService.
 //
 // Tickets live in a match.Queue, and the matchmaker worker in this package drains the queue and asks the Allocator for a room.
-// The usecase exposes the surface the Connect handler talks to: CreateTicket, WatchTicket, CancelTicket, GetCurrentMatch.
 package match
 
 import (
@@ -19,8 +18,7 @@ type Usecase struct {
 	assignments match.AssignmentStore
 }
 
-// New wires the usecase.
-// A nil assignments store makes GetCurrentMatch always report "no active match", convenient for tests that exercise only the ticket flow.
+// New treats a nil assignments store as one that reports "no active match", convenient for tests that exercise only the ticket flow.
 func New(queue match.Queue, assignments match.AssignmentStore) *Usecase {
 	if assignments == nil {
 		assignments = noopAssignmentStore{}
@@ -28,7 +26,6 @@ func New(queue match.Queue, assignments match.AssignmentStore) *Usecase {
 	return &Usecase{queue: queue, assignments: assignments}
 }
 
-// noopAssignmentStore is the fallback when no store is supplied: writes are dropped and reads report nothing.
 type noopAssignmentStore struct{}
 
 func (noopAssignmentStore) Put(context.Context, uuid.UUID, *match.Assignment, time.Duration) error {
@@ -65,14 +62,11 @@ func (u *Usecase) CreateTicket(ctx context.Context, in *TicketInput) (uuid.UUID,
 	return t.ID, nil
 }
 
-// WatchTicket subscribes to events for the given ticket.
-// The returned channel closes after a terminal event or context cancellation.
 func (u *Usecase) WatchTicket(ctx context.Context, ticketID uuid.UUID) (<-chan match.Event, error) {
 	return u.queue.Subscribe(ctx, ticketID)
 }
 
-// CancelTicket marks the ticket as cancelled, publishing a Failed event so any active WatchTicket subscriber exits cleanly.
-// The queue returns match.ErrTicketNotFound for an unknown ticket, which the handler maps to a NotFound response.
+// CancelTicket publishes a Failed event so any active WatchTicket subscriber exits cleanly, and returns match.ErrTicketNotFound for an unknown ticket.
 func (u *Usecase) CancelTicket(ctx context.Context, ticketID uuid.UUID) error {
 	return u.queue.Cancel(ctx, ticketID)
 }

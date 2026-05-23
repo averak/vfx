@@ -1,4 +1,4 @@
-// Package admin orchestrates the operations API: read-only views over players and the matchmaking queue for operators.
+// Package admin orchestrates the operations API: read-only views for operators.
 // It deliberately holds no mutation paths; the gateway owns all state changes.
 package admin
 

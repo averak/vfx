@@ -34,8 +34,7 @@ type Manager struct {
 	matches map[uuid.UUID]*Match
 }
 
-// NewManager constructs a Manager wired to a Factory.
-// The supplied ctx outlives every Match the manager creates; cancel it (typically at daemon shutdown) to tear them all down.
+// NewManager's ctx outlives every Match it creates; cancel it (typically at daemon shutdown) to tear them all down.
 // A nil metrics records nothing.
 func NewManager(ctx context.Context, factory plugin.Factory, logger *slog.Logger, metrics Metrics) *Manager {
 	if metrics == nil {
@@ -52,11 +51,10 @@ func NewManager(ctx context.Context, factory plugin.Factory, logger *slog.Logger
 	}
 }
 
-// Close cancels every running match. Safe to call multiple times.
+// Close cancels every running match and is safe to call multiple times.
 func (mgr *Manager) Close() { mgr.cancelAll() }
 
-// FindOrCreate returns the active Match for matchID, creating one if needed.
-// Creation is serialised under the manager lock so two simultaneous joins for a new match still see the same instance.
+// FindOrCreate serialises creation under the manager lock, so two simultaneous joins for a new match still see the same instance.
 func (mgr *Manager) FindOrCreate(ctx context.Context, matchID uuid.UUID, players []uuid.UUID) (*Match, error) {
 	mgr.mu.Lock()
 	if existing, ok := mgr.matches[matchID]; ok {
@@ -64,8 +62,7 @@ func (mgr *Manager) FindOrCreate(ctx context.Context, matchID uuid.UUID, players
 		return existing, nil
 	}
 
-	// Span covers the cold-start cost of a match: instantiating the plugin and running its Init.
-	// It is a child of the connecting session's span when tracing is on.
+	// Span covers the cold-start cost: instantiating the plugin and running its Init.
 	ctx, span := tracer.Start(ctx, "room.match.create", trace.WithAttributes(
 		attribute.String("vfx.match_id", matchID.String()),
 		attribute.Int("vfx.player_count", len(players)),
@@ -118,7 +115,6 @@ func (mgr *Manager) cleanup(matchID uuid.UUID) {
 	mgr.mu.Unlock()
 }
 
-// Get returns the active Match for matchID without creating one.
 func (mgr *Manager) Get(matchID uuid.UUID) (*Match, bool) {
 	mgr.mu.Lock()
 	defer mgr.mu.Unlock()
@@ -126,7 +122,6 @@ func (mgr *Manager) Get(matchID uuid.UUID) (*Match, bool) {
 	return m, ok
 }
 
-// Count returns the number of matches currently running.
 func (mgr *Manager) Count() int {
 	mgr.mu.Lock()
 	defer mgr.mu.Unlock()

@@ -11,8 +11,7 @@ import (
 	"github.com/averak/vfx/internal/stdx/clock"
 )
 
-// Metrics is the subset of telemetry the matchmaker emits.
-// It is an interface so the usecase stays free of the concrete Prometheus registry: bootstrap supplies an adapter, tests use the no-op default.
+// Metrics is a port so the usecase stays free of the concrete Prometheus registry.
 type Metrics interface {
 	MatchAllocated()
 	SetQueueDepth(gameMode string, depth int)
@@ -23,15 +22,13 @@ type noopMetrics struct{}
 func (noopMetrics) MatchAllocated()           {}
 func (noopMetrics) SetQueueDepth(string, int) {}
 
-// SessionSigner mints the per-match session token a paired player uses to connect to its room.
-// A port, so the usecase depends on the capability rather than the concrete signer in infra.
+// SessionSigner is a port, so the usecase depends on the capability rather than the concrete signer in infra.
 type SessionSigner interface {
 	SignSession(playerID uuid.UUID, matchID string, matchPlayers []string, now time.Time, ttl time.Duration) (string, error)
 }
 
-// Matchmaker is the long-running worker that pairs queued tickets and reserves rooms via the Allocator.
-//
-// Pairing decisions belong to the domain Matcher; the queue's atomic Claim keeps them safe when the matchmaker runs on more than one replica.
+// Matchmaker is the long-running worker that pairs queued tickets and reserves rooms.
+// Pairing decisions belong to the domain Matcher; the queue's atomic Claim keeps them safe across replicas.
 type Matchmaker struct {
 	queue       match.Queue
 	allocator   match.Allocator
@@ -66,8 +63,7 @@ type Config struct {
 	Metrics Metrics
 }
 
-// NewMatchmaker constructs a Matchmaker.
-// GameModes lists the modes the worker scans each tick; an empty list disables matchmaking.
+// NewMatchmaker treats an empty GameModes as "matchmaking disabled".
 func NewMatchmaker(queue match.Queue, allocator match.Allocator, signer SessionSigner, cfg Config) *Matchmaker {
 	if cfg.PlayersPerMatch == 0 {
 		cfg.PlayersPerMatch = 2
@@ -81,8 +77,7 @@ func NewMatchmaker(queue match.Queue, allocator match.Allocator, signer SessionS
 	if cfg.Assignments == nil {
 		cfg.Assignments = noopAssignmentStore{}
 	}
-	// The matching rules and their tier thresholds are a domain concern.
-	// The usecase only supplies the configured policy, then orchestrates around the groups the Matcher returns.
+	// Matching rules are a domain concern, so the usecase only supplies the policy and acts on the groups the Matcher returns.
 	matcher := match.NewMatcher(cfg.PlayersPerMatch, match.MatchingPolicy{
 		BaseRatingWindow:         cfg.BaseRatingWindow,
 		RatingWindowGrowthPerSec: cfg.RatingWindowGrowthPerSec,
@@ -139,7 +134,6 @@ func (m *Matchmaker) processMode(ctx context.Context, mode string) error {
 		if len(pending) < m.matcher.PlayersPerMatch() {
 			return nil
 		}
-		// The domain Matcher decides who pairs; the usecase just acts on the group it returns.
 		group := m.matcher.SelectGroup(now, pending)
 		if group == nil {
 			// No compatible group yet; tiers widen on later ticks, so stop scanning this mode now.

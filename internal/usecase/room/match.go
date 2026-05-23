@@ -21,18 +21,13 @@ import (
 	"github.com/averak/vfx/internal/domain/plugin"
 )
 
-// PlayerIO is the side of the WebTransport session the match sees.
-// Real sessions implement it with the wt connection; tests use a channel-backed fake.
+// PlayerIO is the room's view of a WebTransport session, so a match can be driven by a fake in tests.
 type PlayerIO interface {
-	// SendFrame delivers a Frame to the client.
-	// Implementations may drop frames when the underlying transport is congested.
+	// SendFrame may drop frames when the underlying transport is congested.
 	SendFrame(frame *realtimev1.Frame) error
-
-	// Close signals the player's session to terminate, typically because the match itself is ending.
 	Close()
 }
 
-// Match is the in-memory state of one ongoing game.
 type Match struct {
 	id      uuid.UUID
 	logger  *slog.Logger
@@ -54,8 +49,7 @@ type matchPlayer struct {
 	io PlayerIO
 }
 
-// NewMatch constructs a Match.
-// The Plugin must already be initialised; Match treats it as a pure tick processor.
+// NewMatch requires an already-initialised Plugin; Match treats it as a pure tick processor.
 func NewMatch(id uuid.UUID, p plugin.Plugin, tickRateHz uint32, logger *slog.Logger, metrics Metrics) *Match {
 	if metrics == nil {
 		metrics = noopMetrics{}
@@ -73,8 +67,7 @@ func NewMatch(id uuid.UUID, p plugin.Plugin, tickRateHz uint32, logger *slog.Log
 	}
 }
 
-// Join attaches a player's I/O to the match.
-// It is safe to call from a WebTransport handler goroutine while the tick loop is running.
+// Join is safe to call from a handler goroutine while the tick loop is running.
 func (m *Match) Join(playerID uuid.UUID, io PlayerIO) error {
 	m.mu.Lock()
 	if _, exists := m.players[playerID]; exists {
@@ -98,8 +91,7 @@ func (m *Match) Join(playerID uuid.UUID, io PlayerIO) error {
 	return nil
 }
 
-// Leave detaches the player.
-// The plugin sees a PlayerLeft event on the next tick.
+// Leave makes the plugin see a PlayerLeft event on the next tick.
 func (m *Match) Leave(playerID uuid.UUID, reason string) {
 	m.mu.Lock()
 	p, ok := m.players[playerID]
@@ -123,8 +115,7 @@ func (m *Match) Leave(playerID uuid.UUID, reason string) {
 	}
 }
 
-// SubmitInput records a player action for the next tick.
-// Inputs land on a buffered channel so a fast client cannot block the tick loop; when the buffer fills, inputs are dropped and the client recovers on the next snapshot.
+// SubmitInput buffers the action so a fast client cannot block the tick loop; when the buffer fills, inputs are dropped and the client recovers on the next snapshot.
 func (m *Match) SubmitInput(playerID uuid.UUID, clientTick uint32, payload []byte) {
 	action := &pluginv1.PlayerAction{
 		PlayerId:   playerID.String(),
@@ -139,8 +130,7 @@ func (m *Match) SubmitInput(playerID uuid.UUID, clientTick uint32, payload []byt
 	}
 }
 
-// Run starts the tick loop.
-// It returns when the plugin signals game_ended or when ctx is cancelled.
+// Run returns when the plugin signals game_ended or ctx is cancelled.
 func (m *Match) Run(ctx context.Context) error {
 	defer close(m.done)
 	defer func() {
@@ -174,7 +164,6 @@ func (m *Match) Run(ctx context.Context) error {
 	}
 }
 
-// tick drains buffered inputs and network events, runs the plugin OnTick, then broadcasts the resulting state and events to players.
 func (m *Match) tick(ctx context.Context) (bool, error) {
 	now := time.Now().UTC()
 
@@ -297,7 +286,6 @@ func (m *Match) dispatchEvent(ev *pluginv1.OutboundEvent) {
 	}
 }
 
-// Done returns a channel that is closed when the match has fully shut down.
 func (m *Match) Done() <-chan struct{} { return m.done }
 
 func drainActions(ch chan *pluginv1.PlayerAction) []*pluginv1.PlayerAction {

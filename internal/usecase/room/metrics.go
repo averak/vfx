@@ -2,14 +2,12 @@ package room
 
 import "time"
 
-// Metrics is the telemetry the room orchestrator emits.
-// It is an interface so the usecase stays free of the concrete Prometheus registry: bootstrap supplies an adapter, tests use the no-op default.
+// Metrics is a port so the usecase stays free of the concrete Prometheus registry.
 type Metrics interface {
-	// IncActiveMatches and DecActiveMatches track the number of matches currently running in this daemon.
 	IncActiveMatches()
 	DecActiveMatches()
 
-	// ObserveTick records the wall-clock duration of one plugin OnTick.
+	// ObserveTick records the duration of one plugin OnTick.
 	ObserveTick(d time.Duration)
 }
 

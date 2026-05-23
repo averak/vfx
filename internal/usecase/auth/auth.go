@@ -1,4 +1,4 @@
-// Package auth orchestrates the AuthService and owns the transaction boundary via a Transactor.
+// Package auth orchestrates the AuthService.
 //
 // Anonymous login is the only credential currently supported.
 // A non-nil device_id returns the same Player across calls; a nil one mints a fresh Player whose identity carries a random server-side provider_uid and is therefore unrecoverable.
@@ -17,8 +17,7 @@ import (
 	"github.com/averak/vfx/internal/usecase/tx"
 )
 
-// TokenIssuer mints the credentials a login produces.
-// It is a port, so the usecase depends on the capability rather than the crypto in infra.
+// TokenIssuer is a port, so the usecase depends on the capability rather than the crypto in infra.
 type TokenIssuer interface {
 	SignAccess(playerID uuid.UUID, now time.Time, ttl time.Duration) (string, error)
 	NewRefresh() (raw string, hash []byte, err error)
@@ -58,8 +57,7 @@ type LoginResult struct {
 	Player       *player.Player
 }
 
-// LoginAnonymous resolves an anonymous credential into a logged-in session.
-// A non-nil deviceID makes the login idempotent across calls; a nil one always mints a new Player.
+// LoginAnonymous is idempotent for a non-nil deviceID; a nil one always mints a new Player.
 func (u *Usecase) LoginAnonymous(ctx context.Context, deviceID, nickname *string) (*LoginResult, error) {
 	now := clock.Now(ctx)
 
@@ -86,8 +84,7 @@ func (u *Usecase) LoginAnonymous(ctx context.Context, deviceID, nickname *string
 	return result, nil
 }
 
-// Refresh mints a new access token and rotates the refresh token for the holder of the given one.
-// The old token is revoked atomically with the issue of the new pair.
+// Refresh rotates the refresh token: the old one is revoked atomically with the issue of the new pair.
 func (u *Usecase) Refresh(ctx context.Context, refreshTokenRaw string) (*LoginResult, error) {
 	now := clock.Now(ctx)
 
@@ -124,8 +121,7 @@ func (u *Usecase) Refresh(ctx context.Context, refreshTokenRaw string) (*LoginRe
 	return result, nil
 }
 
-// Logout revokes every refresh token belonging to the player.
-// Access tokens issued before this call stay valid until they expire on their own: the server is stateless about access tokens by design.
+// Logout revokes the player's refresh tokens; access tokens issued earlier stay valid until they expire, since the server is stateless about them by design.
 func (u *Usecase) Logout(ctx context.Context, playerID uuid.UUID) error {
 	now := clock.Now(ctx)
 	return u.tx.RW(ctx, func(ctx context.Context) error {
@@ -133,8 +129,7 @@ func (u *Usecase) Logout(ctx context.Context, playerID uuid.UUID) error {
 	})
 }
 
-// UpdateProfile lets the player rename themselves.
-// A nil nickname leaves the field unchanged, so this RPC can grow to set other optional fields without becoming destructive.
+// UpdateProfile leaves a field unchanged when its argument is nil, so the RPC can grow to set other optional fields without becoming destructive.
 func (u *Usecase) UpdateProfile(ctx context.Context, playerID uuid.UUID, nickname *string) (*player.Player, error) {
 	now := clock.Now(ctx)
 
