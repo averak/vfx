@@ -85,7 +85,7 @@ func (u *Usecase) LoginAnonymous(ctx context.Context, deviceID, nickname *string
 	now := clock.Now(ctx)
 
 	var result *LoginResult
-	err := u.tx.RW(ctx, func(ctx context.Context) error {
+	err := u.runLoginTx(ctx, func(ctx context.Context) error {
 		p, err := u.findOrCreatePlayer(ctx, deviceID, nickname, now)
 		if err != nil {
 			return err
@@ -107,6 +107,16 @@ func (u *Usecase) LoginAnonymous(ctx context.Context, deviceID, nickname *string
 	return result, nil
 }
 
+// runLoginTx runs a find-or-create login transaction, retrying once if a concurrent first login for the same identity won the race.
+// On the first attempt the loser's identity insert hits the unique index (ErrIdentityAlreadyLinked) and its transaction rolls back; the retry then finds the winner's player, so concurrent logins are idempotent and never leave an orphan player.
+func (u *Usecase) runLoginTx(ctx context.Context, fn func(ctx context.Context) error) error {
+	err := u.tx.RW(ctx, fn)
+	if errors.Is(err, player.ErrIdentityAlreadyLinked) {
+		return u.tx.RW(ctx, fn)
+	}
+	return err
+}
+
 // LoginOIDC verifies a provider ID token and logs in the matching Player, creating one on first sign-in.
 // The same provider account always maps to the same Player.
 func (u *Usecase) LoginOIDC(ctx context.Context, provider player.Provider, idToken string) (*LoginResult, error) {
@@ -117,7 +127,7 @@ func (u *Usecase) LoginOIDC(ctx context.Context, provider player.Provider, idTok
 	now := clock.Now(ctx)
 
 	var result *LoginResult
-	err := u.tx.RW(ctx, func(ctx context.Context) error {
+	err := u.runLoginTx(ctx, func(ctx context.Context) error {
 		p, err := u.findOrCreateByIdentity(ctx, provider, identity.Subject, nicknameOrNil(identity.Name), now)
 		if err != nil {
 			return err

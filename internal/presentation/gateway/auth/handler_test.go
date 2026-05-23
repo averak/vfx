@@ -1,6 +1,7 @@
 package auth_test
 
 import (
+	"sync"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -257,6 +258,39 @@ func TestLinkIdentity_AlreadyLinkedToAnother(t *testing.T) {
 			Oidc: &authv1.OidcCredential{Provider: authv1.Provider_PROVIDER_GOOGLE, IdToken: "shared"},
 		}), b.GetAccessToken()))
 	requireCode(t, err, connect.CodeAlreadyExists)
+}
+
+// Concurrent first logins with the same provider account must all resolve to one player (idempotent), never erroring or creating duplicates, even though they race to create it.
+func TestLogin_OIDCConcurrentFirstLoginIsIdempotent(t *testing.T) {
+	srv := testconnect.New(t)
+
+	const n = 8
+	var wg sync.WaitGroup
+	ids := make([]string, n)
+	errs := make([]error, n)
+	for i := range n {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			resp, err := srv.Auth.Login(t.Context(), connect.NewRequest(&authv1.LoginRequest{
+				Credential: &authv1.LoginRequest_Oidc{Oidc: &authv1.OidcCredential{Provider: authv1.Provider_PROVIDER_GOOGLE, IdToken: "race-token"}},
+			}))
+			errs[idx] = err
+			if err == nil {
+				ids[idx] = resp.Msg.GetPlayer().GetId()
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent login %d failed: %v", i, err)
+		}
+		if ids[i] != ids[0] {
+			t.Errorf("concurrent login %d got player %s, want %s (duplicate players created)", i, ids[i], ids[0])
+		}
+	}
 }
 
 func ptr[T any](v T) *T { return &v }

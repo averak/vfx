@@ -6,11 +6,20 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/averak/vfx/internal/domain/player"
 	"github.com/averak/vfx/internal/infra/db"
 	"github.com/averak/vfx/internal/infra/dbgen"
 )
+
+// uniqueViolation is the PostgreSQL SQLSTATE for a unique-constraint violation.
+const uniqueViolation = "23505"
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == uniqueViolation
+}
 
 // Player is the storage implementation of [player.Repository].
 //
@@ -82,6 +91,10 @@ func (Player) SaveIdentity(ctx context.Context, i *player.Identity) error {
 		ProviderUid: i.ProviderUID,
 		CreatedAt:   toTimestamptz(i.CreatedAt),
 	})
+	// The unique (provider, provider_uid) index turns a concurrent identity insert into this violation; surface it as the domain error so the caller can resolve the race (relink target, or retry login and find the winner).
+	if isUniqueViolation(err) {
+		return player.ErrIdentityAlreadyLinked
+	}
 	return err
 }
 
