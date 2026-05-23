@@ -6,9 +6,8 @@ import "google/protobuf/timestamp.proto";
 
 // MatchService はマッチメイキング関連の RPC を提供する。
 //
-// プレイヤーは CreateTicket でチケットを投入し、WatchTicket で server stream
-// を購読してマッチ成立を待つ。サーバ側 matchmaker が定期的にキューを走査し、
-// 互換性のあるチケット同士をグループ化して room を割り当てる。
+// プレイヤーは CreateTicket でチケットを投入し、WatchTicket で server stream を購読してマッチ成立を待つ。
+// サーバ側 matchmaker が定期的にキューを走査し、互換性のあるチケット同士をグループ化して room を割り当てる。
 //
 // 切断後の再接続は GetCurrentMatch で現在の接続情報を引き直す。
 service MatchService {
@@ -25,10 +24,8 @@ service MatchService {
 
   // GetCurrentMatch は現在進行中のマッチがあれば接続情報を返す。
   //
-  // 切断・アプリ再起動・端末復帰など、クライアントが session_token を
-  // 失った状態から再接続する際に使う。room daemon 側は player の grace
-  // period 内 (デフォルト 60 秒) はスロットを保持しているので、その
-  // 期間内にこの RPC で取得した token で再接続すれば同じスロットに復帰できる。
+  // 切断・アプリ再起動・端末復帰など、クライアントが session_token を失った状態から再接続する際に使う。
+  // room daemon 側は player の grace period 内 (デフォルト 60 秒) はスロットを保持しているので、その期間内にこの RPC で取得した token で再接続すれば同じスロットに復帰できる。
   rpc GetCurrentMatch(GetCurrentMatchRequest) returns (GetCurrentMatchResponse);
 }
 

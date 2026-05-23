@@ -5,8 +5,7 @@ package vfx.v1.realtime;
 // Frame は WebTransport 上を流れるすべてのメッセージを包む envelope。
 //
 // Reliable Stream と Unreliable Datagram の両方で同じ codec を使う。
-// 重要イベント (game_started, score 等) は Reliable Stream、高頻度の
-// 状態更新 (位置・物理) は Datagram で送ることを想定する。
+// 重要イベント (game_started, score 等) は Reliable Stream、高頻度の状態更新 (位置・物理) は Datagram で送ることを想定する。
 message Frame {
   // Reliable Stream で送る場合の連番。Datagram では 0。
   uint64 seq = 1;

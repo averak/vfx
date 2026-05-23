@@ -1,7 +1,6 @@
 // TypeScript client SDK for vfx.
 //
-// Mirrors the Go SDK (sdk/client/go) so the same flow reads the same in
-// both languages:
+// Mirrors the Go SDK (sdk/client/go) so the same flow reads the same in both languages:
 //
 //   const client = new VfxClient("http://localhost:8080");
 //   await client.loginAnonymous("device-1", "Alice");
@@ -11,9 +10,8 @@
 //   session.onFrame((frame) => { ... });
 //   await session.sendInput(0, new Uint8Array([82])); // 'R'
 //
-// Realtime uses the browser-native WebTransport API. For local
-// development against a self-signed certificate, pass the cert's
-// SHA-256 hash via connect({ serverCertificateHashes }).
+// Realtime uses the browser-native WebTransport API.
+// For local development against a self-signed certificate, pass the cert's SHA-256 hash via connect({ serverCertificateHashes }).
 
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { createClient, type Client } from "@connectrpc/connect";
@@ -57,8 +55,8 @@ export class VfxClient {
   }
 
   /**
-   * Log in with an anonymous credential. A stable deviceId returns the
-   * same player across calls; an empty deviceId mints a fresh one.
+   * Log in with an anonymous credential.
+   * A stable deviceId returns the same player across calls; an empty deviceId mints a fresh one.
    * nickname is applied only on first registration.
    */
   async loginAnonymous(deviceId?: string, nickname?: string): Promise<Player> {
@@ -86,9 +84,8 @@ export class VfxClient {
   }
 
   /**
-   * Follow the WatchTicket stream until the ticket is matched, then
-   * resolve with the connection details. Rejects on matchmaking
-   * failure.
+   * Follow the WatchTicket stream until the ticket is matched, then resolve with the connection details.
+   * Rejects on matchmaking failure.
    */
   async waitForMatch(ticketId: string): Promise<Match> {
     const stream = this.match.watchTicket(
@@ -118,9 +115,9 @@ export class VfxClient {
 /** Options for opening a room session. */
 export interface ConnectOptions {
   /**
-   * SHA-256 hashes of acceptable server certificates, for connecting to
-   * a self-signed development server. Each entry is the raw 32-byte
-   * digest. When omitted the browser's normal CA validation applies.
+   * SHA-256 hashes of acceptable server certificates, for connecting to a self-signed development server.
+   * Each entry is the raw 32-byte digest.
+   * When omitted the browser's normal CA validation applies.
    */
   serverCertificateHashes?: Uint8Array[];
 }
@@ -140,8 +137,7 @@ export class Match {
     const init: WebTransportOptions = {};
     if (options.serverCertificateHashes) {
       init.serverCertificateHashes = options.serverCertificateHashes.map((hash) => {
-        // Copy into a fresh ArrayBuffer-backed view so the type is
-        // BufferSource regardless of where the bytes originated.
+        // Copy into a fresh ArrayBuffer-backed view so the type is BufferSource regardless of where the bytes originated.
         const value = new Uint8Array(hash.length);
         value.set(hash);
         return { algorithm: "sha-256", value };
@@ -151,11 +147,8 @@ export class Match {
     const wt = new WebTransport(url, init);
     await wt.ready;
 
-    // The room authorises the connection from the session token sent in
-    // the CONNECT request. The browser WebTransport API cannot set
-    // arbitrary headers, so the token also travels in the URL path's
-    // match id and is validated server-side; a future iteration adds a
-    // post-connect auth frame for browsers.
+    // The room authorises the connection from the session token sent in the CONNECT request.
+    // The browser WebTransport API cannot set arbitrary headers, so the token also travels in the URL path's match id and is validated server-side; a future iteration adds a post-connect auth frame for browsers.
     return new Session(wt, this.sessionToken);
   }
 }
@@ -213,8 +206,7 @@ export class Session {
     }
   }
 
-  // streamLoop reads frames sent over reliable unidirectional streams
-  // (large snapshots); each stream carries exactly one frame.
+  // streamLoop reads frames sent over reliable unidirectional streams (large snapshots); each stream carries exactly one frame.
   private async streamLoop(): Promise<void> {
     try {
       const streams = this.wt.incomingUnidirectionalStreams.getReader();
@@ -266,9 +258,8 @@ function concatChunks(chunks: Uint8Array[]): Uint8Array {
 }
 
 /**
- * Pull the match id ("mid" claim) out of the session token's JWT
- * payload. The client does not verify the signature — the room does
- * that on accept — it only needs the id to build the URL.
+ * Pull the match id ("mid" claim) out of the session token's JWT payload.
+ * The client does not verify the signature (the room does that on accept); it only needs the id to build the URL.
  */
 function matchIdFromToken(token: string): string {
   const parts = token.split(".");

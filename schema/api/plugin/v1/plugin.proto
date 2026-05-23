@@ -6,13 +6,11 @@ import "google/protobuf/timestamp.proto";
 
 // PluginService は WASM ゲームプラグインが実装すべき ABI を定義する。
 //
-// vfx room はプラグインをロードした後、Init を 1 回呼んでマニフェストを
-// 受け取り、その後は固定 tick rate で OnTick を回す。試合終了 (tick で
-// game_ended=true を返す) の後に OnGameEnd が呼ばれ、永続化すべき最終
-// 結果を受け取る。
+// vfx room はプラグインをロードした後、Init を 1 回呼んでマニフェストを受け取り、その後は固定 tick rate で OnTick を回す。
+// 試合終了 (tick で game_ended=true を返す) の後に OnGameEnd が呼ばれ、永続化すべき最終結果を受け取る。
 //
-// すべての境界越え呼び出しは protobuf シリアライズを介して行う。FFI コスト
-// を抑えるため、1 tick 分の入力と出力をそれぞれまとめて 1 回ずつ渡す。
+// すべての境界越え呼び出しは protobuf シリアライズを介して行う。
+// FFI コストを抑えるため、1 tick 分の入力と出力をそれぞれまとめて 1 回ずつ渡す。
 service PluginService {
   // Init はプラグインのロード直後に 1 回だけ呼ばれる。
   // プラグインは tick rate などの実行要件を返す。
@@ -42,8 +40,7 @@ message InitRequest {
 
 message InitResponse {
   // プラグインが希望する tick rate (Hz)。
-  // 0 を返すとイベント駆動 (ターン制等) を意味し、入力が到着したときだけ
-  // OnTick が呼ばれる。
+  // 0 を返すとイベント駆動 (ターン制等) を意味し、入力が到着したときだけ OnTick が呼ばれる。
   uint32 tick_rate_hz = 1;
 
   // 初期 snapshot (任意)。クライアントに最初に配信される。
