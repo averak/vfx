@@ -19,7 +19,7 @@ const (
 // Auth returns an interceptor that verifies a bearer access token when one is supplied and attaches the player id to the context.
 // Missing or invalid tokens are not rejected here; the handler decides whether it requires authentication and reads from authctx accordingly.
 //
-// This deliberate softness lets Login/Refresh work without an Authorization header, while Logout/UpdateProfile/Match.* opt into a hard check via authctx.From.
+// This deliberate softness lets endpoints that allow anonymous access work without an Authorization header, while authenticated endpoints opt into a hard check via authctx.From.
 //
 // The interceptor implements the full [connect.Interceptor], so it applies to both unary and streaming RPCs (WatchTicket and similar).
 func Auth(signer *token.Signer) connect.Interceptor {
