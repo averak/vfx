@@ -29,6 +29,11 @@ existingJwtSecretName: "" # When set, the chart binds VFX_JWT_SECRET to this Sec
 gateway:
   enabled: true
   replicas: 2
+  # Matchmaking shape. gameModes should include the room's gameMode so
+  # the allocator can find a Fleet for each mode.
+  gameModes:
+    - rps
+  playersPerMatch: 2
   resources:
     requests:
       cpu: 100m

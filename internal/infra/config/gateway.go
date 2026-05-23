@@ -36,6 +36,18 @@ type Gateway struct {
 	// MatchmakerInterval is how often the worker scans the queue.
 	MatchmakerInterval time.Duration `env:"VFX_MATCHMAKER_INTERVAL" envDefault:"200ms"`
 
+	// GameModes lists the modes the matchmaker scans; PlayersPerMatch is
+	// how many tickets form one match. These default to the rps sample
+	// but are config-driven so the engine is not game-specific.
+	GameModes       []string `env:"VFX_GAME_MODES"        envDefault:"rps" envSeparator:","`
+	PlayersPerMatch int      `env:"VFX_PLAYERS_PER_MATCH" envDefault:"2"`
+
+	// Tier-based matching knobs (see usecase/match.Config). Zero values
+	// fall back to the matchmaker's built-in defaults.
+	MatchBaseRatingWindow         float64       `env:"VFX_MATCH_BASE_RATING_WINDOW"`
+	MatchRatingWindowGrowthPerSec float64       `env:"VFX_MATCH_RATING_WINDOW_GROWTH_PER_SEC"`
+	MatchRegionRelaxAfter         time.Duration `env:"VFX_MATCH_REGION_RELAX_AFTER"`
+
 	// RoomEndpoint is the address handed to clients by the stub
 	// allocator; every match points at the same address. The Agones
 	// allocator ignores it in favour of the allocated GameServer's

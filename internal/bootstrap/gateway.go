@@ -152,12 +152,15 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	matchUC := usecasematch.New(matchQueue, matchAssignments)
 	matchHandler := gatewaymatchhandler.New(matchUC)
 	matchmaker := usecasematch.NewMatchmaker(matchQueue, matchAllocator, signer, usecasematch.Config{
-		Interval:        cfg.MatchmakerInterval,
-		SessionTokenTTL: cfg.SessionTokenTTL,
-		PlayersPerMatch: 2,
-		GameModes:       []string{"rps"},
-		Assignments:     matchAssignments,
-		Metrics:         matchmakerMetrics{reg: metricsReg},
+		Interval:                 cfg.MatchmakerInterval,
+		SessionTokenTTL:          cfg.SessionTokenTTL,
+		PlayersPerMatch:          cfg.PlayersPerMatch,
+		GameModes:                cfg.GameModes,
+		BaseRatingWindow:         cfg.MatchBaseRatingWindow,
+		RatingWindowGrowthPerSec: cfg.MatchRatingWindowGrowthPerSec,
+		RegionRelaxAfter:         cfg.MatchRegionRelaxAfter,
+		Assignments:              matchAssignments,
+		Metrics:                  matchmakerMetrics{reg: metricsReg},
 	})
 
 	cleanup := func() {

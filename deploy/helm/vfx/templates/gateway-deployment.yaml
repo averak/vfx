@@ -46,6 +46,10 @@ spec:
                 secretKeyRef:
                   name: {{ include "vfx.jwtSecretName" . }}
                   key: jwt-secret
+            - name: VFX_GAME_MODES
+              value: {{ join "," .Values.gateway.gameModes | quote }}
+            - name: VFX_PLAYERS_PER_MATCH
+              value: {{ .Values.gateway.playersPerMatch | quote }}
             {{- if .Values.agones.enabled }}
             - name: VFX_ALLOCATOR
               value: "agones"
