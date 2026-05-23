@@ -84,6 +84,9 @@ type Gateway struct {
 	LeaderboardDefaultLimit int      `env:"VFX_LEADERBOARD_DEFAULT_LIMIT"  envDefault:"20"`
 	LeaderboardMaxLimit     int      `env:"VFX_LEADERBOARD_MAX_LIMIT"      envDefault:"100"`
 	LeaderboardMaxRadius    int      `env:"VFX_LEADERBOARD_MAX_RADIUS"     envDefault:"50"`
+
+	ChatHistoryDefaultLimit int `env:"VFX_CHAT_HISTORY_DEFAULT_LIMIT" envDefault:"50"`
+	ChatHistoryMaxLimit     int `env:"VFX_CHAT_HISTORY_MAX_LIMIT"     envDefault:"200"`
 }
 
 func LoadGateway() (*Gateway, error) {

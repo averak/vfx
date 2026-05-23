@@ -206,3 +206,23 @@ CREATE TABLE friendships (
 -- The unique constraint indexes player_low; this covers lookups landing on the high side.
 CREATE INDEX idx_friendships_player_high
   ON friendships (player_high);
+
+-- ============================================================================
+-- direct_messages
+--   One row per DM. (player_low, player_high) is the canonical conversation key so a pair maps to one conversation; sender_id is whichever participant sent it.
+-- ============================================================================
+
+CREATE TABLE direct_messages (
+  id           UUID         PRIMARY KEY,
+  player_low   UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  player_high  UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  sender_id    UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  body         TEXT         NOT NULL,
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  CONSTRAINT direct_messages_canonical_order CHECK (player_low < player_high),
+  CONSTRAINT direct_messages_sender_in_pair CHECK (sender_id = player_low OR sender_id = player_high)
+);
+
+-- Serves the newest-first, before-cursor history scan scoped to a conversation.
+CREATE INDEX idx_direct_messages_conversation
+  ON direct_messages (player_low, player_high, created_at DESC);

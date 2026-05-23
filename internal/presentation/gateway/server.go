@@ -12,6 +12,7 @@ import (
 	"connectrpc.com/otelconnect"
 
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
+	"github.com/averak/vfx/gen/go/vfx/v1/chat/chatconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/leaderboard/leaderboardconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/social/socialconnect"
@@ -50,6 +51,9 @@ func NewHandler(c *bootstrap.Gateway) (http.Handler, error) {
 
 	socialPath, socialHandler := socialconnect.NewSocialServiceHandler(c.SocialHandler, interceptors)
 	mux.Handle(socialPath, socialHandler)
+
+	chatPath, chatHandler := chatconnect.NewChatServiceHandler(c.ChatHandler, interceptors)
+	mux.Handle(chatPath, chatHandler)
 
 	// Storage is optional: the handlers are nil when no object-store bucket is configured, and the services simply go unmounted.
 	if c.PlayerDataStorageHandler != nil {

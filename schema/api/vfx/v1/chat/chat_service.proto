@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package vfx.v1.chat;
+
+import "google/protobuf/timestamp.proto";
+
+// ChatService はプレイヤー間のダイレクトメッセージを提供する。
+//
+// v1 は 1 対 1 の DM のみ。グループチャンネルとリアルタイム購読 (server stream) は後続。
+// 履歴は新しい順で、before カーソル (その時刻より古いもの) + limit でページングする。
+service ChatService {
+  // SendDirectMessage は相手に DM を送り、保存されたメッセージを返す。
+  rpc SendDirectMessage(SendDirectMessageRequest) returns (SendDirectMessageResponse);
+
+  // ListDirectMessages は相手との会話履歴を新しい順で返す。
+  rpc ListDirectMessages(ListDirectMessagesRequest) returns (ListDirectMessagesResponse);
+}
+
+// Message は 1 通の DM。
+message Message {
+  string id = 1;
+  string sender_id = 2;
+  string recipient_id = 3;
+  string body = 4;
+  google.protobuf.Timestamp sent_at = 5;
+}
+
+message SendDirectMessageRequest {
+  string recipient_id = 1;
+  string body = 2;
+}
+
+message SendDirectMessageResponse {
+  Message message = 1;
+}
+
+message ListDirectMessagesRequest {
+  // 会話相手。
+  string other_player_id = 1;
+
+  // 任意。この時刻より前 (古い) のメッセージを返す。未指定なら最新から。
+  google.protobuf.Timestamp before = 2;
+
+  // 取得件数。0 はサーバ既定値、上限はサーバ側でクランプ。
+  int32 limit = 3;
+}
+
+message ListDirectMessagesResponse {
+  // 新しい順。
+  repeated Message messages = 1;
+}

@@ -37,9 +37,11 @@ import {
   type Friend,
   type FriendRequest,
 } from "./gen/vfx/v1/social/social_service_pb.js";
+import { ChatService, type Message as ChatMessage } from "./gen/vfx/v1/chat/chat_service_pb.js";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 
 export { Provider, RequestStatus };
-export type { Player, Frame, FileMetadata, RankEntry, Friend, FriendRequest };
+export type { Player, Frame, FileMetadata, RankEntry, Friend, FriendRequest, ChatMessage };
 
 /** Options for constructing a VfxClient. */
 export interface VfxClientOptions {
@@ -55,6 +57,7 @@ export class VfxClient {
   private readonly titleStorage: Client<typeof TitleStorageService>;
   private readonly leaderboard: Client<typeof LeaderboardService>;
   private readonly social: Client<typeof SocialService>;
+  private readonly chat: Client<typeof ChatService>;
   // The same fetch is used for the direct object-store transfers (PUT/GET on signed URLs), which do not go through the Connect transport.
   private readonly fetchImpl: typeof globalThis.fetch;
   private accessToken = "";
@@ -71,6 +74,7 @@ export class VfxClient {
     this.titleStorage = createClient(TitleStorageService, transport);
     this.leaderboard = createClient(LeaderboardService, transport);
     this.social = createClient(SocialService, transport);
+    this.chat = createClient(ChatService, transport);
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
@@ -274,6 +278,28 @@ export class VfxClient {
 
   async removeFriend(friendPlayerId: string): Promise<void> {
     await this.social.removeFriend({ friendPlayerId }, { headers: this.authHeaders() });
+  }
+
+  /** Send a direct message and return the stored message. */
+  async sendDirectMessage(recipientId: string, body: string): Promise<ChatMessage | undefined> {
+    const resp = await this.chat.sendDirectMessage({ recipientId, body }, { headers: this.authHeaders() });
+    return resp.message;
+  }
+
+  /** Conversation history with another player, newest-first; pass before to page back to older messages. */
+  async listDirectMessages(
+    otherPlayerId: string,
+    opts: { before?: Date; limit?: number } = {},
+  ): Promise<ChatMessage[]> {
+    const resp = await this.chat.listDirectMessages(
+      {
+        otherPlayerId,
+        before: opts.before ? timestampFromDate(opts.before) : undefined,
+        limit: opts.limit ?? 0,
+      },
+      { headers: this.authHeaders() },
+    );
+    return resp.messages;
   }
 
   private authHeaders(): HeadersInit {

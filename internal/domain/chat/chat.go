@@ -1,0 +1,60 @@
+// Package chat is the direct-message aggregate.
+//
+// A message belongs to the conversation between two players, identified by the canonical (low, high) ordering of their ids so each pair has a single conversation.
+package chat
+
+import (
+	"errors"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/google/uuid"
+)
+
+// MaxBodyLength bounds a message in runes; enforcing it here keeps a valid body intrinsic to a Message.
+const MaxBodyLength = 2000
+
+var (
+	ErrSelfMessage = errors.New("chat: cannot message yourself")
+	ErrInvalidBody = errors.New("chat: body is blank or too long")
+)
+
+// Message is one direct message.
+type Message struct {
+	ID          uuid.UUID
+	SenderID    uuid.UUID
+	RecipientID uuid.UUID
+	Body        string
+	SentAt      time.Time
+}
+
+// NewMessage validates the body and rejects self-messages, so an invalid message can never be constructed.
+func NewMessage(id, sender, recipient uuid.UUID, body string, now time.Time) (*Message, error) {
+	if sender == recipient {
+		return nil, ErrSelfMessage
+	}
+	if strings.TrimSpace(body) == "" || utf8.RuneCountInString(body) > MaxBodyLength {
+		return nil, ErrInvalidBody
+	}
+	return &Message{
+		ID:          id,
+		SenderID:    sender,
+		RecipientID: recipient,
+		Body:        body,
+		SentAt:      now,
+	}, nil
+}
+
+// Conversation returns the canonical (low, high) ordering of two participants, so the pair maps to one conversation regardless of who sends.
+func Conversation(a, b uuid.UUID) (low, high uuid.UUID) {
+	for i := range a {
+		switch {
+		case a[i] < b[i]:
+			return a, b
+		case a[i] > b[i]:
+			return b, a
+		}
+	}
+	return a, b
+}

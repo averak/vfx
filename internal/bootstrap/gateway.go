@@ -28,11 +28,13 @@ import (
 	"github.com/averak/vfx/internal/infra/token"
 	"github.com/averak/vfx/internal/infra/valkey"
 	gatewayauthhandler "github.com/averak/vfx/internal/presentation/gateway/auth"
+	gatewaychathandler "github.com/averak/vfx/internal/presentation/gateway/chat"
 	gatewayleaderboardhandler "github.com/averak/vfx/internal/presentation/gateway/leaderboard"
 	gatewaymatchhandler "github.com/averak/vfx/internal/presentation/gateway/match"
 	gatewaysocialhandler "github.com/averak/vfx/internal/presentation/gateway/social"
 	gatewaystoragehandler "github.com/averak/vfx/internal/presentation/gateway/storage"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
+	usecasechat "github.com/averak/vfx/internal/usecase/chat"
 	usecaseleaderboard "github.com/averak/vfx/internal/usecase/leaderboard"
 	usecasematch "github.com/averak/vfx/internal/usecase/match"
 	usecasesocial "github.com/averak/vfx/internal/usecase/social"
@@ -74,6 +76,9 @@ type Gateway struct {
 
 	SocialUsecase *usecasesocial.Usecase
 	SocialHandler *gatewaysocialhandler.Handler
+
+	ChatUsecase *usecasechat.Usecase
+	ChatHandler *gatewaychathandler.Handler
 }
 
 // matchmakerMetrics adapts the Prometheus registry to the usecasematch.Metrics interface, keeping the usecase layer free of a concrete metrics dependency.
@@ -232,6 +237,12 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	socialUC := usecasesocial.New(session, session, repository.NewSocial())
 	socialHandler := gatewaysocialhandler.New(socialUC)
 
+	chatUC := usecasechat.New(session, session, repository.NewChat(), usecasechat.Config{
+		DefaultLimit: cfg.ChatHistoryDefaultLimit,
+		MaxLimit:     cfg.ChatHistoryMaxLimit,
+	})
+	chatHandler := gatewaychathandler.New(chatUC)
+
 	cleanup := func() {
 		blobCleanup()
 		valkeyClient.Close()
@@ -266,6 +277,9 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 
 		SocialUsecase: socialUC,
 		SocialHandler: socialHandler,
+
+		ChatUsecase: chatUC,
+		ChatHandler: chatHandler,
 	}, cleanup, nil
 }
 

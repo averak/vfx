@@ -14,6 +14,7 @@ import (
 	"connectrpc.com/connect"
 
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
+	"github.com/averak/vfx/gen/go/vfx/v1/chat/chatconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/leaderboard/leaderboardconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/social/socialconnect"
@@ -27,6 +28,7 @@ import (
 	"github.com/averak/vfx/internal/infra/repository"
 	"github.com/averak/vfx/internal/infra/token"
 	gatewayauthhandler "github.com/averak/vfx/internal/presentation/gateway/auth"
+	gatewaychathandler "github.com/averak/vfx/internal/presentation/gateway/chat"
 	gatewayleaderboardhandler "github.com/averak/vfx/internal/presentation/gateway/leaderboard"
 	gatewaymatchhandler "github.com/averak/vfx/internal/presentation/gateway/match"
 	gatewaysocialhandler "github.com/averak/vfx/internal/presentation/gateway/social"
@@ -35,6 +37,7 @@ import (
 	"github.com/averak/vfx/internal/testutils/fakeoidc"
 	"github.com/averak/vfx/internal/testutils/testdb"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
+	usecasechat "github.com/averak/vfx/internal/usecase/chat"
 	usecaseleaderboard "github.com/averak/vfx/internal/usecase/leaderboard"
 	usecasematch "github.com/averak/vfx/internal/usecase/match"
 	usecasesocial "github.com/averak/vfx/internal/usecase/social"
@@ -62,6 +65,7 @@ type Server struct {
 	Title       storageconnect.TitleStorageServiceClient
 	Leaderboard leaderboardconnect.LeaderboardServiceClient
 	Social      socialconnect.SocialServiceClient
+	Chat        chatconnect.ChatServiceClient
 
 	// Blob is the in-memory object store behind the storage services; tests Put an object to simulate a finished upload before CommitFile.
 	Blob *fakeblob.Store
@@ -132,6 +136,10 @@ func New(t *testing.T) *Server {
 	socialPath, socialHandler := socialconnect.NewSocialServiceHandler(gatewaysocialhandler.New(socialUC), interceptors)
 	mux.Handle(socialPath, socialHandler)
 
+	chatUC := usecasechat.New(session, session, repository.NewChat(), usecasechat.Config{DefaultLimit: 50, MaxLimit: 200})
+	chatPath, chatHandler := chatconnect.NewChatServiceHandler(gatewaychathandler.New(chatUC), interceptors)
+	mux.Handle(chatPath, chatHandler)
+
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
@@ -142,6 +150,7 @@ func New(t *testing.T) *Server {
 		Title:       storageconnect.NewTitleStorageServiceClient(srv.Client(), srv.URL),
 		Leaderboard: leaderboardconnect.NewLeaderboardServiceClient(srv.Client(), srv.URL),
 		Social:      socialconnect.NewSocialServiceClient(srv.Client(), srv.URL),
+		Chat:        chatconnect.NewChatServiceClient(srv.Client(), srv.URL),
 		Blob:        blob,
 		session:     session,
 		httpServer:  srv,
