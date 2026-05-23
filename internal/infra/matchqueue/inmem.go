@@ -30,7 +30,6 @@ type ticketEntry struct {
 	claimed  bool
 }
 
-// Verify the contract.
 var _ match.Queue = (*InMem)(nil)
 
 // NewInMem returns an empty in-memory queue.

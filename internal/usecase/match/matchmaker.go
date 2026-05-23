@@ -198,17 +198,19 @@ func (m *Matchmaker) pair(ctx context.Context, mode string, tickets []*match.Tic
 
 	now := clock.Now(ctx)
 	expiresAt := now.Add(m.sessionTokenTTL)
+	logger := slog.Default().With("worker", "matchmaker")
 
 	matchPlayers := make([]string, 0, len(tickets))
 	for _, t := range tickets {
 		matchPlayers = append(matchPlayers, t.PlayerID.String())
 	}
 
+	paired := 0
 	for _, t := range tickets {
 		sessionToken, signErr := m.signer.SignSession(t.PlayerID, allocation.MatchID, matchPlayers, now, m.sessionTokenTTL)
 		if signErr != nil {
 			// Tell the player it failed; do not leak which signing step broke.
-			//nolint:errcheck // Best-effort notification; we already return err.
+			//nolint:errcheck // Best-effort notification; the match is already failing for this player.
 			_ = m.queue.Publish(ctx, t.ID, match.EventFailed{
 				Reason:  "internal",
 				Message: "failed to issue session token",
@@ -225,16 +227,29 @@ func (m *Matchmaker) pair(ctx context.Context, mode string, tickets []*match.Tic
 
 		// Persist before publishing so a client that reads the live
 		// Matched event and immediately calls GetCurrentMatch (e.g. after
-		// a reconnect) cannot race ahead of the store.
+		// a reconnect) cannot race ahead of the store. If the persist
+		// fails we must NOT tell the player it matched — it would hold a
+		// token it could never recover via GetCurrentMatch — so we fail
+		// this player instead.
 		if storeErr := m.assignments.Put(ctx, t.PlayerID, assignment, m.sessionTokenTTL); storeErr != nil {
-			logger := slog.Default().With("worker", "matchmaker")
 			logger.Error("failed to persist assignment", "player_id", t.PlayerID, "err", storeErr)
+			//nolint:errcheck // Best-effort notification; the match is already failing for this player.
+			_ = m.queue.Publish(ctx, t.ID, match.EventFailed{
+				Reason:  "internal",
+				Message: "failed to record assignment",
+			})
+			continue
 		}
 
 		//nolint:errcheck // Best-effort notification; subscriber may have dropped.
 		_ = m.queue.Publish(ctx, t.ID, match.EventMatched{Assignment: assignment})
+		paired++
 	}
-	m.metrics.MatchAllocated()
+	// Only count a fully formed match: every player got a token and a
+	// persisted assignment. A partial failure is not an allocation.
+	if paired == len(tickets) {
+		m.metrics.MatchAllocated()
+	}
 	return nil
 }
 

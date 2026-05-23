@@ -16,6 +16,7 @@ package plugin
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
 
 	pluginv1 "github.com/averak/vfx/gen/go/plugin/v1"
 )
@@ -95,12 +96,12 @@ func (g *Game) OnGameEnd(_ *pluginv1.OnGameEndRequest) (*pluginv1.OnGameEndRespo
 			{
 				PlayerId: g.state.playerA,
 				Rank:     g.state.rankOf(g.state.playerA),
-				Stats:    map[string]string{"wins": itoa(g.state.scoreA)},
+				Stats:    map[string]string{"wins": strconv.Itoa(g.state.scoreA)},
 			},
 			{
 				PlayerId: g.state.playerB,
 				Rank:     g.state.rankOf(g.state.playerB),
-				Stats:    map[string]string{"wins": itoa(g.state.scoreB)},
+				Stats:    map[string]string{"wins": strconv.Itoa(g.state.scoreB)},
 			},
 		},
 	}, nil
@@ -237,18 +238,4 @@ func normalize(c byte) byte {
 		return 'S'
 	}
 	return 0
-}
-
-// itoa converts a small non-negative int to a decimal string without
-// pulling in strconv.
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	digits := []byte{}
-	for n > 0 {
-		digits = append([]byte{byte('0' + n%10)}, digits...)
-		n /= 10
-	}
-	return string(digits)
 }

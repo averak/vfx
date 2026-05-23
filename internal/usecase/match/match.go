@@ -9,7 +9,6 @@ package match
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -82,15 +81,11 @@ func (u *Usecase) WatchTicket(ctx context.Context, ticketID uuid.UUID) (<-chan m
 }
 
 // CancelTicket marks the ticket as cancelled, publishing a Failed
-// event so any active WatchTicket subscriber exits cleanly.
+// event so any active WatchTicket subscriber exits cleanly. The queue
+// returns match.ErrTicketNotFound for an unknown ticket, which the
+// handler maps to a NotFound response.
 func (u *Usecase) CancelTicket(ctx context.Context, ticketID uuid.UUID) error {
-	if err := u.queue.Cancel(ctx, ticketID); err != nil {
-		if errors.Is(err, match.ErrTicketNotFound) {
-			return err
-		}
-		return err
-	}
-	return nil
+	return u.queue.Cancel(ctx, ticketID)
 }
 
 // GetCurrentMatch returns the player's active match assignment, if any.

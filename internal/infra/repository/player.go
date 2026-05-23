@@ -20,7 +20,6 @@ import (
 // transactions.
 type Player struct{}
 
-// Verify at compile time that *Player satisfies the domain interface.
 var _ player.Repository = (*Player)(nil)
 
 // NewPlayer returns a Player repository ready to use.

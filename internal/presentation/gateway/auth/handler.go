@@ -23,7 +23,6 @@ type Handler struct {
 	uc *usecaseauth.Usecase
 }
 
-// Verify the contract at compile time.
 var _ authconnect.AuthServiceHandler = (*Handler)(nil)
 
 // New wires the handler with its usecase.
