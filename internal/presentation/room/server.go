@@ -31,7 +31,6 @@ import (
 // It resolves through the global tracer provider, so spans are no-ops until tracing.Setup installs an exporter.
 var tracer = otel.Tracer("github.com/averak/vfx/internal/presentation/room")
 
-// Server hosts the WebTransport endpoint for a single room daemon.
 type Server struct {
 	cfg     *config.Room
 	signer  *token.Signer

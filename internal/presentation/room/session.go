@@ -15,8 +15,7 @@ import (
 	usecaseroom "github.com/averak/vfx/internal/usecase/room"
 )
 
-// playerSession bridges one WebTransport session and the Match it belongs to.
-// It satisfies usecaseroom.PlayerIO so the orchestrator can call SendFrame without knowing anything about WebTransport.
+// playerSession adapts a WebTransport session to usecaseroom.PlayerIO, so the orchestrator never touches WebTransport.
 type playerSession struct {
 	playerID    uuid.UUID
 	matchID     uuid.UUID
@@ -36,9 +35,7 @@ func newPlayerSession(playerID, matchID uuid.UUID, session *webtransport.Session
 	}
 }
 
-// SendFrame marshals frame and delivers it.
-// Small frames go as unreliable datagrams, which is what we want for high-frequency state deltas.
-// Frames larger than datagramMax (typically full snapshots) go over a reliable unidirectional stream so they aren't dropped or rejected for size.
+// SendFrame sends small frames as unreliable datagrams (high-frequency deltas) and larger ones (typically full snapshots) over a reliable unidirectional stream so they aren't dropped or rejected for size.
 // A datagram that fails (e.g. exceeds the path MTU) also falls back to a stream rather than losing the frame.
 func (s *playerSession) SendFrame(frame *realtimev1.Frame) error {
 	if s.closed.Load() {
@@ -84,8 +81,7 @@ func (s *playerSession) sendStream(data []byte) error {
 // Close marks the session as closed; the WebTransport teardown happens in the handler once readLoop returns.
 func (s *playerSession) Close() { s.closed.Store(true) }
 
-// readLoop pumps datagrams from the WebTransport session into the match as PlayerInputs.
-// It returns when the underlying transport closes or ctx is cancelled.
+// readLoop returns when the underlying transport closes or ctx is cancelled.
 func (s *playerSession) readLoop(ctx context.Context, match *usecaseroom.Match) {
 	for {
 		raw, err := s.session.ReceiveDatagram(ctx)

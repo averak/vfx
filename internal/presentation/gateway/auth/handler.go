@@ -17,7 +17,6 @@ import (
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
 )
 
-// Handler implements [authconnect.AuthServiceHandler].
 type Handler struct {
 	uc *usecaseauth.Usecase
 }

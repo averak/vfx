@@ -16,7 +16,6 @@ import (
 	usecasematch "github.com/averak/vfx/internal/usecase/match"
 )
 
-// Handler implements [matchconnect.MatchServiceHandler].
 type Handler struct {
 	uc *usecasematch.Usecase
 }
