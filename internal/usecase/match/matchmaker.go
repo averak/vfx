@@ -8,17 +8,16 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/averak/vfx/internal/domain/match"
-	"github.com/averak/vfx/internal/infra/token"
 	"github.com/averak/vfx/internal/stdx/clock"
 )
 
 // Matchmaker is the long-running worker that pairs queued tickets and
 // reserves rooms via the Allocator.
 //
-// It pairs tickets by game mode using a rating window that widens with
-// wait time and region constraints that relax after a deadline (see
-// selectBatch). The queue's atomic Claim keeps pairing safe when the
-// matchmaker runs on more than one replica.
+// It pairs tickets by game mode using the domain Matcher (rating window
+// that widens with wait time, region relaxed after a deadline). The
+// queue's atomic Claim keeps pairing safe when the matchmaker runs on
+// more than one replica.
 
 // Metrics is the subset of telemetry the matchmaker emits. It is an
 // interface so the usecase layer stays free of the concrete Prometheus
@@ -33,10 +32,17 @@ type noopMetrics struct{}
 func (noopMetrics) MatchAllocated()           {}
 func (noopMetrics) SetQueueDepth(string, int) {}
 
+// SessionSigner mints the per-match session token a paired player uses
+// to connect to its room. A port, so the usecase depends on the
+// capability rather than the concrete signer in infra.
+type SessionSigner interface {
+	SignSession(playerID uuid.UUID, matchID string, matchPlayers []string, now time.Time, ttl time.Duration) (string, error)
+}
+
 type Matchmaker struct {
 	queue       match.Queue
 	allocator   match.Allocator
-	signer      *token.Signer
+	signer      SessionSigner
 	assignments match.AssignmentStore
 	matcher     *match.Matcher
 	metrics     Metrics
@@ -74,7 +80,7 @@ type Config struct {
 
 // NewMatchmaker constructs a Matchmaker. GameModes lists the modes the
 // worker will scan each tick; an empty list disables matchmaking.
-func NewMatchmaker(queue match.Queue, allocator match.Allocator, signer *token.Signer, cfg Config) *Matchmaker {
+func NewMatchmaker(queue match.Queue, allocator match.Allocator, signer SessionSigner, cfg Config) *Matchmaker {
 	if cfg.PlayersPerMatch == 0 {
 		cfg.PlayersPerMatch = 2
 	}

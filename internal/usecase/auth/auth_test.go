@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/averak/vfx/internal/infra/db"
 	"github.com/averak/vfx/internal/infra/repository"
 	"github.com/averak/vfx/internal/infra/token"
 	"github.com/averak/vfx/internal/stdx/clock"
-	"github.com/averak/vfx/internal/stdx/db"
 	"github.com/averak/vfx/internal/testutils/testdb"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
 )

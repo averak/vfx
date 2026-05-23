@@ -150,3 +150,20 @@ func HashRefresh(raw string) []byte {
 	sum := sha256.Sum256([]byte(raw))
 	return sum[:]
 }
+
+// NewRefresh generates a fresh refresh token, returning the raw value
+// and its stored hash. It lets *Signer satisfy the auth usecase's
+// TokenIssuer port (which works in primitives, not the Refresh type).
+func (s *Signer) NewRefresh() (raw string, hash []byte, err error) {
+	r, err := NewRefresh()
+	if err != nil {
+		return "", nil, err
+	}
+	return r.Raw, r.Hash, nil
+}
+
+// HashRefresh hashes a raw refresh token for lookup; method form of the
+// package function so *Signer satisfies the TokenIssuer port.
+func (s *Signer) HashRefresh(raw string) []byte {
+	return HashRefresh(raw)
+}

@@ -1,5 +1,6 @@
 // Package auth orchestrates the AuthService. It glues together the
-// player repository, refresh token repository, token signer, and clock.
+// player repository, refresh token repository, a token issuer, and the
+// clock — and owns the transaction boundary via a Transactor.
 //
 // Anonymous login is the only credential currently supported: if a
 // device_id is provided, the same Player is returned across calls; if
@@ -14,20 +15,32 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	"github.com/averak/vfx/internal/domain/player"
-	"github.com/averak/vfx/internal/infra/token"
 	"github.com/averak/vfx/internal/stdx/clock"
-	"github.com/averak/vfx/internal/stdx/db"
 )
+
+// Transactor runs work inside a read-write transaction. The usecase owns
+// the transaction boundary; the concrete implementation (infra/db) puts
+// the transaction on the context the repositories read from.
+type Transactor interface {
+	RW(ctx context.Context, fn func(context.Context) error) error
+}
+
+// TokenIssuer mints the credentials a login produces. It is a port so
+// the usecase depends on the capability, not on the crypto in infra.
+type TokenIssuer interface {
+	SignAccess(playerID uuid.UUID, now time.Time, ttl time.Duration) (string, error)
+	NewRefresh() (raw string, hash []byte, err error)
+	HashRefresh(raw string) []byte
+}
 
 // Usecase exposes the auth operations to the handler layer.
 type Usecase struct {
-	session          *db.Session
+	tx               Transactor
 	playerRepo       player.Repository
 	refreshTokenRepo player.RefreshTokenRepository
-	signer           *token.Signer
+	tokens           TokenIssuer
 	accessTokenTTL   time.Duration
 	refreshTokenTTL  time.Duration
 }
@@ -35,18 +48,18 @@ type Usecase struct {
 // New wires the usecase. The two TTLs come from config so they can be
 // tuned per environment without code changes.
 func New(
-	session *db.Session,
+	tx Transactor,
 	playerRepo player.Repository,
 	refreshTokenRepo player.RefreshTokenRepository,
-	signer *token.Signer,
+	tokens TokenIssuer,
 	accessTokenTTL time.Duration,
 	refreshTokenTTL time.Duration,
 ) *Usecase {
 	return &Usecase{
-		session:          session,
+		tx:               tx,
 		playerRepo:       playerRepo,
 		refreshTokenRepo: refreshTokenRepo,
-		signer:           signer,
+		tokens:           tokens,
 		accessTokenTTL:   accessTokenTTL,
 		refreshTokenTTL:  refreshTokenTTL,
 	}
@@ -67,12 +80,12 @@ func (u *Usecase) LoginAnonymous(ctx context.Context, deviceID, nickname *string
 	now := clock.Now(ctx)
 
 	var result *LoginResult
-	err := u.session.RW(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		p, err := u.findOrCreatePlayer(ctx, tx, deviceID, nickname, now)
+	err := u.tx.RW(ctx, func(ctx context.Context) error {
+		p, err := u.findOrCreatePlayer(ctx, deviceID, nickname, now)
 		if err != nil {
 			return err
 		}
-		accessToken, refreshTokenRaw, err := u.issueTokens(ctx, tx, p.ID, now)
+		accessToken, refreshTokenRaw, err := u.issueTokens(ctx, p.ID, now)
 		if err != nil {
 			return err
 		}
@@ -96,22 +109,22 @@ func (u *Usecase) Refresh(ctx context.Context, refreshTokenRaw string) (*LoginRe
 	now := clock.Now(ctx)
 
 	var result *LoginResult
-	err := u.session.RW(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		rt, err := u.refreshTokenRepo.FindByHash(ctx, tx, token.HashRefresh(refreshTokenRaw), now)
+	err := u.tx.RW(ctx, func(ctx context.Context) error {
+		rt, err := u.refreshTokenRepo.FindByHash(ctx, u.tokens.HashRefresh(refreshTokenRaw), now)
 		if err != nil {
 			return err
 		}
 		if !rt.IsActive(now) {
 			return player.ErrRefreshTokenInvalid
 		}
-		if revokeErr := u.refreshTokenRepo.Revoke(ctx, tx, rt.ID, now); revokeErr != nil {
+		if revokeErr := u.refreshTokenRepo.Revoke(ctx, rt.ID, now); revokeErr != nil {
 			return revokeErr
 		}
-		p, err := u.playerRepo.GetByID(ctx, tx, rt.PlayerID)
+		p, err := u.playerRepo.GetByID(ctx, rt.PlayerID)
 		if err != nil {
 			return err
 		}
-		accessToken, newRefreshRaw, err := u.issueTokens(ctx, tx, p.ID, now)
+		accessToken, newRefreshRaw, err := u.issueTokens(ctx, p.ID, now)
 		if err != nil {
 			return err
 		}
@@ -133,8 +146,8 @@ func (u *Usecase) Refresh(ctx context.Context, refreshTokenRaw string) (*LoginRe
 // their own — the server stays stateless about access tokens by design.
 func (u *Usecase) Logout(ctx context.Context, playerID uuid.UUID) error {
 	now := clock.Now(ctx)
-	return u.session.RW(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		return u.refreshTokenRepo.RevokeAllForPlayer(ctx, tx, playerID, now)
+	return u.tx.RW(ctx, func(ctx context.Context) error {
+		return u.refreshTokenRepo.RevokeAllForPlayer(ctx, playerID, now)
 	})
 }
 
@@ -145,15 +158,15 @@ func (u *Usecase) UpdateProfile(ctx context.Context, playerID uuid.UUID, nicknam
 	now := clock.Now(ctx)
 
 	var updated *player.Player
-	err := u.session.RW(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		p, err := u.playerRepo.GetByID(ctx, tx, playerID)
+	err := u.tx.RW(ctx, func(ctx context.Context) error {
+		p, err := u.playerRepo.GetByID(ctx, playerID)
 		if err != nil {
 			return err
 		}
 		if nickname != nil {
 			p.SetNickname(nickname, now)
 		}
-		if err := u.playerRepo.UpdateNickname(ctx, tx, p); err != nil {
+		if err := u.playerRepo.UpdateNickname(ctx, p); err != nil {
 			return err
 		}
 		updated = p
@@ -167,9 +180,9 @@ func (u *Usecase) UpdateProfile(ctx context.Context, playerID uuid.UUID, nicknam
 
 // findOrCreatePlayer returns an existing player for a known device_id
 // or creates a new one when the device is fresh or unspecified.
-func (u *Usecase) findOrCreatePlayer(ctx context.Context, tx pgx.Tx, deviceID, nickname *string, now time.Time) (*player.Player, error) {
+func (u *Usecase) findOrCreatePlayer(ctx context.Context, deviceID, nickname *string, now time.Time) (*player.Player, error) {
 	if deviceID != nil {
-		existing, err := u.playerRepo.FindPlayerByIdentity(ctx, tx, player.ProviderAnonymous, *deviceID)
+		existing, err := u.playerRepo.FindPlayerByIdentity(ctx, player.ProviderAnonymous, *deviceID)
 		switch {
 		case err == nil:
 			return existing, nil
@@ -186,11 +199,11 @@ func (u *Usecase) findOrCreatePlayer(ctx context.Context, tx pgx.Tx, deviceID, n
 	}
 
 	p := player.New(uuid.New(), nickname, now)
-	if err := u.playerRepo.Save(ctx, tx, p); err != nil {
+	if err := u.playerRepo.Save(ctx, p); err != nil {
 		return nil, fmt.Errorf("auth: save player: %w", err)
 	}
 	identity := player.NewIdentity(uuid.New(), p.ID, player.ProviderAnonymous, providerUID, now)
-	if err := u.playerRepo.SaveIdentity(ctx, tx, identity); err != nil {
+	if err := u.playerRepo.SaveIdentity(ctx, identity); err != nil {
 		return nil, fmt.Errorf("auth: save identity: %w", err)
 	}
 	return p, nil
@@ -198,24 +211,24 @@ func (u *Usecase) findOrCreatePlayer(ctx context.Context, tx pgx.Tx, deviceID, n
 
 // issueTokens mints an access token and persists a refresh token,
 // returning both values for the caller to assemble into a response.
-func (u *Usecase) issueTokens(ctx context.Context, tx pgx.Tx, playerID uuid.UUID, now time.Time) (accessToken, refreshTokenRaw string, err error) {
-	accessToken, err = u.signer.SignAccess(playerID, now, u.accessTokenTTL)
+func (u *Usecase) issueTokens(ctx context.Context, playerID uuid.UUID, now time.Time) (accessToken, refreshTokenRaw string, err error) {
+	accessToken, err = u.tokens.SignAccess(playerID, now, u.accessTokenTTL)
 	if err != nil {
 		return "", "", err
 	}
-	refresh, err := token.NewRefresh()
+	refreshRaw, refreshHash, err := u.tokens.NewRefresh()
 	if err != nil {
 		return "", "", err
 	}
 	rt := &player.RefreshToken{
 		ID:        uuid.New(),
 		PlayerID:  playerID,
-		Hash:      refresh.Hash,
+		Hash:      refreshHash,
 		ExpiresAt: now.Add(u.refreshTokenTTL),
 		CreatedAt: now,
 	}
-	if err = u.refreshTokenRepo.Create(ctx, tx, rt); err != nil {
+	if err = u.refreshTokenRepo.Create(ctx, rt); err != nil {
 		return "", "", fmt.Errorf("auth: create refresh token: %w", err)
 	}
-	return accessToken, refresh.Raw, nil
+	return accessToken, refreshRaw, nil
 }

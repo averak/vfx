@@ -8,10 +8,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/averak/vfx/internal/infra/db"
 	"github.com/averak/vfx/internal/infra/matchqueue"
 	"github.com/averak/vfx/internal/infra/repository"
 	adminhandler "github.com/averak/vfx/internal/presentation/admin"
-	"github.com/averak/vfx/internal/stdx/db"
 	"github.com/averak/vfx/internal/testutils/testdb"
 	usecaseadmin "github.com/averak/vfx/internal/usecase/admin"
 )

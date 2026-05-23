@@ -9,11 +9,11 @@ import (
 	valkeygo "github.com/valkey-io/valkey-go"
 
 	"github.com/averak/vfx/internal/infra/config"
+	"github.com/averak/vfx/internal/infra/db"
 	"github.com/averak/vfx/internal/infra/postgres"
 	"github.com/averak/vfx/internal/infra/repository"
 	"github.com/averak/vfx/internal/infra/valkey"
 	adminhandler "github.com/averak/vfx/internal/presentation/admin"
-	"github.com/averak/vfx/internal/stdx/db"
 	usecaseadmin "github.com/averak/vfx/internal/usecase/admin"
 )
 

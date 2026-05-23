@@ -7,31 +7,36 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	"github.com/averak/vfx/internal/domain/match"
 	"github.com/averak/vfx/internal/domain/player"
-	"github.com/averak/vfx/internal/stdx/db"
 )
+
+// Transactor runs work inside a read-only transaction. The admin API is
+// read-only, so it needs only RO; the concrete implementation puts the
+// transaction on the context the repository reads from.
+type Transactor interface {
+	RO(ctx context.Context, fn func(context.Context) error) error
+}
 
 // Usecase exposes the operational queries to the admin handler.
 type Usecase struct {
-	session    *db.Session
+	tx         Transactor
 	playerRepo player.Repository
 	queue      match.Queue
 }
 
 // New wires the usecase.
-func New(session *db.Session, playerRepo player.Repository, queue match.Queue) *Usecase {
-	return &Usecase{session: session, playerRepo: playerRepo, queue: queue}
+func New(tx Transactor, playerRepo player.Repository, queue match.Queue) *Usecase {
+	return &Usecase{tx: tx, playerRepo: playerRepo, queue: queue}
 }
 
 // GetPlayer looks up a player by id. It returns player.ErrPlayerNotFound
 // when the id is unknown.
 func (u *Usecase) GetPlayer(ctx context.Context, id uuid.UUID) (*player.Player, error) {
 	var p *player.Player
-	err := u.session.RO(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		found, e := u.playerRepo.GetByID(ctx, tx, id)
+	err := u.tx.RO(ctx, func(ctx context.Context) error {
+		found, e := u.playerRepo.GetByID(ctx, id)
 		if e != nil {
 			return e
 		}

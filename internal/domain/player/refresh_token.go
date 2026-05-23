@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 // ErrRefreshTokenInvalid is returned when a refresh token is unknown,
@@ -34,10 +33,11 @@ func (rt *RefreshToken) IsActive(now time.Time) bool {
 	return rt.ExpiresAt.After(now)
 }
 
-// RefreshTokenRepository persists RefreshToken rows.
+// RefreshTokenRepository persists RefreshToken rows. Like Repository, it
+// takes only a context; the transaction is carried there by the usecase.
 type RefreshTokenRepository interface {
-	Create(ctx context.Context, tx pgx.Tx, rt *RefreshToken) error
-	FindByHash(ctx context.Context, tx pgx.Tx, hash []byte, now time.Time) (*RefreshToken, error)
-	Revoke(ctx context.Context, tx pgx.Tx, id uuid.UUID, now time.Time) error
-	RevokeAllForPlayer(ctx context.Context, tx pgx.Tx, playerID uuid.UUID, now time.Time) error
+	Create(ctx context.Context, rt *RefreshToken) error
+	FindByHash(ctx context.Context, hash []byte, now time.Time) (*RefreshToken, error)
+	Revoke(ctx context.Context, id uuid.UUID, now time.Time) error
+	RevokeAllForPlayer(ctx context.Context, playerID uuid.UUID, now time.Time) error
 }

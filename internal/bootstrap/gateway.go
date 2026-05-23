@@ -18,6 +18,7 @@ import (
 	"github.com/averak/vfx/internal/infra/allocator"
 	"github.com/averak/vfx/internal/infra/assignmentstore"
 	"github.com/averak/vfx/internal/infra/config"
+	"github.com/averak/vfx/internal/infra/db"
 	"github.com/averak/vfx/internal/infra/matchqueue"
 	"github.com/averak/vfx/internal/infra/metrics"
 	"github.com/averak/vfx/internal/infra/postgres"
@@ -26,7 +27,6 @@ import (
 	"github.com/averak/vfx/internal/infra/valkey"
 	gatewayauthhandler "github.com/averak/vfx/internal/presentation/gateway/auth"
 	gatewaymatchhandler "github.com/averak/vfx/internal/presentation/gateway/match"
-	"github.com/averak/vfx/internal/stdx/db"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
 	usecasematch "github.com/averak/vfx/internal/usecase/match"
 )

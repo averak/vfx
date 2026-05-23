@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/averak/vfx/internal/domain/player"
+	"github.com/averak/vfx/internal/infra/db"
 	"github.com/averak/vfx/internal/infra/dbgen"
 )
 
@@ -22,8 +23,12 @@ func NewRefreshToken() *RefreshToken {
 	return &RefreshToken{}
 }
 
-func (RefreshToken) Create(ctx context.Context, tx pgx.Tx, rt *player.RefreshToken) error {
-	_, err := dbgen.New(tx).CreateRefreshToken(ctx, dbgen.CreateRefreshTokenParams{
+func (RefreshToken) Create(ctx context.Context, rt *player.RefreshToken) error {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = dbgen.New(tx).CreateRefreshToken(ctx, dbgen.CreateRefreshTokenParams{
 		ID:        rt.ID,
 		PlayerID:  rt.PlayerID,
 		TokenHash: rt.Hash,
@@ -33,7 +38,11 @@ func (RefreshToken) Create(ctx context.Context, tx pgx.Tx, rt *player.RefreshTok
 	return err
 }
 
-func (RefreshToken) FindByHash(ctx context.Context, tx pgx.Tx, hash []byte, now time.Time) (*player.RefreshToken, error) {
+func (RefreshToken) FindByHash(ctx context.Context, hash []byte, now time.Time) (*player.RefreshToken, error) {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
 	row, err := dbgen.New(tx).FindRefreshTokenByHash(ctx, dbgen.FindRefreshTokenByHashParams{
 		TokenHash: hash,
 		ExpiresAt: toTimestamptz(now),
@@ -54,14 +63,22 @@ func (RefreshToken) FindByHash(ctx context.Context, tx pgx.Tx, hash []byte, now 
 	}, nil
 }
 
-func (RefreshToken) Revoke(ctx context.Context, tx pgx.Tx, id uuid.UUID, now time.Time) error {
+func (RefreshToken) Revoke(ctx context.Context, id uuid.UUID, now time.Time) error {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return err
+	}
 	return dbgen.New(tx).RevokeRefreshToken(ctx, dbgen.RevokeRefreshTokenParams{
 		ID:        id,
 		RevokedAt: toTimestamptz(now),
 	})
 }
 
-func (RefreshToken) RevokeAllForPlayer(ctx context.Context, tx pgx.Tx, playerID uuid.UUID, now time.Time) error {
+func (RefreshToken) RevokeAllForPlayer(ctx context.Context, playerID uuid.UUID, now time.Time) error {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return err
+	}
 	return dbgen.New(tx).RevokeAllRefreshTokensForPlayer(ctx, dbgen.RevokeAllRefreshTokensForPlayerParams{
 		PlayerID:  playerID,
 		RevokedAt: toTimestamptz(now),
