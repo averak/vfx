@@ -6,14 +6,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// Provider names the authentication provider that issued the
-// provider_uid. Anonymous is the only one currently supported; OAuth
-// providers (google, apple, github, ...) would be added as additional
-// constants.
+// Provider names the authentication provider that issued the provider_uid.
+// Anonymous is the only one currently supported; OAuth providers would be added as further constants.
 type Provider string
 
-// Supported provider identifiers. Add new constants here when wiring
-// up additional auth flows (OAuth providers, etc.).
 const (
 	ProviderAnonymous Provider = "anonymous"
 )
@@ -27,7 +23,6 @@ type Identity struct {
 	CreatedAt   time.Time
 }
 
-// NewIdentity constructs an Identity for first insertion.
 func NewIdentity(id, playerID uuid.UUID, provider Provider, providerUID string, now time.Time) *Identity {
 	return &Identity{
 		ID:          id,

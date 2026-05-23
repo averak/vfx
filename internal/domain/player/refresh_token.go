@@ -8,24 +8,19 @@ import (
 	"github.com/google/uuid"
 )
 
-// ErrRefreshTokenInvalid is returned when a refresh token is unknown,
-// expired, or revoked. Callers must not surface the distinction to
-// users: any of these means "log in again".
+// ErrRefreshTokenInvalid covers unknown, expired, and revoked tokens alike.
+// Callers must not surface the distinction: any of these means "log in again".
 var ErrRefreshTokenInvalid = errors.New("player: refresh token invalid")
 
-// RefreshToken is the persistent half of a refresh token. Hash is
-// SHA-256 of the raw token; the raw value is never stored.
 type RefreshToken struct {
 	ID        uuid.UUID
 	PlayerID  uuid.UUID
-	Hash      []byte
+	Hash      []byte // SHA-256 of the raw token; the raw value is never stored
 	ExpiresAt time.Time
 	RevokedAt *time.Time
 	CreatedAt time.Time
 }
 
-// IsActive reports whether the token can be used to mint a new access
-// token at the given moment.
 func (rt *RefreshToken) IsActive(now time.Time) bool {
 	if rt.RevokedAt != nil {
 		return false
@@ -33,8 +28,6 @@ func (rt *RefreshToken) IsActive(now time.Time) bool {
 	return rt.ExpiresAt.After(now)
 }
 
-// RefreshTokenRepository persists RefreshToken rows. Like Repository, it
-// takes only a context; the transaction is carried there by the usecase.
 type RefreshTokenRepository interface {
 	Create(ctx context.Context, rt *RefreshToken) error
 	FindByHash(ctx context.Context, hash []byte, now time.Time) (*RefreshToken, error)
