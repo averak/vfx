@@ -30,10 +30,12 @@ import (
 	gatewayauthhandler "github.com/averak/vfx/internal/presentation/gateway/auth"
 	gatewayleaderboardhandler "github.com/averak/vfx/internal/presentation/gateway/leaderboard"
 	gatewaymatchhandler "github.com/averak/vfx/internal/presentation/gateway/match"
+	gatewaysocialhandler "github.com/averak/vfx/internal/presentation/gateway/social"
 	gatewaystoragehandler "github.com/averak/vfx/internal/presentation/gateway/storage"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
 	usecaseleaderboard "github.com/averak/vfx/internal/usecase/leaderboard"
 	usecasematch "github.com/averak/vfx/internal/usecase/match"
+	usecasesocial "github.com/averak/vfx/internal/usecase/social"
 	usecasestorage "github.com/averak/vfx/internal/usecase/storage"
 )
 
@@ -69,6 +71,9 @@ type Gateway struct {
 	LeaderboardRepo    domainleaderboard.Repository
 	LeaderboardUsecase *usecaseleaderboard.Usecase
 	LeaderboardHandler *gatewayleaderboardhandler.Handler
+
+	SocialUsecase *usecasesocial.Usecase
+	SocialHandler *gatewaysocialhandler.Handler
 }
 
 // matchmakerMetrics adapts the Prometheus registry to the usecasematch.Metrics interface, keeping the usecase layer free of a concrete metrics dependency.
@@ -224,6 +229,9 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	})
 	leaderboardHandler := gatewayleaderboardhandler.New(leaderboardUC)
 
+	socialUC := usecasesocial.New(session, session, repository.NewSocial())
+	socialHandler := gatewaysocialhandler.New(socialUC)
+
 	cleanup := func() {
 		blobCleanup()
 		valkeyClient.Close()
@@ -255,6 +263,9 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 		LeaderboardRepo:    leaderboardRepo,
 		LeaderboardUsecase: leaderboardUC,
 		LeaderboardHandler: leaderboardHandler,
+
+		SocialUsecase: socialUC,
+		SocialHandler: socialHandler,
 	}, cleanup, nil
 }
 

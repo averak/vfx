@@ -72,7 +72,7 @@ Goal: feature breadth comparable to mature game backends.
 - [x] OIDC providers: Google, Apple (ID-token verification via JWKS), with account linking to upgrade an anonymous player; anonymous device already shipped.
 - [x] Storage API — player data (owner-scoped) and title storage (operator-published, tag-gated); bytes in object storage via signed URLs, metadata in PostgreSQL.
 - [x] Leaderboard — config-defined boards (asc/desc), keep-best scores, ranked/around-player queries.
-- [ ] Friends / Groups / Parties.
+- [x] Friends — request lifecycle (send/accept/decline/cancel, mutual auto-accept), friend list, incoming/outgoing, remove. (Groups, parties, and blocking still pending.)
 - [ ] Chat (channels, DMs).
 - [ ] Admin web UI, embedded via `go:embed`.
 - [ ] C# (Unity) client SDK.

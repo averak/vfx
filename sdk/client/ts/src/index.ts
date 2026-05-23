@@ -31,9 +31,15 @@ import {
   type FileMetadata,
 } from "./gen/vfx/v1/storage/storage_service_pb.js";
 import { LeaderboardService, type RankEntry } from "./gen/vfx/v1/leaderboard/leaderboard_service_pb.js";
+import {
+  SocialService,
+  RequestStatus,
+  type Friend,
+  type FriendRequest,
+} from "./gen/vfx/v1/social/social_service_pb.js";
 
-export { Provider };
-export type { Player, Frame, FileMetadata, RankEntry };
+export { Provider, RequestStatus };
+export type { Player, Frame, FileMetadata, RankEntry, Friend, FriendRequest };
 
 /** Options for constructing a VfxClient. */
 export interface VfxClientOptions {
@@ -48,6 +54,7 @@ export class VfxClient {
   private readonly playerData: Client<typeof PlayerDataStorageService>;
   private readonly titleStorage: Client<typeof TitleStorageService>;
   private readonly leaderboard: Client<typeof LeaderboardService>;
+  private readonly social: Client<typeof SocialService>;
   // The same fetch is used for the direct object-store transfers (PUT/GET on signed URLs), which do not go through the Connect transport.
   private readonly fetchImpl: typeof globalThis.fetch;
   private accessToken = "";
@@ -63,6 +70,7 @@ export class VfxClient {
     this.playerData = createClient(PlayerDataStorageService, transport);
     this.titleStorage = createClient(TitleStorageService, transport);
     this.leaderboard = createClient(LeaderboardService, transport);
+    this.social = createClient(SocialService, transport);
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
@@ -229,6 +237,43 @@ export class VfxClient {
       throw new Error(`vfx: download returned ${resp.status}`);
     }
     return new Uint8Array(await resp.arrayBuffer());
+  }
+
+  /** Send a friend request; the result is ACCEPTED when the addressee already had a pending request to you (mutual), otherwise PENDING. */
+  async sendFriendRequest(addresseePlayerId: string): Promise<RequestStatus> {
+    const resp = await this.social.sendFriendRequest({ addresseePlayerId }, { headers: this.authHeaders() });
+    return resp.status;
+  }
+
+  async acceptFriendRequest(requesterPlayerId: string): Promise<void> {
+    await this.social.acceptFriendRequest({ requesterPlayerId }, { headers: this.authHeaders() });
+  }
+
+  async declineFriendRequest(requesterPlayerId: string): Promise<void> {
+    await this.social.declineFriendRequest({ requesterPlayerId }, { headers: this.authHeaders() });
+  }
+
+  async cancelFriendRequest(addresseePlayerId: string): Promise<void> {
+    await this.social.cancelFriendRequest({ addresseePlayerId }, { headers: this.authHeaders() });
+  }
+
+  async listFriends(): Promise<Friend[]> {
+    const resp = await this.social.listFriends({}, { headers: this.authHeaders() });
+    return resp.friends;
+  }
+
+  async listIncomingFriendRequests(): Promise<FriendRequest[]> {
+    const resp = await this.social.listIncomingRequests({}, { headers: this.authHeaders() });
+    return resp.requests;
+  }
+
+  async listOutgoingFriendRequests(): Promise<FriendRequest[]> {
+    const resp = await this.social.listOutgoingRequests({}, { headers: this.authHeaders() });
+    return resp.requests;
+  }
+
+  async removeFriend(friendPlayerId: string): Promise<void> {
+    await this.social.removeFriend({ friendPlayerId }, { headers: this.authHeaders() });
   }
 
   private authHeaders(): HeadersInit {

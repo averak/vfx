@@ -171,3 +171,38 @@ CREATE TABLE leaderboard_entries (
 -- Serves both the ranked scans (ORDER BY score, updated_at) and the count-of-better-scores rank query, scoped per leaderboard.
 CREATE INDEX idx_leaderboard_entries_ranking
   ON leaderboard_entries (leaderboard_id, score, updated_at);
+
+-- ============================================================================
+-- friend_requests
+--   Directed, pending-only: a row exists only while requester -> addressee is outstanding.
+--   Accepting deletes the row and inserts a friendship; declining/cancelling just deletes it.
+-- ============================================================================
+
+CREATE TABLE friend_requests (
+  id            UUID         PRIMARY KEY,
+  requester_id  UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  addressee_id  UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  UNIQUE (requester_id, addressee_id)
+);
+
+CREATE INDEX idx_friend_requests_addressee
+  ON friend_requests (addressee_id);
+
+-- ============================================================================
+-- friendships
+--   Undirected, stored once with player_low < player_high so a pair has a single row regardless of who initiated.
+-- ============================================================================
+
+CREATE TABLE friendships (
+  id           UUID         PRIMARY KEY,
+  player_low   UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  player_high  UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  UNIQUE (player_low, player_high),
+  CONSTRAINT friendships_canonical_order CHECK (player_low < player_high)
+);
+
+-- The unique constraint indexes player_low; this covers lookups landing on the high side.
+CREATE INDEX idx_friendships_player_high
+  ON friendships (player_high);

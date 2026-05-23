@@ -16,6 +16,7 @@ import (
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/leaderboard/leaderboardconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
+	"github.com/averak/vfx/gen/go/vfx/v1/social/socialconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/storage/storageconnect"
 	domainleaderboard "github.com/averak/vfx/internal/domain/leaderboard"
 	domainstorage "github.com/averak/vfx/internal/domain/storage"
@@ -28,6 +29,7 @@ import (
 	gatewayauthhandler "github.com/averak/vfx/internal/presentation/gateway/auth"
 	gatewayleaderboardhandler "github.com/averak/vfx/internal/presentation/gateway/leaderboard"
 	gatewaymatchhandler "github.com/averak/vfx/internal/presentation/gateway/match"
+	gatewaysocialhandler "github.com/averak/vfx/internal/presentation/gateway/social"
 	gatewaystoragehandler "github.com/averak/vfx/internal/presentation/gateway/storage"
 	"github.com/averak/vfx/internal/testutils/fakeblob"
 	"github.com/averak/vfx/internal/testutils/fakeoidc"
@@ -35,6 +37,7 @@ import (
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
 	usecaseleaderboard "github.com/averak/vfx/internal/usecase/leaderboard"
 	usecasematch "github.com/averak/vfx/internal/usecase/match"
+	usecasesocial "github.com/averak/vfx/internal/usecase/social"
 	usecasestorage "github.com/averak/vfx/internal/usecase/storage"
 )
 
@@ -58,6 +61,7 @@ type Server struct {
 	PlayerData  storageconnect.PlayerDataStorageServiceClient
 	Title       storageconnect.TitleStorageServiceClient
 	Leaderboard leaderboardconnect.LeaderboardServiceClient
+	Social      socialconnect.SocialServiceClient
 
 	// Blob is the in-memory object store behind the storage services; tests Put an object to simulate a finished upload before CommitFile.
 	Blob *fakeblob.Store
@@ -124,6 +128,10 @@ func New(t *testing.T) *Server {
 	leaderboardPath, leaderboardHandler := leaderboardconnect.NewLeaderboardServiceHandler(gatewayleaderboardhandler.New(leaderboardUC), interceptors)
 	mux.Handle(leaderboardPath, leaderboardHandler)
 
+	socialUC := usecasesocial.New(session, session, repository.NewSocial())
+	socialPath, socialHandler := socialconnect.NewSocialServiceHandler(gatewaysocialhandler.New(socialUC), interceptors)
+	mux.Handle(socialPath, socialHandler)
+
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
@@ -133,6 +141,7 @@ func New(t *testing.T) *Server {
 		PlayerData:  storageconnect.NewPlayerDataStorageServiceClient(srv.Client(), srv.URL),
 		Title:       storageconnect.NewTitleStorageServiceClient(srv.Client(), srv.URL),
 		Leaderboard: leaderboardconnect.NewLeaderboardServiceClient(srv.Client(), srv.URL),
+		Social:      socialconnect.NewSocialServiceClient(srv.Client(), srv.URL),
 		Blob:        blob,
 		session:     session,
 		httpServer:  srv,

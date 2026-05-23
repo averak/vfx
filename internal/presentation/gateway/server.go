@@ -14,6 +14,7 @@ import (
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/leaderboard/leaderboardconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
+	"github.com/averak/vfx/gen/go/vfx/v1/social/socialconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/storage/storageconnect"
 	"github.com/averak/vfx/internal/bootstrap"
 	"github.com/averak/vfx/internal/infra/connectrpc/interceptor"
@@ -46,6 +47,9 @@ func NewHandler(c *bootstrap.Gateway) (http.Handler, error) {
 
 	leaderboardPath, leaderboardHandler := leaderboardconnect.NewLeaderboardServiceHandler(c.LeaderboardHandler, interceptors)
 	mux.Handle(leaderboardPath, leaderboardHandler)
+
+	socialPath, socialHandler := socialconnect.NewSocialServiceHandler(c.SocialHandler, interceptors)
+	mux.Handle(socialPath, socialHandler)
 
 	// Storage is optional: the handlers are nil when no object-store bucket is configured, and the services simply go unmounted.
 	if c.PlayerDataStorageHandler != nil {

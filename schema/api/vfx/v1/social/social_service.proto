@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package vfx.v1.social;
+
+import "google/protobuf/timestamp.proto";
+
+// SocialService は friend グラフを提供する。
+//
+// friend request は有向 (A→B)、成立した friendship は無向。
+// 相手から先に来ていた request に send で応えると即 friendship が成立する (相互リクエストの自動承認)。
+service SocialService {
+  // SendFriendRequest は相手に friend request を送る。
+  // 相手から自分宛の pending request が既にある場合は即 friendship を成立させ、status=ACCEPTED を返す。
+  rpc SendFriendRequest(SendFriendRequestRequest) returns (SendFriendRequestResponse);
+
+  // AcceptFriendRequest は自分宛の pending request を承認して friendship を成立させる。
+  rpc AcceptFriendRequest(AcceptFriendRequestRequest) returns (AcceptFriendRequestResponse);
+
+  // DeclineFriendRequest は自分宛の pending request を拒否する。
+  rpc DeclineFriendRequest(DeclineFriendRequestRequest) returns (DeclineFriendRequestResponse);
+
+  // CancelFriendRequest は自分が送った pending request を取り消す。
+  rpc CancelFriendRequest(CancelFriendRequestRequest) returns (CancelFriendRequestResponse);
+
+  rpc ListFriends(ListFriendsRequest) returns (ListFriendsResponse);
+
+  // ListIncomingRequests は自分宛の pending request を返す。
+  rpc ListIncomingRequests(ListIncomingRequestsRequest) returns (ListIncomingRequestsResponse);
+
+  // ListOutgoingRequests は自分が送った pending request を返す。
+  rpc ListOutgoingRequests(ListOutgoingRequestsRequest) returns (ListOutgoingRequestsResponse);
+
+  rpc RemoveFriend(RemoveFriendRequest) returns (RemoveFriendResponse);
+}
+
+// Friend は成立済みの友達。
+message Friend {
+  string player_id = 1;
+  optional string nickname = 2;
+  google.protobuf.Timestamp since = 3;
+}
+
+// FriendRequest は pending な friend request の相手。
+message FriendRequest {
+  string player_id = 1;
+  optional string nickname = 2;
+  google.protobuf.Timestamp requested_at = 3;
+}
+
+enum RequestStatus {
+  REQUEST_STATUS_UNSPECIFIED = 0;
+  REQUEST_STATUS_PENDING = 1;
+  REQUEST_STATUS_ACCEPTED = 2;
+}
+
+message SendFriendRequestRequest {
+  string addressee_player_id = 1;
+}
+
+message SendFriendRequestResponse {
+  // 相互リクエストで即成立した場合は ACCEPTED、通常は PENDING。
+  RequestStatus status = 1;
+}
+
+message AcceptFriendRequestRequest {
+  string requester_player_id = 1;
+}
+
+message AcceptFriendRequestResponse {}
+
+message DeclineFriendRequestRequest {
+  string requester_player_id = 1;
+}
+
+message DeclineFriendRequestResponse {}
+
+message CancelFriendRequestRequest {
+  string addressee_player_id = 1;
+}
+
+message CancelFriendRequestResponse {}
+
+message ListFriendsRequest {}
+
+message ListFriendsResponse {
+  repeated Friend friends = 1;
+}
+
+message ListIncomingRequestsRequest {}
+
+message ListIncomingRequestsResponse {
+  repeated FriendRequest requests = 1;
+}
+
+message ListOutgoingRequestsRequest {}
+
+message ListOutgoingRequestsResponse {
+  repeated FriendRequest requests = 1;
+}
+
+message RemoveFriendRequest {
+  string friend_player_id = 1;
+}
+
+message RemoveFriendResponse {}
