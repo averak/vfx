@@ -14,15 +14,12 @@ import (
 	"github.com/averak/vfx/internal/domain/match"
 )
 
-// GameModeLabel is the label vfx stamps on a Fleet's GameServer template
-// so the matchmaker can select a room of the right game mode. The Helm
-// chart sets it; the allocator filters on it.
+// GameModeLabel is the label vfx stamps on a Fleet's GameServer template so the matchmaker can select a room of the right game mode.
+// The Helm chart sets it; the allocator filters on it.
 const GameModeLabel = "vfx.dev/game-mode"
 
-// Agones allocates rooms by asking Agones for a Ready GameServer of the
-// requested game mode. It creates a GameServerAllocation through the
-// in-cluster Kubernetes API; Agones flips a Ready GameServer to
-// Allocated and returns its externally reachable address and port.
+// Agones allocates rooms by asking Agones for a Ready GameServer of the requested game mode.
+// It creates a GameServerAllocation through the in-cluster Kubernetes API; Agones flips a Ready GameServer to Allocated and returns its externally reachable address and port.
 type Agones struct {
 	client    versioned.Interface
 	namespace string
@@ -31,9 +28,7 @@ type Agones struct {
 var _ match.Allocator = (*Agones)(nil)
 
 // NewAgones builds an allocator using the in-cluster service account.
-// It must run inside a pod whose service account may create
-// allocation.agones.dev/gameserverallocations (the Helm chart grants
-// this to the gateway).
+// It must run inside a pod whose service account may create allocation.agones.dev/gameserverallocations (the Helm chart grants this to the gateway).
 func NewAgones(namespace string) (*Agones, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
@@ -69,8 +64,7 @@ func (a *Agones) Allocate(ctx context.Context, gameMode string, _ int) (*match.R
 		return nil, fmt.Errorf("allocator: create allocation: %w", err)
 	}
 	if result.Status.State != allocationv1.GameServerAllocationAllocated {
-		// No Ready GameServer was available; the matchmaker surfaces this
-		// to the waiting tickets so players can retry.
+		// No Ready GameServer was available; the matchmaker surfaces this to the waiting tickets so players can retry.
 		return nil, fmt.Errorf("allocator: no game server available for %q (state=%s)", gameMode, result.Status.State)
 	}
 	if len(result.Status.Ports) == 0 {

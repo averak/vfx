@@ -1,10 +1,7 @@
-// Package matchqueue holds queue implementations of the match.Queue
-// contract.
+// Package matchqueue holds queue implementations of the match.Queue contract.
 //
-// InMem is the single-process backend: an in-memory queue with fan-out
-// pub/sub per ticket. It is correct for a single-gateway deployment; the
-// Valkey-backed implementation is used when matchmaking has to span
-// gateway replicas.
+// InMem is the single-process backend: an in-memory queue with per-ticket fan-out.
+// It is correct for a single-gateway deployment; the Valkey-backed implementation is used when matchmaking has to span gateway replicas.
 package matchqueue
 
 import (
@@ -16,7 +13,6 @@ import (
 	"github.com/averak/vfx/internal/domain/match"
 )
 
-// InMem is an in-process implementation of match.Queue.
 type InMem struct {
 	mu          sync.Mutex
 	tickets     map[uuid.UUID]*ticketEntry
@@ -32,7 +28,6 @@ type ticketEntry struct {
 
 var _ match.Queue = (*InMem)(nil)
 
-// NewInMem returns an empty in-memory queue.
 func NewInMem() *InMem {
 	return &InMem{
 		tickets:     make(map[uuid.UUID]*ticketEntry),
@@ -97,8 +92,7 @@ func (q *InMem) Subscribe(ctx context.Context, ticketID uuid.UUID) (<-chan match
 	q.subscribers[ticketID] = append(q.subscribers[ticketID], ch)
 	q.mu.Unlock()
 
-	// Watch for ctx cancellation so a disconnecting client doesn't
-	// leak a subscriber slot.
+	// Watch for ctx cancellation so a disconnecting client doesn't leak a subscriber slot.
 	go func() {
 		<-ctx.Done()
 		q.detach(ticketID, ch)
@@ -126,8 +120,7 @@ func (q *InMem) Pending(_ context.Context, gameMode string) ([]*match.Ticket, er
 }
 
 // Claim marks the tickets as taken, removing them from the pending pool.
-// All-or-nothing: if any ticket is already claimed or finished, none are
-// claimed and it returns false.
+// All-or-nothing: if any ticket is already claimed or finished, none are claimed and it returns false.
 func (q *InMem) Claim(_ context.Context, _ string, ticketIDs []uuid.UUID) (bool, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -174,9 +167,8 @@ func (q *InMem) countPendingLocked(gameMode string) int32 {
 	return n
 }
 
-// publishLocked writes event to all current subscribers of ticketID,
-// updates the cached "latest" event, and marks the entry finished when
-// event is terminal. Caller must hold q.mu.
+// publishLocked writes event to all current subscribers of ticketID, updates the cached "latest" event, and marks the entry finished when event is terminal.
+// Caller must hold q.mu.
 func (q *InMem) publishLocked(ticketID uuid.UUID, event match.Event) {
 	entry := q.tickets[ticketID]
 	entry.latest = event
@@ -187,8 +179,8 @@ func (q *InMem) publishLocked(ticketID uuid.UUID, event match.Event) {
 		select {
 		case ch <- event:
 		default:
-			// Slow consumer: drop the event. A reconnecting client will
-			// resync via GetCurrentMatch when needed.
+			// Slow consumer: drop the event.
+			// A reconnecting client resyncs via GetCurrentMatch when needed.
 		}
 		if terminal {
 			close(ch)
@@ -200,10 +192,8 @@ func (q *InMem) publishLocked(ticketID uuid.UUID, event match.Event) {
 	}
 }
 
-// detach removes a subscriber on context cancellation and closes its
-// channel so the handler's range loop unblocks. If a terminal event
-// already removed and closed the channel via publishLocked, target is no
-// longer in the slice, so we leave it alone and avoid a double close.
+// detach removes a subscriber on context cancellation and closes its channel so the handler's range loop unblocks.
+// If a terminal event already removed and closed the channel via publishLocked, target is no longer in the slice, so we leave it alone and avoid a double close.
 // Both paths run under q.mu, so the find-then-close is race-free.
 func (q *InMem) detach(ticketID uuid.UUID, target chan match.Event) {
 	q.mu.Lock()
@@ -227,8 +217,8 @@ func isTerminal(e match.Event) bool {
 	return false
 }
 
-// sortByCreatedAt orders tickets oldest-first. An insertion sort is fine
-// for the small queue sizes a single gateway holds in memory.
+// sortByCreatedAt orders tickets oldest-first.
+// An insertion sort is fine for the small queue sizes a single gateway holds in memory.
 func sortByCreatedAt(ts []*match.Ticket) {
 	for i := 1; i < len(ts); i++ {
 		for j := i; j > 0 && ts[j-1].CreatedAt.After(ts[j].CreatedAt); j-- {

@@ -1,6 +1,5 @@
-// Package authctx propagates the authenticated player id through a
-// request context. Interceptors attach the id once at the request
-// boundary; handlers read it back when they need to know "who is this".
+// Package authctx propagates the authenticated player id through a request context.
+// Interceptors attach the id once at the request boundary; handlers read it back when they need to know who is calling.
 package authctx
 
 import (
@@ -16,8 +15,7 @@ func With(ctx context.Context, playerID uuid.UUID) context.Context {
 	return context.WithValue(ctx, ctxKey{}, playerID)
 }
 
-// From returns the authenticated player id and ok=true when one is
-// present, or uuid.Nil and ok=false otherwise.
+// From returns the authenticated player id and ok=true when one is present, or uuid.Nil and ok=false otherwise.
 func From(ctx context.Context) (uuid.UUID, bool) {
 	id, ok := ctx.Value(ctxKey{}).(uuid.UUID)
 	return id, ok

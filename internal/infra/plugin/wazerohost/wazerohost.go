@@ -1,13 +1,7 @@
-// Package wazerohost loads WebAssembly game plugins with wazero and
-// adapts them to the host plugin.Plugin / plugin.Factory contract.
+// Package wazerohost loads WebAssembly game plugins with wazero and adapts them to the host plugin.Plugin / plugin.Factory contract.
 //
-// One CompiledModule is shared across the daemon; each match gets a
-// fresh module instance so its linear memory (and therefore its game
-// state) is isolated. Calls cross the boundary as protobuf-encoded
-// plugin.v1 messages following the ABI documented in the guest SDK
-// (sdk/plugin/go): vfx_alloc reserves a request buffer, and each
-// lifecycle export returns a packed (ptr<<32 | len) pointing at the
-// response.
+// One CompiledModule is shared across the daemon; each match gets a fresh module instance so its linear memory (and therefore its game state) is isolated.
+// Calls cross the boundary as protobuf-encoded plugin.v1 messages following the ABI documented in the guest SDK (sdk/plugin/go): vfx_alloc reserves a request buffer, and each lifecycle export returns a packed (ptr<<32 | len) pointing at the response.
 package wazerohost
 
 import (
@@ -24,14 +18,11 @@ import (
 	"github.com/averak/vfx/internal/domain/plugin"
 )
 
-// statusOK is the result-frame status byte for a successful call; any
-// other value marks an error frame whose payload is a UTF-8 message.
-// Kept in sync with the guest SDK (sdk/plugin/go), which returns
-// packed(ptr<<32 | len) pointing at the frame.
+// statusOK is the result-frame status byte for a successful call; any other value marks an error frame whose payload is a UTF-8 message.
+// Kept in sync with the guest SDK (sdk/plugin/go), which returns packed(ptr<<32 | len) pointing at the frame.
 const statusOK = 0
 
-// Factory compiles a WASM module once and instantiates a fresh copy per
-// match.
+// Factory compiles a WASM module once and instantiates a fresh copy per match.
 type Factory struct {
 	name     string
 	runtime  wazero.Runtime
@@ -40,10 +31,9 @@ type Factory struct {
 
 var _ plugin.Factory = (*Factory)(nil)
 
-// NewFactory compiles the given WASM bytes. name is the identifier the
-// room matches against VFX_ROOM_PLUGIN_PATH (for a file-loaded plugin
-// the caller typically passes the path). The returned Factory owns a
-// wazero runtime; call Close to release it at shutdown.
+// NewFactory compiles the given WASM bytes.
+// name is the identifier the room matches against VFX_ROOM_PLUGIN_PATH (for a file-loaded plugin the caller typically passes the path).
+// The returned Factory owns a wazero runtime; call Close to release it at shutdown.
 func NewFactory(ctx context.Context, name string, wasm []byte) (*Factory, error) {
 	rt := wazero.NewRuntime(ctx)
 	if _, err := wasi_snapshot_preview1.Instantiate(ctx, rt); err != nil {
@@ -58,20 +48,16 @@ func NewFactory(ctx context.Context, name string, wasm []byte) (*Factory, error)
 	return &Factory{name: name, runtime: rt, compiled: compiled}, nil
 }
 
-// Name returns the plugin identifier.
 func (f *Factory) Name() string { return f.name }
 
 // Close releases the wazero runtime and every module instance it owns.
 func (f *Factory) Close(ctx context.Context) error { return f.runtime.Close(ctx) }
 
-// Create instantiates a fresh module for one match. The instance runs
-// its _initialize (package init) so the guest registers its game
-// factory before any export is called.
+// Create instantiates a fresh module for one match.
+// The instance runs its _initialize (package init) so the guest registers its game factory before any export is called.
 func (f *Factory) Create(ctx context.Context) (plugin.Plugin, error) {
-	// TinyGo's -buildmode=c-shared produces a WASI reactor whose runtime
-	// is brought up by _initialize, not _start. wazero defaults to
-	// calling _start, so we point it at _initialize explicitly; without
-	// this the guest's wasmexport guard panics ("runtime not started").
+	// TinyGo's -buildmode=c-shared produces a WASI reactor whose runtime is brought up by _initialize, not _start.
+	// wazero defaults to calling _start, so we point it at _initialize explicitly; without this the guest's wasmexport guard panics ("runtime not started").
 	mod, err := f.runtime.InstantiateModule(ctx, f.compiled,
 		wazero.NewModuleConfig().WithName("").WithStartFunctions("_initialize"))
 	if err != nil {
@@ -134,8 +120,7 @@ func (p *wasmPlugin) Close() error {
 	return p.mod.Close(context.Background())
 }
 
-// call marshals req, hands it to the guest through a freshly allocated
-// buffer, invokes fn, and unmarshals the packed response back into out.
+// call marshals req, hands it to the guest through a freshly allocated buffer, invokes fn, and unmarshals the packed response back into out.
 func (p *wasmPlugin) call(ctx context.Context, fn api.Function, req, out proto.Message) error {
 	data, err := proto.Marshal(req)
 	if err != nil {
@@ -146,8 +131,7 @@ func (p *wasmPlugin) call(ctx context.Context, fn api.Function, req, out proto.M
 	if err != nil {
 		return fmt.Errorf("wazerohost: alloc: %w", err)
 	}
-	// WASM linear memory is 32-bit addressed; pointers and lengths are
-	// inherently uint32, so these truncations are exact by construction.
+	// WASM linear memory is 32-bit addressed; pointers and lengths are inherently uint32, so these truncations are exact by construction.
 	ptr := uint32(allocRes[0]) //nolint:gosec // 32-bit wasm address.
 
 	if len(data) > 0 && !p.memory.Write(ptr, data) {
@@ -162,8 +146,7 @@ func (p *wasmPlugin) call(ctx context.Context, fn api.Function, req, out proto.M
 	respPtr := uint32(packed >> 32)
 	respLen := uint32(packed) //nolint:gosec // 32-bit wasm length.
 	if respLen == 0 {
-		// The guest always returns at least a status byte; a zero-length
-		// frame means it trapped or never wrote one.
+		// The guest always returns at least a status byte; a zero-length frame means it trapped or never wrote one.
 		return errors.New("wazerohost: guest returned an empty frame")
 	}
 
@@ -171,8 +154,8 @@ func (p *wasmPlugin) call(ctx context.Context, fn api.Function, req, out proto.M
 	if !ok {
 		return errors.New("wazerohost: failed reading response from guest memory")
 	}
-	// frame = [status byte][payload]. statusErr carries a UTF-8 message
-	// instead of a marshalled response.
+	// frame = [status byte][payload].
+	// A non-OK status carries a UTF-8 message instead of a marshalled response.
 	status, payload := frame[0], frame[1:]
 	if status != statusOK {
 		return fmt.Errorf("wazerohost: plugin returned an error: %s", payload)

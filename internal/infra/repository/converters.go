@@ -1,9 +1,7 @@
-// Package repository contains the storage implementations of the
-// domain Repository interfaces.
+// Package repository contains the storage implementations of the domain Repository interfaces.
 //
-// Converters here translate between sqlc's pgtype values and Go-native
-// types (time.Time, pointer-to-time). Keeping the translation in one
-// file lets the rest of the package read like straight domain code.
+// The converters here translate between sqlc's pgtype values and Go-native types (time.Time, pointer-to-time).
+// Keeping the translation in one file lets the rest of the package read like straight domain code.
 package repository
 
 import (

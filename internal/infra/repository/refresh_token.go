@@ -18,7 +18,6 @@ type RefreshToken struct{}
 
 var _ player.RefreshTokenRepository = (*RefreshToken)(nil)
 
-// NewRefreshToken returns a refresh-token repository ready to use.
 func NewRefreshToken() *RefreshToken {
 	return &RefreshToken{}
 }

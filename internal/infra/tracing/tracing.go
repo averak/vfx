@@ -1,13 +1,8 @@
-// Package tracing wires OpenTelemetry span export for the vfx
-// processes.
+// Package tracing wires OpenTelemetry span export for the vfx processes.
 //
-// Tracing is opt-in: Setup installs a global tracer provider only when
-// an OTLP endpoint is configured via the standard OTEL_* environment
-// variables. With no endpoint, the global provider stays the SDK's
-// no-op, so a single-node or VPS deployment that never runs a collector
-// pays nothing and emits no connection errors. Span instrumentation in
-// the rest of the codebase always talks to otel.Tracer(...), so it is
-// correct whether or not Setup turned anything on.
+// Tracing is opt-in: Setup installs a global tracer provider only when an OTLP endpoint is configured via the standard OTEL_* environment variables.
+// With no endpoint the global provider stays the SDK's no-op, so a single-node or VPS deployment that never runs a collector pays nothing and emits no connection errors.
+// Span instrumentation in the rest of the codebase always talks to otel.Tracer(...), so it is correct whether or not Setup turned anything on.
 package tracing
 
 import (
@@ -23,15 +18,13 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
-// ShutdownFunc flushes and tears down the tracer provider. Call it
-// before the process exits so buffered spans are exported.
+// ShutdownFunc flushes and tears down the tracer provider.
+// Call it before the process exits so buffered spans are exported.
 type ShutdownFunc func(context.Context) error
 
-// Setup installs a global OTLP/HTTP tracer provider for serviceName and
-// returns a shutdown function. When neither OTEL_EXPORTER_OTLP_ENDPOINT
-// nor OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is set, tracing stays off and
-// the returned shutdown is a no-op. Endpoint, headers, and TLS follow
-// the standard OTEL_EXPORTER_OTLP_* variables read by the SDK.
+// Setup installs a global OTLP/HTTP tracer provider for serviceName and returns a shutdown function.
+// When neither OTEL_EXPORTER_OTLP_ENDPOINT nor OTEL_EXPORTER_OTLP_TRACES_ENDPOINT is set, tracing stays off and the returned shutdown is a no-op.
+// Endpoint, headers, and TLS follow the standard OTEL_EXPORTER_OTLP_* variables read by the SDK.
 func Setup(ctx context.Context, serviceName string) (ShutdownFunc, error) {
 	if !enabled() {
 		return func(context.Context) error { return nil }, nil

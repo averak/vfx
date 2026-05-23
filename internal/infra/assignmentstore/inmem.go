@@ -10,9 +10,8 @@ import (
 	"github.com/averak/vfx/internal/domain/match"
 )
 
-// InMem is a single-process AssignmentStore. It honours TTLs with a
-// per-entry expiry checked lazily on read, which is enough for tests and
-// single-node deployments where there is no second replica to serve.
+// InMem is a single-process AssignmentStore.
+// It honours TTLs with a per-entry expiry checked lazily on read, which is enough for tests and single-node deployments where there is no second replica to serve.
 type InMem struct {
 	mu      sync.Mutex
 	entries map[uuid.UUID]inMemEntry
@@ -25,7 +24,6 @@ type inMemEntry struct {
 
 var _ match.AssignmentStore = (*InMem)(nil)
 
-// NewInMem returns an empty in-memory store.
 func NewInMem() *InMem {
 	return &InMem{entries: make(map[uuid.UUID]inMemEntry)}
 }

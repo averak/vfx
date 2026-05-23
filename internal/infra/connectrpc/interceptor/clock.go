@@ -1,10 +1,7 @@
-// Package interceptor holds Connect-RPC interceptors used by the
-// gateway.
+// Package interceptor holds Connect-RPC interceptors used by the gateway.
 //
-// Each interceptor here addresses a single concern. The Clock
-// interceptor stamps the request boundary with a fixed "now"; the Auth
-// interceptor verifies the Authorization header and attaches the
-// player id to ctx.
+// Each interceptor addresses a single concern.
+// The Clock interceptor stamps the request boundary with a fixed "now"; the Auth interceptor verifies the Authorization header and attaches the player id to ctx.
 package interceptor
 
 import (
@@ -16,10 +13,8 @@ import (
 	"github.com/averak/vfx/internal/stdx/clock"
 )
 
-// Clock returns an interceptor that attaches time.Now (UTC) to the
-// request context so downstream layers can call clock.Now without
-// reaching for time.Now directly. The interceptor applies to both
-// unary and streaming RPCs.
+// Clock returns an interceptor that attaches time.Now (UTC) to the request context so downstream layers can call clock.Now instead of reaching for time.Now directly.
+// It applies to both unary and streaming RPCs.
 func Clock() connect.Interceptor {
 	return &clockInterceptor{}
 }

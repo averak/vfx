@@ -1,11 +1,7 @@
-// Package assignmentstore holds implementations of the
-// match.AssignmentStore contract.
+// Package assignmentstore holds implementations of the match.AssignmentStore contract.
 //
-// Valkey is the shared-state backend: a player's current assignment is
-// written under a per-player key with a TTL, so any gateway replica can
-// answer GetCurrentMatch and a reconnecting client recovers its room
-// without re-queuing. InMem is the single-process fallback used in
-// tests and single-node deployments.
+// Valkey is the shared-state backend: a player's current assignment is written under a per-player key with a TTL, so any gateway replica can answer GetCurrentMatch and a reconnecting client recovers its room without re-queuing.
+// InMem is the single-process fallback used in tests and single-node deployments.
 package assignmentstore
 
 import (
@@ -20,8 +16,7 @@ import (
 	"github.com/averak/vfx/internal/domain/match"
 )
 
-// keyPrefix namespaces assignment keys so they never collide with other
-// vfx state sharing the same Valkey database.
+// keyPrefix namespaces assignment keys so they never collide with other vfx state sharing the same Valkey database.
 const keyPrefix = "vfx:assignment:"
 
 // Valkey persists assignments in a Valkey/Redis-compatible store.
@@ -31,14 +26,12 @@ type Valkey struct {
 
 var _ match.AssignmentStore = (*Valkey)(nil)
 
-// NewValkey wraps a connected client.
 func NewValkey(client valkeygo.Client) *Valkey {
 	return &Valkey{client: client}
 }
 
-// assignmentDTO is the wire form written to Valkey. Keeping it separate
-// from the domain type means a field rename in match.Assignment does not
-// silently change the persisted schema.
+// assignmentDTO is the wire form written to Valkey.
+// Keeping it separate from the domain type means a field rename in match.Assignment does not silently change the persisted schema.
 type assignmentDTO struct {
 	MatchID      string    `json:"match_id"`
 	Endpoint     string    `json:"endpoint"`
@@ -47,8 +40,7 @@ type assignmentDTO struct {
 }
 
 func (s *Valkey) Put(ctx context.Context, playerID uuid.UUID, a *match.Assignment, ttl time.Duration) error {
-	// Persisting the session token is the point of this store: a
-	// reconnecting client recovers the exact token it needs for the room.
+	// Persisting the session token is the point of this store: a reconnecting client recovers the exact token it needs for the room.
 	// The token is short-lived (TTL below) and the key expires with it.
 	payload, err := json.Marshal(assignmentDTO{ //nolint:gosec // G117: storing the session token is intentional and TTL-bounded.
 		MatchID:      a.MatchID.String(),
@@ -60,8 +52,7 @@ func (s *Valkey) Put(ctx context.Context, playerID uuid.UUID, a *match.Assignmen
 		return fmt.Errorf("assignmentstore: marshal: %w", err)
 	}
 
-	// Round the TTL up to whole seconds; a sub-second floor would expire
-	// the key before the token it guards.
+	// Round the TTL up to whole seconds; a sub-second floor would expire the key before the token it guards.
 	seconds := int64(ttl.Seconds())
 	if seconds < 1 {
 		seconds = 1

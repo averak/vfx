@@ -9,11 +9,8 @@ import (
 	"github.com/averak/vfx/internal/infra/metrics"
 )
 
-// Metrics returns an interceptor that records a request count (labelled
-// by method and result code) and a latency histogram for every unary
-// RPC. Streaming RPCs are passed through untimed — their lifetime is
-// dominated by how long the client stays subscribed, which is not a
-// useful latency signal.
+// Metrics returns an interceptor that records a request count (labelled by method and result code) and a latency histogram for every unary RPC.
+// Streaming RPCs are passed through untimed: their lifetime is dominated by how long the client stays subscribed, which is not a useful latency signal.
 func Metrics(reg *metrics.Registry) connect.Interceptor {
 	return &metricsInterceptor{reg: reg}
 }
@@ -45,8 +42,7 @@ func (m *metricsInterceptor) WrapStreamingHandler(next connect.StreamingHandlerF
 	}
 }
 
-// codeLabel maps a handler error to a metric label, reporting success
-// as "ok" rather than connect's zero code.
+// codeLabel maps a handler error to a metric label, reporting success as "ok" rather than connect's zero code.
 func codeLabel(err error) string {
 	if err == nil {
 		return "ok"

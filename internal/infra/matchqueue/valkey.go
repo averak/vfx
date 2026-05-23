@@ -12,12 +12,9 @@ import (
 	"github.com/averak/vfx/internal/domain/match"
 )
 
-// Valkey is a match.Queue shared across gateway replicas. Tickets live
-// in a per-game-mode sorted set (scored by creation time so Pending is
-// FIFO), the latest event per ticket is a snapshot key, and live updates
-// fan out over Valkey pub/sub. Claim removes tickets from the pending
-// set atomically via a Lua script, so two gateways' matchmakers can run
-// concurrently without double-matching.
+// Valkey is a match.Queue shared across gateway replicas.
+// Tickets live in a per-game-mode sorted set (scored by creation time so Pending is FIFO), the latest event per ticket is a snapshot key, and live updates fan out over a per-ticket stream.
+// Claim removes tickets from the pending set atomically via a Lua script, so two gateways' matchmakers can run concurrently without double-matching.
 type Valkey struct {
 	client valkeygo.Client
 	ttl    time.Duration
@@ -25,9 +22,8 @@ type Valkey struct {
 
 var _ match.Queue = (*Valkey)(nil)
 
-// NewValkey wraps a connected client. ttl bounds how long a ticket and
-// its event snapshot live; matchmaking is short, so an hour is ample and
-// guarantees abandoned tickets are reclaimed.
+// NewValkey wraps a connected client.
+// ttl bounds how long a ticket and its event snapshot live; matchmaking is short, so an hour is ample and guarantees abandoned tickets are reclaimed.
 func NewValkey(client valkeygo.Client) *Valkey {
 	return &Valkey{client: client, ttl: time.Hour}
 }
@@ -242,9 +238,7 @@ func (q *Valkey) Publish(ctx context.Context, ticketID uuid.UUID, event match.Ev
 	return q.publish(ctx, t, event)
 }
 
-// publish records the snapshot, removes the ticket from the pending pool
-// on a terminal event, and appends the event to the ticket's stream for
-// subscribers to read.
+// publish records the snapshot, removes the ticket from the pending pool on a terminal event, and appends the event to the ticket's stream for subscribers to read.
 func (q *Valkey) publish(ctx context.Context, t *match.Ticket, event match.Event) error {
 	if err := q.setEvent(ctx, t.ID, event); err != nil {
 		return err
@@ -270,8 +264,8 @@ func (q *Valkey) Pending(ctx context.Context, gameMode string) ([]*match.Ticket,
 		}
 		t, terr := q.getTicket(ctx, id)
 		if terr != nil {
-			// The ticket key expired out from under the pending set; skip
-			// it. (A future sweep could ZREM these.)
+			// The ticket key expired out from under the pending set; skip it.
+			// (A future sweep could ZREM these.)
 			continue
 		}
 		out = append(out, t)
@@ -319,11 +313,8 @@ func (q *Valkey) Subscribe(ctx context.Context, ticketID uuid.UUID) (<-chan matc
 	go func() {
 		defer close(ch)
 		defer cancel()
-		// Read the ticket's stream from the very beginning ("0"), so the
-		// Queued event seeded at enqueue and everything published before
-		// this subscriber attached are delivered — no gap between a
-		// snapshot read and going live, unlike pub/sub. BLOCK lets the
-		// read wait for new events; a timeout returns nil and we re-issue.
+		// Read the ticket's stream from the very beginning ("0"), so the Queued event seeded at enqueue and everything published before this subscriber attached are delivered, with no gap between a snapshot read and going live.
+		// BLOCK lets the read wait for new events; a timeout returns nil and we re-issue.
 		lastID := "0"
 		for {
 			if subCtx.Err() != nil {
@@ -370,8 +361,7 @@ func (q *Valkey) setEvent(ctx context.Context, ticketID uuid.UUID, event match.E
 	return nil
 }
 
-// xaddEvent appends an event to the ticket's stream and refreshes the
-// stream's TTL so it is reclaimed alongside the ticket.
+// xaddEvent appends an event to the ticket's stream and refreshes the stream's TTL so it is reclaimed alongside the ticket.
 func (q *Valkey) xaddEvent(ctx context.Context, ticketID uuid.UUID, event match.Event) error {
 	data, err := marshalEvent(event)
 	if err != nil {

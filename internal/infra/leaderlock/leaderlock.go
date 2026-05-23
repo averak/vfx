@@ -1,13 +1,7 @@
-// Package leaderlock provides a best-effort single-leader election over
-// Valkey, used so only one gateway replica runs the matchmaker loop at a
-// time instead of all of them scanning the shared queue.
+// Package leaderlock provides a best-effort single-leader election over Valkey, so only one gateway replica runs the matchmaker loop at a time instead of all of them scanning the shared queue.
 //
-// The election is intentionally loose: a brief overlap between an old
-// leader losing its lease and a new one acquiring it is acceptable
-// because matchmaking correctness does not depend on exclusivity — the
-// queue's atomic Claim already prevents two matchmakers from pairing the
-// same ticket. The lock is purely an optimisation to avoid redundant
-// work, so it needs no fencing tokens or Redlock-style quorum.
+// The election is intentionally loose: a brief overlap between an old leader losing its lease and a new one acquiring it is acceptable, because matchmaking correctness does not depend on exclusivity (the queue's atomic Claim already prevents two matchmakers from pairing the same ticket).
+// The lock is purely an optimisation to avoid redundant work, so it needs no fencing tokens or Redlock-style quorum.
 package leaderlock
 
 import (
@@ -30,14 +24,12 @@ type Config struct {
 // renewScript extends the lease only if we still own it.
 const renewScript = `if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('PEXPIRE', KEYS[1], ARGV[2]) else return 0 end`
 
-// releaseScript deletes the lease only if we still own it, so we never
-// delete a lease a successor already took.
+// releaseScript deletes the lease only if we still own it, so we never delete a lease a successor already took.
 const releaseScript = `if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end`
 
 // Run contends for leadership and runs fn while this instance holds it.
-// fn receives a context cancelled when leadership is lost (lease expired
-// or stolen) or when the outer ctx is done. Run returns only when ctx is
-// done; it keeps re-contending after losing leadership.
+// fn receives a context cancelled when leadership is lost (lease expired or stolen) or when the outer ctx is done.
+// Run returns only when ctx is done; it keeps re-contending after losing leadership.
 func Run(ctx context.Context, client valkeygo.Client, cfg Config, fn func(context.Context) error) error {
 	id := uuid.NewString()
 	if cfg.TTL <= 0 {
@@ -68,8 +60,7 @@ func Run(ctx context.Context, client valkeygo.Client, cfg Config, fn func(contex
 	}
 }
 
-// leadAndHold runs fn under a leadership context and renews the lease
-// until ctx ends, the lease can no longer be renewed, or fn returns.
+// leadAndHold runs fn under a leadership context and renews the lease until ctx ends, the lease can no longer be renewed, or fn returns.
 func leadAndHold(ctx context.Context, client valkeygo.Client, cfg Config, id string, renewEvery time.Duration, fn func(context.Context) error) error {
 	leaderCtx, cancel := context.WithCancel(ctx)
 	defer cancel()

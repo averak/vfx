@@ -1,14 +1,11 @@
 // Package token deals with access tokens and refresh tokens.
 //
 // Access tokens are JWTs signed with HMAC-SHA256 using a shared secret.
-// Both the gateway (issuer) and the room (verifier) read the same secret
-// from VFX_JWT_SECRET. A future iteration can switch to an asymmetric
-// algorithm (EdDSA) without changing call sites.
+// Both the gateway (issuer) and the room (verifier) read the same secret from VFX_JWT_SECRET.
+// A future iteration can switch to an asymmetric algorithm (EdDSA) without changing call sites.
 //
-// Refresh tokens are 32 random bytes encoded as hex. Only the SHA-256
-// of the raw token is stored, so a database leak does not directly
-// enable impersonation; the raw value is returned to the client and
-// never persisted.
+// Refresh tokens are 32 random bytes encoded as hex.
+// Only the SHA-256 of the raw token is stored, so a database leak does not directly enable impersonation; the raw value is returned to the client and never persisted.
 package token
 
 import (
@@ -22,7 +19,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// AccessClaims are the claims embedded in every issued access token.
 type AccessClaims struct {
 	PlayerID uuid.UUID `json:"sub"`
 	jwt.RegisteredClaims
@@ -34,10 +30,8 @@ type SessionClaims struct {
 	PlayerID uuid.UUID `json:"sub"`
 	MatchID  string    `json:"mid"`
 
-	// MatchPlayers is the full roster the gateway paired together for
-	// this match. The room daemon uses the first joining player's
-	// roster to call plugin.Init so plugins that require an exact
-	// player count work even when joins arrive one by one.
+	// MatchPlayers is the full roster the gateway paired together for this match.
+	// The room daemon reads it from the first joining player to call plugin.Init, so plugins that require an exact player count work even when joins arrive one by one.
 	MatchPlayers []string `json:"mps,omitempty"`
 
 	jwt.RegisteredClaims
@@ -48,12 +42,10 @@ type Signer struct {
 	secret []byte
 }
 
-// NewSigner returns a Signer using the given HMAC secret.
 func NewSigner(secret string) *Signer {
 	return &Signer{secret: []byte(secret)}
 }
 
-// SignAccess issues a fresh access token for the given player.
 func (s *Signer) SignAccess(playerID uuid.UUID, now time.Time, ttl time.Duration) (string, error) {
 	claims := AccessClaims{
 		PlayerID: playerID,
@@ -70,11 +62,9 @@ func (s *Signer) SignAccess(playerID uuid.UUID, now time.Time, ttl time.Duration
 	return signed, nil
 }
 
-// SignSession issues a short-lived token used by clients to connect to
-// the assigned room. The room daemon trusts these because it shares the
-// signing secret with the gateway. matchPlayers is the full roster the
-// gateway paired together; the room reads it from the first joining
-// player to initialise the plugin with the right player set.
+// SignSession issues a short-lived token clients use to connect to the assigned room.
+// The room daemon trusts these because it shares the signing secret with the gateway.
+// matchPlayers is the full paired roster; the room reads it from the first joining player to initialise the plugin with the right player set.
 func (s *Signer) SignSession(playerID uuid.UUID, matchID string, matchPlayers []string, now time.Time, ttl time.Duration) (string, error) {
 	claims := SessionClaims{
 		PlayerID:     playerID,
@@ -93,8 +83,7 @@ func (s *Signer) SignSession(playerID uuid.UUID, matchID string, matchPlayers []
 	return signed, nil
 }
 
-// VerifySession parses and validates a session token, returning its
-// claims when the signature, algorithm, and expiry all check out.
+// VerifySession parses and validates a session token, returning its claims when the signature, algorithm, and expiry all check out.
 func (s *Signer) VerifySession(tokenStr string) (*SessionClaims, error) {
 	claims := &SessionClaims{}
 	_, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
@@ -109,9 +98,7 @@ func (s *Signer) VerifySession(tokenStr string) (*SessionClaims, error) {
 	return claims, nil
 }
 
-// Verify parses and validates an access token string. It returns the
-// embedded claims when the signature, algorithm, and expiry all check
-// out.
+// Verify parses and validates an access token string, returning its claims when the signature, algorithm, and expiry all check out.
 func (s *Signer) Verify(tokenStr string) (*AccessClaims, error) {
 	claims := &AccessClaims{}
 	_, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
@@ -144,16 +131,15 @@ func NewRefresh() (*Refresh, error) {
 	return &Refresh{Raw: raw, Hash: HashRefresh(raw)}, nil
 }
 
-// HashRefresh returns the SHA-256 of the raw token. It is the form
-// stored in the database and looked up on refresh.
+// HashRefresh returns the SHA-256 of the raw token.
+// This is the form stored in the database and looked up on refresh.
 func HashRefresh(raw string) []byte {
 	sum := sha256.Sum256([]byte(raw))
 	return sum[:]
 }
 
-// NewRefresh generates a fresh refresh token, returning the raw value
-// and its stored hash. It lets *Signer satisfy the auth usecase's
-// TokenIssuer port (which works in primitives, not the Refresh type).
+// NewRefresh returns a fresh refresh token's raw value and stored hash.
+// The method form lets *Signer satisfy the auth usecase's TokenIssuer port, which works in primitives rather than the Refresh type.
 func (s *Signer) NewRefresh() (raw string, hash []byte, err error) {
 	r, err := NewRefresh()
 	if err != nil {
@@ -162,8 +148,7 @@ func (s *Signer) NewRefresh() (raw string, hash []byte, err error) {
 	return r.Raw, r.Hash, nil
 }
 
-// HashRefresh hashes a raw refresh token for lookup; method form of the
-// package function so *Signer satisfies the TokenIssuer port.
+// HashRefresh is the method form of the package function, so *Signer satisfies the TokenIssuer port.
 func (s *Signer) HashRefresh(raw string) []byte {
 	return HashRefresh(raw)
 }

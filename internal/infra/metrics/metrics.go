@@ -1,9 +1,6 @@
 // Package metrics holds the Prometheus collectors vfx exposes.
 //
-// Collectors are registered against a private Registry rather than the
-// process default so tests can construct an isolated set, and so the
-// /metrics endpoint never accidentally exposes Go runtime metrics from
-// a transitive dependency we did not vet.
+// Collectors are registered against a private Registry rather than the process default, so tests can construct an isolated set and the /metrics endpoint never accidentally exposes Go runtime metrics from a transitive dependency we did not vet.
 package metrics
 
 import (
@@ -14,13 +11,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// Registry is the vfx-owned Prometheus registry. All vfx collectors
-// register here; nothing should touch prometheus.DefaultRegisterer.
+// Registry is the vfx-owned Prometheus registry.
+// All vfx collectors register here; nothing should touch prometheus.DefaultRegisterer.
 type Registry struct {
 	*prometheus.Registry
 
-	// RPC-level metrics, recorded generically by the metrics
-	// interceptor for every Connect call.
+	// RPC-level metrics, recorded generically by the metrics interceptor for every Connect call.
 	RPCRequests *prometheus.CounterVec   // labels: method, code
 	RPCDuration *prometheus.HistogramVec // labels: method
 
@@ -28,14 +24,12 @@ type Registry struct {
 	MatchesAllocated prometheus.Counter
 	QueueDepth       *prometheus.GaugeVec // labels: game_mode
 
-	// Room metrics, recorded by the room daemon (exposed once the room
-	// grows an HTTP probe sidecar).
+	// Room metrics, recorded by the room daemon.
 	RoomMatchesActive prometheus.Gauge
 	RoomTickDuration  prometheus.Histogram
 }
 
-// NewRegistry builds a fresh registry pre-loaded with the standard Go
-// and process collectors plus the vfx-specific ones.
+// NewRegistry builds a fresh registry pre-loaded with the standard Go and process collectors plus the vfx-specific ones.
 func NewRegistry() *Registry {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(
@@ -93,8 +87,7 @@ func NewRegistry() *Registry {
 	return r
 }
 
-// Handler returns an http.Handler that exports the registry in the
-// Prometheus text format.
+// Handler returns an http.Handler that exports the registry in the Prometheus text format.
 func (r *Registry) Handler() http.Handler {
 	return promhttp.HandlerFor(r.Registry, promhttp.HandlerOpts{
 		Registry: r.Registry,

@@ -14,15 +14,11 @@ import (
 
 // Player is the storage implementation of [player.Repository].
 //
-// Methods are stateless; each pulls the active transaction from the
-// context (placed there by db.Session) and wraps it in a fresh
-// dbgen.Queries, so the same instance is safe across goroutines and
-// transactions.
+// Methods are stateless: each pulls the active transaction from the context (placed there by db.Session) and wraps it in a fresh dbgen.Queries, so one instance is safe across goroutines and transactions.
 type Player struct{}
 
 var _ player.Repository = (*Player)(nil)
 
-// NewPlayer returns a Player repository ready to use.
 func NewPlayer() *Player {
 	return &Player{}
 }
