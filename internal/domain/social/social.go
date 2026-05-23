@@ -12,10 +12,12 @@ import (
 
 var (
 	ErrSelfFriend       = errors.New("social: cannot friend yourself")
+	ErrSelfBlock        = errors.New("social: cannot block yourself")
 	ErrAlreadyFriends   = errors.New("social: already friends")
 	ErrAlreadyRequested = errors.New("social: a request to this player is already pending")
 	ErrRequestNotFound  = errors.New("social: no such pending request")
 	ErrNotFriends       = errors.New("social: not friends")
+	ErrBlocked          = errors.New("social: blocked between these players")
 )
 
 // Friend is a read model: an accepted friend with their display name and when the friendship formed.
@@ -30,6 +32,13 @@ type PendingRequest struct {
 	PlayerID    uuid.UUID
 	Nickname    *string
 	RequestedAt time.Time
+}
+
+// BlockedPlayer is a read model: a player the caller has blocked and when.
+type BlockedPlayer struct {
+	PlayerID  uuid.UUID
+	Nickname  *string
+	BlockedAt time.Time
 }
 
 // OrderPair returns the two ids in canonical order (low, high) so an undirected friendship has a single representation.

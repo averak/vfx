@@ -163,6 +163,88 @@ func TestRemoveFriend(t *testing.T) {
 	requireCode(t, err, connect.CodeNotFound)
 }
 
+// Blocking severs an existing friendship and bars new requests; both are visible/enforced afterwards.
+func TestBlock_SeversFriendshipAndBarsRequests(t *testing.T) {
+	srv := testconnect.New(t)
+	a := join(t, srv, "ba")
+	b := join(t, srv, "bb")
+	send(t, srv, a, b.id)
+	send(t, srv, b, a.id) // mutual -> friends
+
+	if _, err := srv.Social.BlockPlayer(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&socialv1.BlockPlayerRequest{PlayerId: b.id}), a.token)); err != nil {
+		t.Fatalf("BlockPlayer: %v", err)
+	}
+
+	// Friendship is gone for both.
+	if ids := friendIDs(t, srv, a); len(ids) != 0 {
+		t.Errorf("blocker still has the friend: %v", ids)
+	}
+	if ids := friendIDs(t, srv, b); len(ids) != 0 {
+		t.Errorf("blocked player still has the friend: %v", ids)
+	}
+
+	// b is listed as blocked by a.
+	listed, err := srv.Social.ListBlocked(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&socialv1.ListBlockedRequest{}), a.token))
+	if err != nil {
+		t.Fatalf("ListBlocked: %v", err)
+	}
+	if len(listed.Msg.GetBlocked()) != 1 || listed.Msg.GetBlocked()[0].GetPlayerId() != b.id {
+		t.Fatalf("ListBlocked = %+v, want [b]", listed.Msg.GetBlocked())
+	}
+
+	// A new request either way is refused while the block stands.
+	_, aToB := srv.Social.SendFriendRequest(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&socialv1.SendFriendRequestRequest{AddresseePlayerId: b.id}), a.token))
+	requireCode(t, aToB, connect.CodeFailedPrecondition)
+	_, bToA := srv.Social.SendFriendRequest(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&socialv1.SendFriendRequestRequest{AddresseePlayerId: a.id}), b.token))
+	requireCode(t, bToA, connect.CodeFailedPrecondition)
+}
+
+// Block is idempotent, and unblocking restores the ability to send requests.
+func TestBlock_IdempotentAndUnblock(t *testing.T) {
+	srv := testconnect.New(t)
+	a := join(t, srv, "ia")
+	b := join(t, srv, "ib")
+
+	block := func() error {
+		_, err := srv.Social.BlockPlayer(t.Context(),
+			testconnect.Authorize(connect.NewRequest(&socialv1.BlockPlayerRequest{PlayerId: b.id}), a.token))
+		return err
+	}
+	if err := block(); err != nil {
+		t.Fatalf("first block: %v", err)
+	}
+	if err := block(); err != nil {
+		t.Fatalf("second block (must be idempotent): %v", err)
+	}
+
+	if _, err := srv.Social.UnblockPlayer(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&socialv1.UnblockPlayerRequest{PlayerId: b.id}), a.token)); err != nil {
+		t.Fatalf("UnblockPlayer: %v", err)
+	}
+	// Unblock is idempotent too.
+	if _, err := srv.Social.UnblockPlayer(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&socialv1.UnblockPlayerRequest{PlayerId: b.id}), a.token)); err != nil {
+		t.Fatalf("second unblock (must be idempotent): %v", err)
+	}
+
+	// After unblocking, a request goes through again.
+	if status := send(t, srv, a, b.id).GetStatus(); status != socialv1.RequestStatus_REQUEST_STATUS_PENDING {
+		t.Errorf("after unblock, send status = %v, want PENDING", status)
+	}
+}
+
+func TestBlockPlayer_RejectsSelf(t *testing.T) {
+	srv := testconnect.New(t)
+	a := join(t, srv, "selfblock")
+	_, err := srv.Social.BlockPlayer(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&socialv1.BlockPlayerRequest{PlayerId: a.id}), a.token))
+	requireCode(t, err, connect.CodeInvalidArgument)
+}
+
 func TestCancelFriendRequest(t *testing.T) {
 	srv := testconnect.New(t)
 	a := join(t, srv, "ca")

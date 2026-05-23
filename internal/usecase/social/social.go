@@ -3,6 +3,7 @@ package social
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 
@@ -31,6 +32,14 @@ func (u *Usecase) SendFriendRequest(ctx context.Context, me, addressee uuid.UUID
 
 	var accepted bool
 	err := u.rw.RW(ctx, func(ctx context.Context) error {
+		blocked, err := u.repo.IsBlocked(ctx, me, addressee)
+		if err != nil {
+			return err
+		}
+		if blocked {
+			return domainsocial.ErrBlocked
+		}
+
 		friends, err := u.repo.AreFriends(ctx, me, addressee)
 		if err != nil {
 			return err
@@ -93,6 +102,45 @@ func (u *Usecase) RemoveFriend(ctx context.Context, me, friend uuid.UUID) error 
 	return u.rw.RW(ctx, func(ctx context.Context) error {
 		return u.repo.DeleteFriendship(ctx, me, friend)
 	})
+}
+
+// BlockPlayer blocks target and severs any existing relationship: it removes the friendship and pending requests in both directions, ignoring whichever do not exist.
+func (u *Usecase) BlockPlayer(ctx context.Context, me, target uuid.UUID) error {
+	if me == target {
+		return domainsocial.ErrSelfBlock
+	}
+	now := clock.Now(ctx)
+	return u.rw.RW(ctx, func(ctx context.Context) error {
+		if err := u.repo.Block(ctx, me, target, now); err != nil {
+			return err
+		}
+		if err := u.repo.DeleteFriendship(ctx, me, target); err != nil && !errors.Is(err, domainsocial.ErrNotFriends) {
+			return err
+		}
+		if err := u.repo.DeleteRequest(ctx, me, target); err != nil && !errors.Is(err, domainsocial.ErrRequestNotFound) {
+			return err
+		}
+		if err := u.repo.DeleteRequest(ctx, target, me); err != nil && !errors.Is(err, domainsocial.ErrRequestNotFound) {
+			return err
+		}
+		return nil
+	})
+}
+
+func (u *Usecase) UnblockPlayer(ctx context.Context, me, target uuid.UUID) error {
+	return u.rw.RW(ctx, func(ctx context.Context) error {
+		return u.repo.Unblock(ctx, me, target)
+	})
+}
+
+func (u *Usecase) ListBlocked(ctx context.Context, me uuid.UUID) ([]*domainsocial.BlockedPlayer, error) {
+	var blocked []*domainsocial.BlockedPlayer
+	err := u.ro.RO(ctx, func(ctx context.Context) error {
+		var err error
+		blocked, err = u.repo.ListBlocked(ctx, me)
+		return err
+	})
+	return blocked, err
 }
 
 func (u *Usecase) ListFriends(ctx context.Context, me uuid.UUID) ([]*domainsocial.Friend, error) {

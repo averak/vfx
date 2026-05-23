@@ -36,12 +36,13 @@ import {
   RequestStatus,
   type Friend,
   type FriendRequest,
+  type BlockedPlayer,
 } from "./gen/vfx/v1/social/social_service_pb.js";
 import { ChatService, type Message as ChatMessage } from "./gen/vfx/v1/chat/chat_service_pb.js";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 
 export { Provider, RequestStatus };
-export type { Player, Frame, FileMetadata, RankEntry, Friend, FriendRequest, ChatMessage };
+export type { Player, Frame, FileMetadata, RankEntry, Friend, FriendRequest, BlockedPlayer, ChatMessage };
 
 /** Options for constructing a VfxClient. */
 export interface VfxClientOptions {
@@ -278,6 +279,20 @@ export class VfxClient {
 
   async removeFriend(friendPlayerId: string): Promise<void> {
     await this.social.removeFriend({ friendPlayerId }, { headers: this.authHeaders() });
+  }
+
+  /** Block a player, severing any friendship and pending requests; idempotent. */
+  async blockPlayer(playerId: string): Promise<void> {
+    await this.social.blockPlayer({ playerId }, { headers: this.authHeaders() });
+  }
+
+  async unblockPlayer(playerId: string): Promise<void> {
+    await this.social.unblockPlayer({ playerId }, { headers: this.authHeaders() });
+  }
+
+  async listBlocked(): Promise<BlockedPlayer[]> {
+    const resp = await this.social.listBlocked({}, { headers: this.authHeaders() });
+    return resp.blocked;
   }
 
   /** Send a direct message and return the stored message. */

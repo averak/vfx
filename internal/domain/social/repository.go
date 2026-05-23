@@ -29,4 +29,15 @@ type Repository interface {
 	DeleteFriendship(ctx context.Context, a, b uuid.UUID) error
 
 	ListFriends(ctx context.Context, playerID uuid.UUID) ([]*Friend, error)
+
+	// Block records blocker -> blocked; it is idempotent (re-blocking is a no-op).
+	Block(ctx context.Context, blocker, blocked uuid.UUID, now time.Time) error
+
+	// Unblock removes blocker -> blocked; it is idempotent (unblocking a non-block is a no-op).
+	Unblock(ctx context.Context, blocker, blocked uuid.UUID) error
+
+	// IsBlocked reports whether either player has blocked the other.
+	IsBlocked(ctx context.Context, a, b uuid.UUID) (bool, error)
+
+	ListBlocked(ctx context.Context, blocker uuid.UUID) ([]*BlockedPlayer, error)
 }

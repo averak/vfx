@@ -31,6 +31,14 @@ service SocialService {
   rpc ListOutgoingRequests(ListOutgoingRequestsRequest) returns (ListOutgoingRequestsResponse);
 
   rpc RemoveFriend(RemoveFriendRequest) returns (RemoveFriendResponse);
+
+  // BlockPlayer は相手をブロックする。既存の friendship と双方向の pending request は解消され、以後どちら向きの friend request も拒否される。冪等。
+  rpc BlockPlayer(BlockPlayerRequest) returns (BlockPlayerResponse);
+
+  // UnblockPlayer はブロックを解除する。冪等。
+  rpc UnblockPlayer(UnblockPlayerRequest) returns (UnblockPlayerResponse);
+
+  rpc ListBlocked(ListBlockedRequest) returns (ListBlockedResponse);
 }
 
 // Friend は成立済みの友達。
@@ -103,3 +111,28 @@ message RemoveFriendRequest {
 }
 
 message RemoveFriendResponse {}
+
+// BlockedPlayer はブロック中の相手。
+message BlockedPlayer {
+  string player_id = 1;
+  optional string nickname = 2;
+  google.protobuf.Timestamp blocked_at = 3;
+}
+
+message BlockPlayerRequest {
+  string player_id = 1;
+}
+
+message BlockPlayerResponse {}
+
+message UnblockPlayerRequest {
+  string player_id = 1;
+}
+
+message UnblockPlayerResponse {}
+
+message ListBlockedRequest {}
+
+message ListBlockedResponse {
+  repeated BlockedPlayer blocked = 1;
+}

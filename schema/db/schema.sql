@@ -226,3 +226,20 @@ CREATE TABLE direct_messages (
 -- Serves the newest-first, before-cursor history scan scoped to a conversation.
 CREATE INDEX idx_direct_messages_conversation
   ON direct_messages (player_low, player_high, created_at DESC);
+
+-- ============================================================================
+-- player_blocks
+--   Directed: blocker_id has blocked blocked_id. A friend request is refused when a block exists in either direction.
+-- ============================================================================
+
+CREATE TABLE player_blocks (
+  id          UUID         PRIMARY KEY,
+  blocker_id  UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  blocked_id  UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  UNIQUE (blocker_id, blocked_id)
+);
+
+-- Covers the reverse-direction check (has the other player blocked me?).
+CREATE INDEX idx_player_blocks_blocked
+  ON player_blocks (blocked_id);

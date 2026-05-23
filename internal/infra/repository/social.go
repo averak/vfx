@@ -127,6 +127,51 @@ func (Social) DeleteFriendship(ctx context.Context, a, b uuid.UUID) error {
 	return nil
 }
 
+func (Social) Block(ctx context.Context, blocker, blocked uuid.UUID, now time.Time) error {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	return dbgen.New(tx).BlockPlayer(ctx, dbgen.BlockPlayerParams{
+		ID:        uuid.New(),
+		BlockerID: blocker,
+		BlockedID: blocked,
+		CreatedAt: toTimestamptz(now),
+	})
+}
+
+func (Social) Unblock(ctx context.Context, blocker, blocked uuid.UUID) error {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	return dbgen.New(tx).UnblockPlayer(ctx, dbgen.UnblockPlayerParams{BlockerID: blocker, BlockedID: blocked})
+}
+
+func (Social) IsBlocked(ctx context.Context, a, b uuid.UUID) (bool, error) {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return false, err
+	}
+	return dbgen.New(tx).BlockExistsEitherWay(ctx, dbgen.BlockExistsEitherWayParams{BlockerID: a, BlockedID: b})
+}
+
+func (Social) ListBlocked(ctx context.Context, blocker uuid.UUID) ([]*social.BlockedPlayer, error) {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := dbgen.New(tx).ListBlocked(ctx, blocker)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*social.BlockedPlayer, len(rows))
+	for i, row := range rows {
+		out[i] = &social.BlockedPlayer{PlayerID: row.ID, Nickname: row.Nickname, BlockedAt: row.CreatedAt.Time}
+	}
+	return out, nil
+}
+
 func (Social) ListFriends(ctx context.Context, playerID uuid.UUID) ([]*social.Friend, error) {
 	tx, err := db.Tx(ctx)
 	if err != nil {

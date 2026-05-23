@@ -85,3 +85,32 @@ func (c *Client) RemoveFriend(ctx context.Context, friendPlayerID string) error 
 	}
 	return nil
 }
+
+// BlockPlayer blocks a player, severing any friendship and pending requests; idempotent.
+func (c *Client) BlockPlayer(ctx context.Context, playerID string) error {
+	req := connect.NewRequest(&socialv1.BlockPlayerRequest{PlayerId: playerID})
+	c.authorize(req.Header())
+	if _, err := c.social.BlockPlayer(ctx, req); err != nil {
+		return fmt.Errorf("vfxclient: block player: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) UnblockPlayer(ctx context.Context, playerID string) error {
+	req := connect.NewRequest(&socialv1.UnblockPlayerRequest{PlayerId: playerID})
+	c.authorize(req.Header())
+	if _, err := c.social.UnblockPlayer(ctx, req); err != nil {
+		return fmt.Errorf("vfxclient: unblock player: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) ListBlocked(ctx context.Context) ([]*socialv1.BlockedPlayer, error) {
+	req := connect.NewRequest(&socialv1.ListBlockedRequest{})
+	c.authorize(req.Header())
+	resp, err := c.social.ListBlocked(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("vfxclient: list blocked: %w", err)
+	}
+	return resp.Msg.GetBlocked(), nil
+}

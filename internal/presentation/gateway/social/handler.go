@@ -139,3 +139,45 @@ func (h *Handler) RemoveFriend(ctx context.Context, req *connect.Request[socialv
 	}
 	return connect.NewResponse(&socialv1.RemoveFriendResponse{}), nil
 }
+
+func (h *Handler) BlockPlayer(ctx context.Context, req *connect.Request[socialv1.BlockPlayerRequest]) (*connect.Response[socialv1.BlockPlayerResponse], error) {
+	me, err := requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	target, err := parsePlayerID(req.Msg.GetPlayerId())
+	if err != nil {
+		return nil, err
+	}
+	if err := h.uc.BlockPlayer(ctx, me, target); err != nil {
+		return nil, toConnectError(err)
+	}
+	return connect.NewResponse(&socialv1.BlockPlayerResponse{}), nil
+}
+
+func (h *Handler) UnblockPlayer(ctx context.Context, req *connect.Request[socialv1.UnblockPlayerRequest]) (*connect.Response[socialv1.UnblockPlayerResponse], error) {
+	me, err := requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	target, err := parsePlayerID(req.Msg.GetPlayerId())
+	if err != nil {
+		return nil, err
+	}
+	if err := h.uc.UnblockPlayer(ctx, me, target); err != nil {
+		return nil, toConnectError(err)
+	}
+	return connect.NewResponse(&socialv1.UnblockPlayerResponse{}), nil
+}
+
+func (h *Handler) ListBlocked(ctx context.Context, _ *connect.Request[socialv1.ListBlockedRequest]) (*connect.Response[socialv1.ListBlockedResponse], error) {
+	me, err := requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	blocked, err := h.uc.ListBlocked(ctx, me)
+	if err != nil {
+		return nil, toConnectError(err)
+	}
+	return connect.NewResponse(&socialv1.ListBlockedResponse{Blocked: toBlockedListPb(blocked)}), nil
+}

@@ -56,14 +56,28 @@ func toRequestListPb(requests []*domainsocial.PendingRequest) []*socialv1.Friend
 	return out
 }
 
+func toBlockedListPb(blocked []*domainsocial.BlockedPlayer) []*socialv1.BlockedPlayer {
+	out := make([]*socialv1.BlockedPlayer, len(blocked))
+	for i, b := range blocked {
+		out[i] = &socialv1.BlockedPlayer{
+			PlayerId:  b.PlayerID.String(),
+			Nickname:  b.Nickname,
+			BlockedAt: timestamppb.New(b.BlockedAt),
+		}
+	}
+	return out
+}
+
 func toConnectError(err error) error {
 	switch {
-	case errors.Is(err, domainsocial.ErrSelfFriend):
+	case errors.Is(err, domainsocial.ErrSelfFriend), errors.Is(err, domainsocial.ErrSelfBlock):
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	case errors.Is(err, domainsocial.ErrAlreadyFriends), errors.Is(err, domainsocial.ErrAlreadyRequested):
 		return connect.NewError(connect.CodeAlreadyExists, err)
 	case errors.Is(err, domainsocial.ErrRequestNotFound), errors.Is(err, domainsocial.ErrNotFriends):
 		return connect.NewError(connect.CodeNotFound, err)
+	case errors.Is(err, domainsocial.ErrBlocked):
+		return connect.NewError(connect.CodeFailedPrecondition, err)
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}
