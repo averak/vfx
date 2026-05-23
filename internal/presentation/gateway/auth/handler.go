@@ -110,6 +110,8 @@ func (h *Handler) UpdateProfile(ctx context.Context, req *connect.Request[authv1
 // Anything else falls through as Internal so unexpected failures stay loud.
 func toConnectError(err error) error {
 	switch {
+	case errors.Is(err, player.ErrInvalidNickname):
+		return connect.NewError(connect.CodeInvalidArgument, err)
 	case errors.Is(err, player.ErrPlayerNotFound):
 		return connect.NewError(connect.CodeNotFound, err)
 	case errors.Is(err, player.ErrIdentityNotFound):

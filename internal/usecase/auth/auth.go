@@ -150,7 +150,9 @@ func (u *Usecase) UpdateProfile(ctx context.Context, playerID uuid.UUID, nicknam
 			return err
 		}
 		if nickname != nil {
-			p.SetNickname(nickname, now)
+			if err := p.SetNickname(nickname, now); err != nil {
+				return err
+			}
 		}
 		if err := u.playerRepo.UpdateNickname(ctx, p); err != nil {
 			return err
@@ -182,7 +184,10 @@ func (u *Usecase) findOrCreatePlayer(ctx context.Context, deviceID, nickname *st
 		providerUID = *deviceID
 	}
 
-	p := player.New(uuid.New(), nickname, now)
+	p, err := player.New(uuid.New(), nickname, now)
+	if err != nil {
+		return nil, err
+	}
 	if err := u.playerRepo.Save(ctx, p); err != nil {
 		return nil, fmt.Errorf("auth: save player: %w", err)
 	}
