@@ -220,12 +220,20 @@ Key design points:
 
 ## Storage
 
+Durable data lives in two substrates chosen by shape: structured records in PostgreSQL, opaque file bytes in object storage. The gateway is the control plane for both and never proxies file bytes.
+
 ### PostgreSQL
 
-- Sole long-lived storage target.
-- Holds accounts, friends, match history, key-value records, leaderboards.
+- Holds accounts, friends, match history, leaderboards, and file *metadata* (filename, size, content hash, tags).
 - Managed services (Cloud SQL, RDS, Neon, Supabase) and self-hosted instances are both first-class.
 - Distributed SQL backends are not a supported target.
+
+### Object storage (GCS)
+
+- Holds the file bytes for two buckets: **player data** (owner-scoped save data) and **title storage** (operator-published, read-only, tag-gated content and remote config).
+- Transfers go directly between the client and the store over V4 signed URLs, so large blobs never traverse the gateway. The gateway authorizes the request, enforces per-player quotas, issues the URL, and — for writes — verifies the uploaded object before recording its metadata.
+- A metadata row exists only after a committed upload; an interrupted upload leaves an orphan object with no row, reclaimed by the bucket's lifecycle/sweep. Deletes remove the metadata row first (the source of truth) and best-effort the object second.
+- Signing uses IAM SignBlob (Workload Identity) in production, so no service-account key is placed on disk; local development and CI run [fake-gcs-server](https://github.com/fsouza/fake-gcs-server).
 
 ### Valkey
 

@@ -57,6 +57,22 @@ type Gateway struct {
 	// AgonesNamespace is the namespace the Agones allocator creates GameServerAllocations in.
 	// Only used when Allocator is "agones".
 	AgonesNamespace string `env:"VFX_AGONES_NAMESPACE" envDefault:"default"`
+
+	// StorageBucket is the GCS bucket holding player-data and title-storage objects.
+	// Leaving it empty disables the storage services entirely, so a deployment that does not use them needs no object store.
+	StorageBucket string `env:"VFX_STORAGE_BUCKET"`
+
+	// StorageEmulatorHost mirrors the GCS client's STORAGE_EMULATOR_HOST so the blob adapter knows to sign with an ephemeral key (the emulator does not verify signatures) instead of IAM SignBlob.
+	StorageEmulatorHost string `env:"STORAGE_EMULATOR_HOST"`
+
+	StoragePlayerDataPrefix string `env:"VFX_STORAGE_PLAYER_DATA_PREFIX" envDefault:"player-data"`
+	StorageTitlePrefix      string `env:"VFX_STORAGE_TITLE_PREFIX"       envDefault:"title"`
+
+	// StorageURLTTL bounds how long an issued upload/download URL stays valid.
+	StorageURLTTL time.Duration `env:"VFX_STORAGE_URL_TTL" envDefault:"15m"`
+
+	StorageMaxBytesPerPlayer uint64 `env:"VFX_STORAGE_MAX_BYTES_PER_PLAYER" envDefault:"10485760"` // 10 MiB
+	StorageMaxFilesPerPlayer int    `env:"VFX_STORAGE_MAX_FILES_PER_PLAYER" envDefault:"64"`
 }
 
 func LoadGateway() (*Gateway, error) {

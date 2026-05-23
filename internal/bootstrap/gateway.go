@@ -15,6 +15,7 @@ import (
 	"github.com/averak/vfx/internal/domain/player"
 	"github.com/averak/vfx/internal/infra/allocator"
 	"github.com/averak/vfx/internal/infra/assignmentstore"
+	"github.com/averak/vfx/internal/infra/blobstore"
 	"github.com/averak/vfx/internal/infra/config"
 	"github.com/averak/vfx/internal/infra/db"
 	"github.com/averak/vfx/internal/infra/matchqueue"
@@ -25,8 +26,10 @@ import (
 	"github.com/averak/vfx/internal/infra/valkey"
 	gatewayauthhandler "github.com/averak/vfx/internal/presentation/gateway/auth"
 	gatewaymatchhandler "github.com/averak/vfx/internal/presentation/gateway/match"
+	gatewaystoragehandler "github.com/averak/vfx/internal/presentation/gateway/storage"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
 	usecasematch "github.com/averak/vfx/internal/usecase/match"
+	usecasestorage "github.com/averak/vfx/internal/usecase/storage"
 )
 
 type Gateway struct {
@@ -52,6 +55,11 @@ type Gateway struct {
 
 	MatchUsecase *usecasematch.Usecase
 	MatchHandler *gatewaymatchhandler.Handler
+
+	// Storage fields are nil when VFX_STORAGE_BUCKET is unset: the storage services are then disabled and the gateway needs no object store.
+	StorageUsecase           *usecasestorage.Usecase
+	PlayerDataStorageHandler *gatewaystoragehandler.PlayerDataHandler
+	TitleStorageHandler      *gatewaystoragehandler.TitleHandler
 }
 
 // matchmakerMetrics adapts the Prometheus registry to the usecasematch.Metrics interface, keeping the usecase layer free of a concrete metrics dependency.
@@ -152,7 +160,43 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 		Metrics:                  matchmakerMetrics{reg: metricsReg},
 	})
 
+	var (
+		storageUC         *usecasestorage.Usecase
+		playerDataHandler *gatewaystoragehandler.PlayerDataHandler
+		titleHandler      *gatewaystoragehandler.TitleHandler
+		blobCleanup       = func() {}
+	)
+	if cfg.StorageBucket != "" {
+		blobs, cleanup, blobErr := blobstore.NewGCS(ctx, blobstore.Config{
+			Bucket:   cfg.StorageBucket,
+			Emulated: cfg.StorageEmulatorHost != "",
+		})
+		if blobErr != nil {
+			valkeyClient.Close()
+			pool.Close()
+			return nil, nil, blobErr
+		}
+		blobCleanup = cleanup
+		storageUC = usecasestorage.New(
+			session,
+			session,
+			repository.NewPlayerFile(),
+			repository.NewTitleFile(),
+			blobs,
+			usecasestorage.Config{
+				PlayerDataPrefix:  cfg.StoragePlayerDataPrefix,
+				TitlePrefix:       cfg.StorageTitlePrefix,
+				URLTTL:            cfg.StorageURLTTL,
+				MaxBytesPerPlayer: cfg.StorageMaxBytesPerPlayer,
+				MaxFilesPerPlayer: cfg.StorageMaxFilesPerPlayer,
+			},
+		)
+		playerDataHandler = gatewaystoragehandler.NewPlayerDataHandler(storageUC)
+		titleHandler = gatewaystoragehandler.NewTitleHandler(storageUC)
+	}
+
 	cleanup := func() {
+		blobCleanup()
 		valkeyClient.Close()
 		pool.Close()
 	}
@@ -174,5 +218,9 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 		AuthHandler:      authHandler,
 		MatchUsecase:     matchUC,
 		MatchHandler:     matchHandler,
+
+		StorageUsecase:           storageUC,
+		PlayerDataStorageHandler: playerDataHandler,
+		TitleStorageHandler:      titleHandler,
 	}, cleanup, nil
 }

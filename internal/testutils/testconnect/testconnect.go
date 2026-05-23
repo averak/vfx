@@ -5,6 +5,7 @@
 package testconnect
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
+	"github.com/averak/vfx/gen/go/vfx/v1/storage/storageconnect"
+	domainstorage "github.com/averak/vfx/internal/domain/storage"
 	"github.com/averak/vfx/internal/infra/assignmentstore"
 	"github.com/averak/vfx/internal/infra/connectrpc/interceptor"
 	"github.com/averak/vfx/internal/infra/db"
@@ -22,17 +25,32 @@ import (
 	"github.com/averak/vfx/internal/infra/token"
 	gatewayauthhandler "github.com/averak/vfx/internal/presentation/gateway/auth"
 	gatewaymatchhandler "github.com/averak/vfx/internal/presentation/gateway/match"
+	gatewaystoragehandler "github.com/averak/vfx/internal/presentation/gateway/storage"
+	"github.com/averak/vfx/internal/testutils/fakeblob"
 	"github.com/averak/vfx/internal/testutils/testdb"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
 	usecasematch "github.com/averak/vfx/internal/usecase/match"
+	usecasestorage "github.com/averak/vfx/internal/usecase/storage"
 )
 
 const jwtSecret = "test-secret"
 
-type Server struct {
-	Auth  authconnect.AuthServiceClient
-	Match matchconnect.MatchServiceClient
+// Storage limits are kept tiny so quota and size rejections are easy to trigger from a handler test.
+const (
+	StorageMaxBytesPerPlayer = 1024
+	StorageMaxFilesPerPlayer = 2
+)
 
+type Server struct {
+	Auth       authconnect.AuthServiceClient
+	Match      matchconnect.MatchServiceClient
+	PlayerData storageconnect.PlayerDataStorageServiceClient
+	Title      storageconnect.TitleStorageServiceClient
+
+	// Blob is the in-memory object store behind the storage services; tests Put an object to simulate a finished upload before CommitFile.
+	Blob *fakeblob.Store
+
+	session    *db.Session
 	httpServer *httptest.Server
 }
 
@@ -42,10 +60,11 @@ func New(t *testing.T) *Server {
 	t.Helper()
 
 	pool := testdb.Pool(t)
+	session := db.NewSession(pool)
 	signer := token.NewSigner(jwtSecret)
 
 	authUC := usecaseauth.New(
-		db.NewSession(pool),
+		session,
 		repository.NewPlayer(),
 		repository.NewRefreshToken(),
 		signer,
@@ -53,6 +72,22 @@ func New(t *testing.T) *Server {
 		720*time.Hour,
 	)
 	matchUC := usecasematch.New(matchqueue.NewInMem(), assignmentstore.NewInMem())
+
+	blob := fakeblob.New()
+	storageUC := usecasestorage.New(
+		session,
+		session,
+		repository.NewPlayerFile(),
+		repository.NewTitleFile(),
+		blob,
+		usecasestorage.Config{
+			PlayerDataPrefix:  "player-data",
+			TitlePrefix:       "title",
+			URLTTL:            5 * time.Minute,
+			MaxBytesPerPlayer: StorageMaxBytesPerPlayer,
+			MaxFilesPerPlayer: StorageMaxFilesPerPlayer,
+		},
+	)
 
 	interceptors := connect.WithInterceptors(
 		interceptor.Clock(),
@@ -64,6 +99,10 @@ func New(t *testing.T) *Server {
 	mux.Handle(authPath, authHandler)
 	matchPath, matchHandler := matchconnect.NewMatchServiceHandler(gatewaymatchhandler.New(matchUC), interceptors)
 	mux.Handle(matchPath, matchHandler)
+	playerDataPath, playerDataHandler := storageconnect.NewPlayerDataStorageServiceHandler(gatewaystoragehandler.NewPlayerDataHandler(storageUC), interceptors)
+	mux.Handle(playerDataPath, playerDataHandler)
+	titlePath, titleHandler := storageconnect.NewTitleStorageServiceHandler(gatewaystoragehandler.NewTitleHandler(storageUC), interceptors)
+	mux.Handle(titlePath, titleHandler)
 
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -71,7 +110,21 @@ func New(t *testing.T) *Server {
 	return &Server{
 		Auth:       authconnect.NewAuthServiceClient(srv.Client(), srv.URL),
 		Match:      matchconnect.NewMatchServiceClient(srv.Client(), srv.URL),
+		PlayerData: storageconnect.NewPlayerDataStorageServiceClient(srv.Client(), srv.URL),
+		Title:      storageconnect.NewTitleStorageServiceClient(srv.Client(), srv.URL),
+		Blob:       blob,
+		session:    session,
 		httpServer: srv,
+	}
+}
+
+// SeedTitleFile inserts title-file metadata directly, standing in for the operator-side publish path that clients cannot perform.
+func (s *Server) SeedTitleFile(t *testing.T, f *domainstorage.File, tags []string) {
+	t.Helper()
+	if err := s.session.RW(t.Context(), func(ctx context.Context) error {
+		return repository.NewTitleFile().SaveFile(ctx, f, tags)
+	}); err != nil {
+		t.Fatalf("testconnect: seed title file: %v", err)
 	}
 }
 

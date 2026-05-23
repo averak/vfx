@@ -73,7 +73,7 @@ func TestRun_OnlyOneLeaderRunsFn(t *testing.T) {
 		}
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{}, 2)
 	go func() { _ = leaderlock.Run(ctx, c1, cfg, fn); done <- struct{}{} }()
 	go func() { _ = leaderlock.Run(ctx, c2, cfg, fn); done <- struct{}{} }()
@@ -112,8 +112,8 @@ func TestRun_FailoverToSecond(t *testing.T) {
 		return ctx.Err()
 	}
 
-	ctx1, cancel1 := context.WithCancel(context.Background())
-	ctx2, cancel2 := context.WithCancel(context.Background())
+	ctx1, cancel1 := context.WithCancel(t.Context())
+	ctx2, cancel2 := context.WithCancel(t.Context())
 	defer cancel2()
 	done1 := make(chan struct{})
 	go func() { _ = leaderlock.Run(ctx1, c1, cfg, first); close(done1) }()

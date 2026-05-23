@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package vfx.v1.storage;
+
+import "google/protobuf/timestamp.proto";
+
+// PlayerDataStorageService はプレイヤー本人のセーブデータ等を保存する owner スコープのストレージ。
+//
+// owner は常にアクセストークンの player なので、RPC は owner を引数に取らない。
+// バイト列は object storage に直接転送され、gateway は認可・メタデータ・署名付き URL の発行だけを担う (バイトの中継はしない)。
+// 書き込みは WriteFile で署名付き URL を得て直接アップロードし、CommitFile で確定する 2 段構成 (理由は WriteFile 参照)。
+service PlayerDataStorageService {
+  // QueryFiles は本人の File 一覧をメタデータ付きで返す。
+  // hash を突き合わせて差分だけ Read/Write することを想定する。
+  rpc QueryFiles(QueryFilesRequest) returns (QueryFilesResponse);
+
+  // ReadFile はダウンロード用の署名付き URL を返す。
+  // 本人が所有しない filename には NotFound を返す (他プレイヤーのデータは存在自体を秘匿する)。
+  rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
+
+  // WriteFile はアップロード用の署名付き URL を発行する。この時点では metadata を永続化しない。
+  //
+  // 2 段に分ける理由: アップロードは client から object storage への直接転送なので、gateway は「上がった事実とサイズ・hash」を自分で確認するまで metadata を確定できない。
+  // CommitFile されなかったアップロードは metadata 行を持たない孤児オブジェクトとなり、ライフサイクル/sweep で回収される。
+  rpc WriteFile(WriteFileRequest) returns (WriteFileResponse);
+
+  // CommitFile はアップロード完了後に呼び、object storage 上のオブジェクト属性を検証して metadata を確定する。
+  // オブジェクトが存在しなければ (アップロード未完) FailedPrecondition を返し、metadata は変更しない。
+  rpc CommitFile(CommitFileRequest) returns (CommitFileResponse);
+
+  rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse);
+}
+
+// TitleStorageService は運営が配信する読み取り専用ストレージ (リモートコンフィグ・コンテンツ配信)。
+//
+// 書き込みは運営側 (管理ツール) が行い、クライアントは読むだけ。
+// tag でアクセスを絞る: クライアントは許可された tag を指定して該当 File を引く。
+service TitleStorageService {
+  // QueryFiles は指定 tag を全て持つ File を返す。tag 未指定なら全件。
+  rpc QueryFiles(TitleStorageServiceQueryFilesRequest) returns (TitleStorageServiceQueryFilesResponse);
+
+  rpc ReadFile(TitleStorageServiceReadFileRequest) returns (TitleStorageServiceReadFileResponse);
+}
+
+// FileMetadata は 1 ファイルのメタデータ。バイト列は object storage 側にあり、ここには含めない。
+message FileMetadata {
+  string filename = 1;
+
+  // バイト数。
+  uint64 size = 2;
+
+  // 内容の hash (object storage が返す md5 の hex)。差分判定に使う不透明な識別子。
+  string hash = 3;
+
+  google.protobuf.Timestamp updated_at = 4;
+}
+
+message QueryFilesRequest {
+  // 任意。指定すると filename がこの prefix で始まる File だけを返す。
+  string prefix = 1;
+}
+
+message QueryFilesResponse {
+  repeated FileMetadata files = 1;
+}
+
+message ReadFileRequest {
+  string filename = 1;
+}
+
+message ReadFileResponse {
+  FileMetadata metadata = 1;
+
+  // object storage から直接 DL するための署名付き URL。SDK が隠蔽するので利用側は意識しない。
+  string download_url = 2;
+
+  google.protobuf.Timestamp url_expires_at = 3;
+}
+
+message WriteFileRequest {
+  string filename = 1;
+
+  // アップロード予定のバイト数。クォータの事前検査に使う。
+  uint64 size = 2;
+}
+
+message WriteFileResponse {
+  // object storage へ直接 PUT するための署名付き URL。
+  string upload_url = 1;
+
+  // PUT 時に必須のヘッダ (URL の署名対象)。これらを過不足なく送らないと object storage が 403 を返す。
+  map<string, string> required_headers = 2;
+
+  google.protobuf.Timestamp url_expires_at = 3;
+}
+
+message CommitFileRequest {
+  string filename = 1;
+}
+
+message CommitFileResponse {
+  FileMetadata metadata = 1;
+}
+
+message DeleteFileRequest {
+  string filename = 1;
+}
+
+message DeleteFileResponse {}
+
+message TitleStorageServiceQueryFilesRequest {
+  // この全 tag を持つ File だけを返す。空なら全件。
+  repeated string tags = 1;
+}
+
+message TitleStorageServiceQueryFilesResponse {
+  repeated FileMetadata files = 1;
+}
+
+message TitleStorageServiceReadFileRequest {
+  string filename = 1;
+}
+
+message TitleStorageServiceReadFileResponse {
+  FileMetadata metadata = 1;
+  string download_url = 2;
+  google.protobuf.Timestamp url_expires_at = 3;
+}

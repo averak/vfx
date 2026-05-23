@@ -44,7 +44,7 @@ func newManager(ctx context.Context) *room.Manager {
 // A second player connecting to the same match must join the instance the
 // first connection lazily created, not spin up a parallel match.
 func TestManager_FindOrCreateDedupsByMatchID(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	mgr := newManager(ctx)
 	defer mgr.Close()
@@ -80,7 +80,7 @@ func TestManager_FindOrCreateDedupsByMatchID(t *testing.T) {
 }
 
 func TestManager_GetUnknownMatch(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	mgr := newManager(ctx)
 	defer mgr.Close()

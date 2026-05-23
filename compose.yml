@@ -28,6 +28,22 @@ services:
       timeout: 3s
       retries: 10
 
+  # Local stand-in for Google Cloud Storage; the storage services issue signed URLs against it.
+  # -scheme http and a fixed public host make the signed URLs the client receives point back here.
+  fake-gcs:
+    image: fsouza/fake-gcs-server:1.52.2
+    command:
+      - "-scheme"
+      - "http"
+      - "-port"
+      - "4443"
+      - "-public-host"
+      - "localhost:4443"
+      - "-external-url"
+      - "http://localhost:4443"
+    ports:
+      - "4443:4443"
+
 volumes:
   postgres-data:
   valkey-data:

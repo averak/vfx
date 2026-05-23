@@ -14,6 +14,8 @@ import (
 
 // tables are truncated by Truncate, child-first so foreign keys allow it.
 var tables = []string{
+	"player_files",
+	"title_files",
 	"match_players",
 	"matches",
 	"refresh_tokens",
@@ -21,8 +23,13 @@ var tables = []string{
 	"players",
 }
 
+// testDBLockKey is an arbitrary fixed key for the session advisory lock that serializes DB-backed tests; see Pool.
+const testDBLockKey = 0x7666_7864_6200 // "vfxdb"
+
 // Pool returns a connection pool to the test database, or skips the test when DATABASE_URL is not configured.
-// The pool is closed via t.Cleanup.
+//
+// `go test ./...` runs each package's test binary in parallel, and every DB-backed test wipes the shared tables with Truncate.
+// To stop one package's truncate from deleting another's rows mid-test, Pool takes a session-scoped Postgres advisory lock held for the whole test (released on cleanup), so DB-backed tests serialize across packages and processes while pure-logic suites still run fully in parallel.
 func Pool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
@@ -40,6 +47,22 @@ func Pool(t *testing.T) *pgxpool.Pool {
 		t.Fatalf("testdb: ping: %v", err)
 	}
 	t.Cleanup(pool.Close)
+
+	// The lock lives on a dedicated connection held for the test; the session-scoped lock is auto-released by Postgres if the process dies, so a crash cannot wedge the suite.
+	// Background (not t.Context) on purpose: the unlock runs from a cleanup, after t.Context is already cancelled.
+	lockConn, err := pool.Acquire(context.Background())
+	if err != nil {
+		t.Fatalf("testdb: acquire lock conn: %v", err)
+	}
+	if _, err := lockConn.Exec(context.Background(), "SELECT pg_advisory_lock($1)", testDBLockKey); err != nil {
+		lockConn.Release()
+		t.Fatalf("testdb: advisory lock: %v", err)
+	}
+	t.Cleanup(func() {
+		//nolint:errcheck // Best-effort unlock; the session-scoped lock is released anyway when the connection closes.
+		_, _ = lockConn.Exec(context.Background(), "SELECT pg_advisory_unlock($1)", testDBLockKey)
+		lockConn.Release()
+	})
 
 	Truncate(t, pool)
 	return pool

@@ -1,7 +1,6 @@
 package agones
 
 import (
-	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -66,7 +65,7 @@ func waitFor(t *testing.T, timeout time.Duration, cond func() bool) {
 
 func TestStart_ReadyHealthShutdown(t *testing.T) {
 	f := &fakeSDK{}
-	stop, err := start(context.Background(), f, 5*time.Millisecond, discardLogger())
+	stop, err := start(t.Context(), f, 5*time.Millisecond, discardLogger())
 	if err != nil {
 		t.Fatalf("start: %v", err)
 	}
@@ -92,7 +91,7 @@ func TestStart_ReadyHealthShutdown(t *testing.T) {
 
 func TestStart_ReadyFailureAborts(t *testing.T) {
 	f := &fakeSDK{readyErr: errors.New("sidecar down")}
-	if _, err := start(context.Background(), f, 5*time.Millisecond, discardLogger()); err == nil {
+	if _, err := start(t.Context(), f, 5*time.Millisecond, discardLogger()); err == nil {
 		t.Fatal("start succeeded despite a Ready failure, want an error")
 	}
 	if _, health, shutdown := f.counts(); health != 0 || shutdown != 0 {

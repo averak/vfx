@@ -13,6 +13,7 @@ import (
 
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
+	"github.com/averak/vfx/gen/go/vfx/v1/storage/storageconnect"
 	"github.com/averak/vfx/internal/bootstrap"
 	"github.com/averak/vfx/internal/infra/connectrpc/interceptor"
 )
@@ -41,6 +42,15 @@ func NewHandler(c *bootstrap.Gateway) (http.Handler, error) {
 
 	matchPath, matchHandler := matchconnect.NewMatchServiceHandler(c.MatchHandler, interceptors)
 	mux.Handle(matchPath, matchHandler)
+
+	// Storage is optional: the handlers are nil when no object-store bucket is configured, and the services simply go unmounted.
+	if c.PlayerDataStorageHandler != nil {
+		playerDataPath, playerDataHandler := storageconnect.NewPlayerDataStorageServiceHandler(c.PlayerDataStorageHandler, interceptors)
+		mux.Handle(playerDataPath, playerDataHandler)
+
+		titlePath, titleHandler := storageconnect.NewTitleStorageServiceHandler(c.TitleStorageHandler, interceptors)
+		mux.Handle(titlePath, titleHandler)
+	}
 
 	// Liveness probe: the process can answer HTTP, which is all this check guarantees.
 	// Kubernetes uses it to decide when to restart.

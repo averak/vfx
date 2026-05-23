@@ -81,4 +81,93 @@ func TestUpdateProfile_WithToken(t *testing.T) {
 	}
 }
 
+func mustLogin(t *testing.T, srv *testconnect.Server, device string) *authv1.LoginResponse {
+	t.Helper()
+	resp, err := srv.Auth.Login(t.Context(), connect.NewRequest(&authv1.LoginRequest{
+		Credential: &authv1.LoginRequest_Anonymous{
+			Anonymous: &authv1.AnonymousCredential{DeviceId: ptr(device)},
+		},
+	}))
+	if err != nil {
+		t.Fatalf("Login: %v", err)
+	}
+	return resp.Msg
+}
+
+func requireCode(t *testing.T, err error, want connect.Code) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("got nil error, want %v", want)
+	}
+	if got := connect.CodeOf(err); got != want {
+		t.Errorf("code = %v, want %v", got, want)
+	}
+}
+
+// Refresh rotates the pair: the new tokens are issued and the presented refresh token is revoked, so reusing it fails.
+func TestRefresh_RotatesAndRevokes(t *testing.T) {
+	srv := testconnect.New(t)
+	login := mustLogin(t, srv, "refresh-dev")
+
+	rotated, err := srv.Auth.Refresh(t.Context(), connect.NewRequest(&authv1.RefreshRequest{
+		RefreshToken: login.GetRefreshToken(),
+	}))
+	if err != nil {
+		t.Fatalf("Refresh: %v", err)
+	}
+	if rotated.Msg.GetAccessToken() == "" || rotated.Msg.GetRefreshToken() == "" {
+		t.Error("Refresh returned an empty token")
+	}
+
+	_, err = srv.Auth.Refresh(t.Context(), connect.NewRequest(&authv1.RefreshRequest{
+		RefreshToken: login.GetRefreshToken(),
+	}))
+	requireCode(t, err, connect.CodeUnauthenticated)
+}
+
+func TestRefresh_EmptyToken(t *testing.T) {
+	srv := testconnect.New(t)
+	_, err := srv.Auth.Refresh(t.Context(), connect.NewRequest(&authv1.RefreshRequest{}))
+	requireCode(t, err, connect.CodeInvalidArgument)
+}
+
+func TestRefresh_UnknownToken(t *testing.T) {
+	srv := testconnect.New(t)
+	_, err := srv.Auth.Refresh(t.Context(), connect.NewRequest(&authv1.RefreshRequest{
+		RefreshToken: "not-a-real-token",
+	}))
+	requireCode(t, err, connect.CodeUnauthenticated)
+}
+
+func TestLogout_RequiresAuth(t *testing.T) {
+	srv := testconnect.New(t)
+	_, err := srv.Auth.Logout(t.Context(), connect.NewRequest(&authv1.LogoutRequest{}))
+	requireCode(t, err, connect.CodeUnauthenticated)
+}
+
+// Logout revokes the player's refresh tokens, so a refresh with the pre-logout token then fails.
+func TestLogout_RevokesRefreshTokens(t *testing.T) {
+	srv := testconnect.New(t)
+	login := mustLogin(t, srv, "logout-dev")
+
+	if _, err := srv.Auth.Logout(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&authv1.LogoutRequest{}), login.GetAccessToken())); err != nil {
+		t.Fatalf("Logout: %v", err)
+	}
+
+	_, err := srv.Auth.Refresh(t.Context(), connect.NewRequest(&authv1.RefreshRequest{
+		RefreshToken: login.GetRefreshToken(),
+	}))
+	requireCode(t, err, connect.CodeUnauthenticated)
+}
+
+func TestUpdateProfile_InvalidNickname(t *testing.T) {
+	srv := testconnect.New(t)
+	login := mustLogin(t, srv, "invalid-nick")
+
+	_, err := srv.Auth.UpdateProfile(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&authv1.UpdateProfileRequest{Nickname: ptr("   ")}), login.GetAccessToken()))
+	requireCode(t, err, connect.CodeInvalidArgument)
+}
+
 func ptr[T any](v T) *T { return &v }

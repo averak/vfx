@@ -1,7 +1,6 @@
 package authctx_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -11,7 +10,7 @@ import (
 
 func TestWithFrom_RoundTrip(t *testing.T) {
 	id := uuid.New()
-	ctx := authctx.With(context.Background(), id)
+	ctx := authctx.With(t.Context(), id)
 	got, ok := authctx.From(ctx)
 	if !ok {
 		t.Fatal("From reported no player id after With")
@@ -22,7 +21,7 @@ func TestWithFrom_RoundTrip(t *testing.T) {
 }
 
 func TestFrom_Absent(t *testing.T) {
-	got, ok := authctx.From(context.Background())
+	got, ok := authctx.From(t.Context())
 	if ok {
 		t.Errorf("From reported ok on a bare context (id=%v)", got)
 	}

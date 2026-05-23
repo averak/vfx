@@ -112,3 +112,41 @@ CREATE INDEX idx_match_players_player_id
 
 CREATE INDEX idx_match_players_match_id
   ON match_players (match_id);
+
+-- ============================================================================
+-- player_files
+--   Player Data Storage metadata, one row per (owner, filename).
+--   The bytes live in object storage under a key derived from owner_id and filename; only metadata is here.
+--   A row exists only after a committed upload, so the table never lists a file whose bytes are absent (the reverse can happen: an uncommitted upload is an orphan object with no row).
+-- ============================================================================
+
+CREATE TABLE player_files (
+  id          UUID         PRIMARY KEY,
+  owner_id    UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  filename    TEXT         NOT NULL,
+  size        BIGINT       NOT NULL,
+  hash        TEXT         NOT NULL,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  -- The unique constraint's index leads with owner_id, so it also serves owner-scoped list and prefix scans; no separate owner_id index is needed.
+  UNIQUE (owner_id, filename)
+);
+
+-- ============================================================================
+-- title_files
+--   Title Storage metadata: operator-written, read-only for clients.
+--   tags gate access; clients query by tag. The GIN index serves the "contains all requested tags" filter (tags @> requested).
+-- ============================================================================
+
+CREATE TABLE title_files (
+  id          UUID         PRIMARY KEY,
+  filename    TEXT         NOT NULL UNIQUE,
+  size        BIGINT       NOT NULL,
+  hash        TEXT         NOT NULL,
+  tags        TEXT[]       NOT NULL DEFAULT '{}',
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_title_files_tags
+  ON title_files USING GIN (tags);

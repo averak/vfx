@@ -81,7 +81,7 @@ jobs:
           base="--set externalDatabase.url=postgres://ci --set externalValkey.url=redis://ci --set jwtSecret=ci --set room.tls.existingSecretName=vfx-tls"
           mise exec -- helm lint deploy/helm/vfx
           mise exec -- helm template vfx deploy/helm/vfx $base >/dev/null
-          mise exec -- helm template vfx deploy/helm/vfx $base --set agones.enabled=true --set admin.enabled=true >/dev/null
+          mise exec -- helm template vfx deploy/helm/vfx $base --set agones.enabled=true --set admin.enabled=true --set storage.enabled=true --set storage.bucket=vfx-ci >/dev/null
 
   test:
     name: test
@@ -112,6 +112,7 @@ jobs:
       DATABASE_URL: postgres://vfx:dev@localhost:5432/vfx?sslmode=disable
       VALKEY_URL: redis://localhost:6379
       VFX_JWT_SECRET: ci-only-do-not-use-in-production
+      STORAGE_EMULATOR_HOST: http://localhost:4443
 
     steps:
       - uses: actions/checkout@v4
@@ -127,6 +128,18 @@ jobs:
 
       - name: apply migrations
         run: mise run db-migrate
+
+      # The storage E2E talks to a real object store; fake-gcs-server stands in for GCS.
+      # It is started as a step rather than a service so its command flags (-scheme http) can be set; the storage client honors STORAGE_EMULATOR_HOST and the signed URLs point back here.
+      - name: start fake-gcs-server
+        run: |
+          docker run -d --name fake-gcs -p 4443:4443 fsouza/fake-gcs-server:1.52.2 \
+            -scheme http -port 4443 -public-host localhost:4443 -external-url http://localhost:4443
+          for _ in $(seq 1 30); do
+            if curl -sf "http://localhost:4443/storage/v1/b?project=ci" >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "::error::fake-gcs-server did not become ready"; exit 1
 
       # quic-go needs large UDP buffers; the runner default is small enough to drop packets, which delays a lost CONNECTION_CLOSE in the room E2E test.
       - name: raise UDP buffer sizes for quic-go

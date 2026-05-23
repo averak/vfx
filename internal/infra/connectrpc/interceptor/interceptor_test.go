@@ -30,7 +30,7 @@ func recorder() (next connect.UnaryFunc, seenCtx func() context.Context) {
 func TestClockInterceptor_AttachesUTCNow(t *testing.T) {
 	next, seen := recorder()
 	wrapped := interceptor.Clock().WrapUnary(next)
-	if _, err := wrapped(context.Background(), connect.NewRequest(&authv1.LoginRequest{})); err != nil {
+	if _, err := wrapped(t.Context(), connect.NewRequest(&authv1.LoginRequest{})); err != nil {
 		t.Fatalf("wrapped: %v", err)
 	}
 
@@ -58,7 +58,7 @@ func TestAuthInterceptor_PopulatesFromValidBearer(t *testing.T) {
 	wrapped := interceptor.Auth(signer).WrapUnary(next)
 	req := connect.NewRequest(&authv1.LoginRequest{})
 	req.Header().Set("Authorization", "Bearer "+tok)
-	if _, err := wrapped(context.Background(), req); err != nil {
+	if _, err := wrapped(t.Context(), req); err != nil {
 		t.Fatalf("wrapped: %v", err)
 	}
 
@@ -93,7 +93,7 @@ func TestAuthInterceptor_SoftFailsWithoutCredentials(t *testing.T) {
 			if tt.header != "" {
 				req.Header().Set("Authorization", tt.header)
 			}
-			if _, err := wrapped(context.Background(), req); err != nil {
+			if _, err := wrapped(t.Context(), req); err != nil {
 				t.Fatalf("interceptor rejected the request instead of passing it through: %v", err)
 			}
 			if _, ok := authctx.From(seen()); ok {

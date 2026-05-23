@@ -67,7 +67,7 @@ func TestRoomE2E_ConnectPlayEnd(t *testing.T) {
 		t.Fatalf("SignSession: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	defer cancel()
 
 	session := dial(ctx, t, rm.Endpoint, tok)
@@ -101,7 +101,7 @@ func TestRoomE2E_RejectsForeignToken(t *testing.T) {
 		t.Fatalf("SignSession: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
 	defer cancel()
 
 	session := dial(ctx, t, rm.Endpoint, tok)

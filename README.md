@@ -11,6 +11,7 @@ vfx hosts realtime multiplayer matches. You write the game logic as a WebAssembl
 - **WebTransport (HTTP/3) realtime** — reliable streams and unreliable datagrams over one connection, for native and browser clients alike.
 - **Sandboxed game logic** — plugins run as WebAssembly under [`wazero`](https://wazero.io/), so you can write a game in any language that targets WASM (or link a Go plugin in directly).
 - **Kubernetes-native** — one process per match, with the room fleet's lifecycle managed by [Agones](https://agones.dev/).
+- **Player & title storage** — owner-scoped save data and operator-published content. File bytes stream directly between the client and object storage over signed URLs; the gateway brokers only metadata and authorization, never the bytes.
 - **Schema-first** — Protocol Buffers define the wire protocols and the plugin ABI; the database is declarative SQL via [atlas](https://atlasgo.io/) and [sqlc](https://sqlc.dev/).
 - **Built to last** — a Clean Architecture dependency rule enforced in CI, property-based and race-checked tests, and the transaction boundary owned by the application layer.
 

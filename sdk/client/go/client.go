@@ -26,6 +26,7 @@ import (
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
 	matchv1 "github.com/averak/vfx/gen/go/vfx/v1/match"
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
+	"github.com/averak/vfx/gen/go/vfx/v1/storage/storageconnect"
 )
 
 // Client is a logged-in (or about-to-be) vfx client.
@@ -34,8 +35,10 @@ type Client struct {
 	gatewayURL string
 	httpClient *http.Client
 
-	auth  authconnect.AuthServiceClient
-	match matchconnect.MatchServiceClient
+	auth         authconnect.AuthServiceClient
+	match        matchconnect.MatchServiceClient
+	playerData   storageconnect.PlayerDataStorageServiceClient
+	titleStorage storageconnect.TitleStorageServiceClient
 
 	accessToken  string
 	refreshToken string
@@ -58,6 +61,8 @@ func New(gatewayURL string, opts ...Option) *Client {
 	}
 	c.auth = authconnect.NewAuthServiceClient(c.httpClient, gatewayURL)
 	c.match = matchconnect.NewMatchServiceClient(c.httpClient, gatewayURL)
+	c.playerData = storageconnect.NewPlayerDataStorageServiceClient(c.httpClient, gatewayURL)
+	c.titleStorage = storageconnect.NewTitleStorageServiceClient(c.httpClient, gatewayURL)
 	return c
 }
 

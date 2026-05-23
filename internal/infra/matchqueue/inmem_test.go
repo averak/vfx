@@ -1,7 +1,6 @@
 package matchqueue_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -26,13 +25,13 @@ func newTicketAt(gameMode string, created time.Time) *match.Ticket {
 func TestInMem_SubscribeReplaysQueuedState(t *testing.T) {
 	q := matchqueue.NewInMem()
 	ticket := newTicket("rps")
-	if err := q.Enqueue(context.Background(), ticket); err != nil {
+	if err := q.Enqueue(t.Context(), ticket); err != nil {
 		t.Fatalf("Enqueue: %v", err)
 	}
 
 	// A subscriber attaching after Enqueue still sees the current Queued
 	// state thanks to the cached "latest" event.
-	ch, err := q.Subscribe(context.Background(), ticket.ID)
+	ch, err := q.Subscribe(t.Context(), ticket.ID)
 	if err != nil {
 		t.Fatalf("Subscribe: %v", err)
 	}
@@ -45,16 +44,16 @@ func TestInMem_SubscribeReplaysQueuedState(t *testing.T) {
 func TestInMem_PublishMatchedClosesChannel(t *testing.T) {
 	q := matchqueue.NewInMem()
 	ticket := newTicket("rps")
-	_ = q.Enqueue(context.Background(), ticket)
+	_ = q.Enqueue(t.Context(), ticket)
 
-	ch, err := q.Subscribe(context.Background(), ticket.ID)
+	ch, err := q.Subscribe(t.Context(), ticket.ID)
 	if err != nil {
 		t.Fatalf("Subscribe: %v", err)
 	}
 	<-ch // drain the queued event
 
 	assignment := &match.Assignment{MatchID: uuid.New(), Endpoint: "host:1", SessionToken: "tok"}
-	if err := q.Publish(context.Background(), ticket.ID, match.EventMatched{Assignment: assignment}); err != nil {
+	if err := q.Publish(t.Context(), ticket.ID, match.EventMatched{Assignment: assignment}); err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
 
@@ -71,12 +70,12 @@ func TestInMem_PublishMatchedClosesChannel(t *testing.T) {
 func TestInMem_CancelPublishesFailed(t *testing.T) {
 	q := matchqueue.NewInMem()
 	ticket := newTicket("rps")
-	_ = q.Enqueue(context.Background(), ticket)
+	_ = q.Enqueue(t.Context(), ticket)
 
-	ch, _ := q.Subscribe(context.Background(), ticket.ID)
+	ch, _ := q.Subscribe(t.Context(), ticket.ID)
 	<-ch // queued
 
-	if err := q.Cancel(context.Background(), ticket.ID); err != nil {
+	if err := q.Cancel(t.Context(), ticket.ID); err != nil {
 		t.Fatalf("Cancel: %v", err)
 	}
 	ev := <-ch
@@ -96,10 +95,10 @@ func TestInMem_PendingIsFIFOAndModeScoped(t *testing.T) {
 	newer := newTicketAt("rps", time.Now())
 	other := newTicket("chess")
 	for _, ticket := range []*match.Ticket{newer, older, other} {
-		_ = q.Enqueue(context.Background(), ticket)
+		_ = q.Enqueue(t.Context(), ticket)
 	}
 
-	pending, err := q.Pending(context.Background(), "rps")
+	pending, err := q.Pending(t.Context(), "rps")
 	if err != nil {
 		t.Fatalf("Pending: %v", err)
 	}
@@ -113,11 +112,11 @@ func TestInMem_PendingIsFIFOAndModeScoped(t *testing.T) {
 
 func TestInMem_DepthCountsPendingPerMode(t *testing.T) {
 	q := matchqueue.NewInMem()
-	_ = q.Enqueue(context.Background(), newTicket("rps"))
-	_ = q.Enqueue(context.Background(), newTicket("rps"))
-	_ = q.Enqueue(context.Background(), newTicket("chess"))
+	_ = q.Enqueue(t.Context(), newTicket("rps"))
+	_ = q.Enqueue(t.Context(), newTicket("rps"))
+	_ = q.Enqueue(t.Context(), newTicket("chess"))
 
-	depth, err := q.Depth(context.Background(), "rps")
+	depth, err := q.Depth(t.Context(), "rps")
 	if err != nil {
 		t.Fatalf("Depth: %v", err)
 	}
@@ -128,7 +127,7 @@ func TestInMem_DepthCountsPendingPerMode(t *testing.T) {
 
 func TestInMem_CancelUnknownTicket(t *testing.T) {
 	q := matchqueue.NewInMem()
-	if err := q.Cancel(context.Background(), uuid.New()); err == nil {
+	if err := q.Cancel(t.Context(), uuid.New()); err == nil {
 		t.Error("Cancel of unknown ticket returned nil, want ErrTicketNotFound")
 	}
 }

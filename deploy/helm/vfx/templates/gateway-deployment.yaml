@@ -56,6 +56,20 @@ spec:
             - name: VFX_AGONES_NAMESPACE
               value: {{ .Values.agones.namespace | default .Release.Namespace | quote }}
             {{- end }}
+            {{- if .Values.storage.enabled }}
+            - name: VFX_STORAGE_BUCKET
+              value: {{ required "storage.bucket is required when storage.enabled" .Values.storage.bucket | quote }}
+            - name: VFX_STORAGE_PLAYER_DATA_PREFIX
+              value: {{ .Values.storage.playerDataPrefix | quote }}
+            - name: VFX_STORAGE_TITLE_PREFIX
+              value: {{ .Values.storage.titlePrefix | quote }}
+            - name: VFX_STORAGE_URL_TTL
+              value: {{ .Values.storage.urlTTL | quote }}
+            - name: VFX_STORAGE_MAX_BYTES_PER_PLAYER
+              value: {{ .Values.storage.maxBytesPerPlayer | quote }}
+            - name: VFX_STORAGE_MAX_FILES_PER_PLAYER
+              value: {{ .Values.storage.maxFilesPerPlayer | quote }}
+            {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.gateway.service.port }}

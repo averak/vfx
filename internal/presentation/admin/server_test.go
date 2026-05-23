@@ -1,13 +1,17 @@
 package admin_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/averak/vfx/internal/domain/player"
 	"github.com/averak/vfx/internal/infra/db"
 	"github.com/averak/vfx/internal/infra/matchqueue"
 	"github.com/averak/vfx/internal/infra/repository"
@@ -18,16 +22,38 @@ import (
 
 func newServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	return newServerWithToken(t, "")
+	srv, _ := newServerAndPool(t, "")
+	return srv
 }
 
 func newServerWithToken(t *testing.T, token string) *httptest.Server {
+	t.Helper()
+	srv, _ := newServerAndPool(t, token)
+	return srv
+}
+
+func newServerAndPool(t *testing.T, token string) (*httptest.Server, *pgxpool.Pool) {
 	t.Helper()
 	pool := testdb.Pool(t)
 	uc := usecaseadmin.New(db.NewSession(pool), repository.NewPlayer(), matchqueue.NewInMem())
 	srv := httptest.NewServer(adminhandler.NewHandler(uc, pool, token))
 	t.Cleanup(srv.Close)
-	return srv
+	return srv, pool
+}
+
+func seedPlayer(t *testing.T, pool *pgxpool.Pool, nickname string) uuid.UUID {
+	t.Helper()
+	id := uuid.New()
+	if err := db.NewSession(pool).RW(t.Context(), func(ctx context.Context) error {
+		p, err := player.New(id, &nickname, time.Now().UTC())
+		if err != nil {
+			return err
+		}
+		return repository.NewPlayer().Save(ctx, p)
+	}); err != nil {
+		t.Fatalf("seed player: %v", err)
+	}
+	return id
 }
 
 func TestAdmin_HealthEndpoints(t *testing.T) {
@@ -65,6 +91,33 @@ func TestAdmin_GetPlayerInvalidID(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestAdmin_GetPlayerReturnsRecord(t *testing.T) {
+	srv, pool := newServerAndPool(t, "")
+	id := seedPlayer(t, pool, "Tester")
+
+	resp, err := srv.Client().Get(srv.URL + "/api/players/" + id.String())
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	var body struct {
+		ID       string  `json:"id"`
+		Nickname *string `json:"nickname"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body.ID != id.String() {
+		t.Errorf("id = %q, want %q", body.ID, id)
+	}
+	if body.Nickname == nil || *body.Nickname != "Tester" {
+		t.Errorf("nickname = %v, want Tester", body.Nickname)
 	}
 }
 

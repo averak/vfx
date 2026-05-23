@@ -31,7 +31,7 @@ func TestMatchmaker_PairsTwoTicketsInSameMode(t *testing.T) {
 			Assignments:     store,
 		})
 
-	ctx, cancel := context.WithCancel(clock.With(context.Background(), time.Now()))
+	ctx, cancel := context.WithCancel(clock.With(t.Context(), time.Now()))
 	defer cancel()
 
 	// Two players queue tickets and watch them.
@@ -98,7 +98,7 @@ func TestMatchmaker_LeavesLoneTicketQueued(t *testing.T) {
 			GameModes:       []string{gameMode},
 		})
 
-	ctx, cancel := context.WithCancel(clock.With(context.Background(), time.Now()))
+	ctx, cancel := context.WithCancel(clock.With(t.Context(), time.Now()))
 	defer cancel()
 
 	ticketID, err := uc.CreateTicket(ctx, &usecasematch.TicketInput{PlayerID: uuid.New(), GameMode: gameMode})

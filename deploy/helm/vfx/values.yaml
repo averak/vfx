@@ -68,6 +68,18 @@ admin:
   podAnnotations: {}
   podLabels: {}
 
+# storage enables the player-data and title-storage services, backed by a GCS bucket.
+# Disabled by default; with no bucket the gateway does not mount the storage RPCs at all.
+# In production, bind the gateway's service account to a GCP service account holding object access and the Service Account Token Creator role (Workload Identity); signed URLs are then produced via IAM SignBlob with no key on disk.
+storage:
+  enabled: false
+  bucket: ""
+  playerDataPrefix: player-data
+  titlePrefix: title
+  urlTTL: 15m
+  maxBytesPerPlayer: 10485760 # 10 MiB
+  maxFilesPerPlayer: 64
+
 # agones, when enabled, runs the room tier as an Agones Fleet (instead of a plain Deployment) and switches the gateway to the Agones allocator, granting it RBAC to create GameServerAllocations.
 # Requires Agones installed in the cluster.
 # Leave disabled for a plain K8s or single-node deployment.

@@ -25,8 +25,13 @@ import {
   PlayerInputSchema,
   ClientHelloSchema,
 } from "./gen/vfx/v1/realtime/frame_pb.js";
+import {
+  PlayerDataStorageService,
+  TitleStorageService,
+  type FileMetadata,
+} from "./gen/vfx/v1/storage/storage_service_pb.js";
 
-export type { Player, Frame };
+export type { Player, Frame, FileMetadata };
 
 /** Options for constructing a VfxClient. */
 export interface VfxClientOptions {
@@ -38,6 +43,10 @@ export interface VfxClientOptions {
 export class VfxClient {
   private readonly auth: Client<typeof AuthService>;
   private readonly match: Client<typeof MatchService>;
+  private readonly playerData: Client<typeof PlayerDataStorageService>;
+  private readonly titleStorage: Client<typeof TitleStorageService>;
+  // The same fetch is used for the direct object-store transfers (PUT/GET on signed URLs), which do not go through the Connect transport.
+  private readonly fetchImpl: typeof globalThis.fetch;
   private accessToken = "";
   private player?: Player;
 
@@ -48,6 +57,9 @@ export class VfxClient {
     });
     this.auth = createClient(AuthService, transport);
     this.match = createClient(MatchService, transport);
+    this.playerData = createClient(PlayerDataStorageService, transport);
+    this.titleStorage = createClient(TitleStorageService, transport);
+    this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
   /** The authenticated player, or undefined before login. */
@@ -106,6 +118,67 @@ export class VfxClient {
       }
     }
     throw new Error("vfx: ticket stream closed without a match");
+  }
+
+  /** List the player's stored files with metadata, for diff-sync against local copies via the hash field. */
+  async queryFiles(prefix = ""): Promise<FileMetadata[]> {
+    const resp = await this.playerData.queryFiles({ prefix }, { headers: this.authHeaders() });
+    return resp.files;
+  }
+
+  /**
+   * Store data under filename, hiding the two-step upload: request an upload URL, PUT the bytes directly to the object store, then commit so the gateway records the verified metadata.
+   */
+  async writeFile(filename: string, data: Uint8Array): Promise<void> {
+    const resp = await this.playerData.writeFile(
+      { filename, size: BigInt(data.length) },
+      { headers: this.authHeaders() },
+    );
+    await this.putObject(resp.uploadUrl, resp.requiredHeaders, data);
+    await this.playerData.commitFile({ filename }, { headers: this.authHeaders() });
+  }
+
+  /** Fetch filename's bytes, hiding the URL step: ask for a download URL and GET the bytes directly from the object store. */
+  async readFile(filename: string): Promise<Uint8Array> {
+    const resp = await this.playerData.readFile({ filename }, { headers: this.authHeaders() });
+    return this.getObject(resp.downloadUrl);
+  }
+
+  async deleteFile(filename: string): Promise<void> {
+    await this.playerData.deleteFile({ filename }, { headers: this.authHeaders() });
+  }
+
+  /** List operator-published title files carrying all of the given tags (no tags lists everything visible). */
+  async queryTitleFiles(tags: string[] = []): Promise<FileMetadata[]> {
+    const resp = await this.titleStorage.queryFiles({ tags }, { headers: this.authHeaders() });
+    return resp.files;
+  }
+
+  async readTitleFile(filename: string): Promise<Uint8Array> {
+    const resp = await this.titleStorage.readFile({ filename }, { headers: this.authHeaders() });
+    return this.getObject(resp.downloadUrl);
+  }
+
+  private async putObject(
+    url: string,
+    headers: Record<string, string>,
+    data: Uint8Array,
+  ): Promise<void> {
+    // Copy into a fresh ArrayBuffer-backed view so the body is a plain BufferSource regardless of the input's backing store.
+    const body = new Uint8Array(data.length);
+    body.set(data);
+    const resp = await this.fetchImpl(url, { method: "PUT", headers, body });
+    if (!resp.ok) {
+      throw new Error(`vfx: upload returned ${resp.status}`);
+    }
+  }
+
+  private async getObject(url: string): Promise<Uint8Array> {
+    const resp = await this.fetchImpl(url);
+    if (!resp.ok) {
+      throw new Error(`vfx: download returned ${resp.status}`);
+    }
+    return new Uint8Array(await resp.arrayBuffer());
   }
 
   private authHeaders(): HeadersInit {

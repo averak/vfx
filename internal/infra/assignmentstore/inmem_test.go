@@ -1,7 +1,6 @@
 package assignmentstore_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -21,7 +20,7 @@ func assignment() *match.Assignment {
 }
 
 func TestInMem_PutGetRoundTrip(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	store := assignmentstore.NewInMem()
 	playerID := uuid.New()
 	want := assignment()
@@ -41,7 +40,7 @@ func TestInMem_PutGetRoundTrip(t *testing.T) {
 // A player with no stored assignment is the normal "no current match"
 // case, reported as (nil, nil) rather than an error.
 func TestInMem_GetMissing(t *testing.T) {
-	got, err := assignmentstore.NewInMem().Get(context.Background(), uuid.New())
+	got, err := assignmentstore.NewInMem().Get(t.Context(), uuid.New())
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -53,7 +52,7 @@ func TestInMem_GetMissing(t *testing.T) {
 // The store honours TTLs lazily on read: an entry whose deadline has
 // already passed reads back as absent.
 func TestInMem_ExpiredEntryReadsAbsent(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	store := assignmentstore.NewInMem()
 	playerID := uuid.New()
 

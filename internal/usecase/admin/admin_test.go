@@ -46,7 +46,7 @@ func TestGetPlayer_ReturnsPlayer(t *testing.T) {
 	}
 	uc := admin.New(roInline{}, fakePlayerRepo{p: want}, fakeQueue{})
 
-	got, err := uc.GetPlayer(context.Background(), want.ID)
+	got, err := uc.GetPlayer(t.Context(), want.ID)
 	if err != nil {
 		t.Fatalf("GetPlayer: %v", err)
 	}
@@ -57,14 +57,14 @@ func TestGetPlayer_ReturnsPlayer(t *testing.T) {
 
 func TestGetPlayer_PropagatesNotFound(t *testing.T) {
 	uc := admin.New(roInline{}, fakePlayerRepo{err: player.ErrPlayerNotFound}, fakeQueue{})
-	if _, err := uc.GetPlayer(context.Background(), uuid.New()); !errors.Is(err, player.ErrPlayerNotFound) {
+	if _, err := uc.GetPlayer(t.Context(), uuid.New()); !errors.Is(err, player.ErrPlayerNotFound) {
 		t.Errorf("err = %v, want ErrPlayerNotFound", err)
 	}
 }
 
 func TestQueueDepth(t *testing.T) {
 	uc := admin.New(roInline{}, fakePlayerRepo{}, fakeQueue{depth: 7})
-	depth, err := uc.QueueDepth(context.Background(), "rps")
+	depth, err := uc.QueueDepth(t.Context(), "rps")
 	if err != nil {
 		t.Fatalf("QueueDepth: %v", err)
 	}
