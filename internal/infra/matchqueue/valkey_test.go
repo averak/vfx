@@ -85,8 +85,9 @@ func TestValkeyQueue_SubscribeReceivesQueuedThenMatched(t *testing.T) {
 		t.Fatalf("first event = %T, want Queued", ev)
 	}
 
-	// Let the SUBSCRIBE connection establish before publishing.
-	time.Sleep(150 * time.Millisecond)
+	// No settle needed before publishing: the subscriber reads the ticket
+	// stream from the beginning, so an event published before its first
+	// read is still delivered.
 	assignment := &domainmatch.Assignment{
 		MatchID:      uuid.New(),
 		Endpoint:     "room:7777",

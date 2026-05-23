@@ -32,6 +32,21 @@ func dialClient(t *testing.T) valkeygo.Client {
 
 func discardLogger() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
+// waitFor polls cond until it holds or the timeout elapses, so a test
+// reacts to a leadership change as soon as it happens rather than sleeping
+// a fixed window and hoping the transition already occurred.
+func waitFor(t *testing.T, timeout time.Duration, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("condition not met within %s", timeout)
+}
+
 // TestRun_OnlyOneLeaderRunsFn starts two contenders for the same key and
 // asserts fn is only ever active in one of them at a time.
 func TestRun_OnlyOneLeaderRunsFn(t *testing.T) {
@@ -63,7 +78,10 @@ func TestRun_OnlyOneLeaderRunsFn(t *testing.T) {
 	go func() { _ = leaderlock.Run(ctx, c1, cfg, fn); done <- struct{}{} }()
 	go func() { _ = leaderlock.Run(ctx, c2, cfg, fn); done <- struct{}{} }()
 
-	time.Sleep(700 * time.Millisecond)
+	// Wait until one contender holds leadership, then sample a window:
+	// mutual exclusion means the concurrent count never exceeds 1.
+	waitFor(t, 2*time.Second, func() bool { return active.Load() >= 1 })
+	time.Sleep(500 * time.Millisecond)
 	if got := maxActive.Load(); got != 1 {
 		t.Errorf("max concurrent leaders = %d, want 1", got)
 	}
@@ -100,27 +118,13 @@ func TestRun_FailoverToSecond(t *testing.T) {
 	done1 := make(chan struct{})
 	go func() { _ = leaderlock.Run(ctx1, c1, cfg, first); close(done1) }()
 
-	// Let c1 become leader, then start c2 (which should stand by).
-	time.Sleep(300 * time.Millisecond)
+	// c1 becomes leader; c2 then stands by (its standby is the mutual
+	// exclusion that TestRun_OnlyOneLeaderRunsFn already verifies).
+	waitFor(t, 2*time.Second, firstRan.Load)
 	go func() { _ = leaderlock.Run(ctx2, c2, cfg, second) }()
-	time.Sleep(300 * time.Millisecond)
-
-	if !firstRan.Load() {
-		t.Fatal("first contender never became leader")
-	}
-	if secondRan.Load() {
-		t.Fatal("second contender ran fn while first held leadership")
-	}
 
 	// Stop the first; the second should acquire within ~1 lease TTL.
 	cancel1()
 	<-done1
-	deadline := time.After(3 * time.Second)
-	for !secondRan.Load() {
-		select {
-		case <-deadline:
-			t.Fatal("second contender did not take over after the first stopped")
-		case <-time.After(50 * time.Millisecond):
-		}
-	}
+	waitFor(t, 3*time.Second, secondRan.Load)
 }

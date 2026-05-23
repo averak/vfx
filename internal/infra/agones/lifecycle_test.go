@@ -49,6 +49,21 @@ func discardLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
+// waitFor polls cond until it holds or the timeout elapses, so a test
+// reacts to an event as soon as it happens instead of sleeping a fixed,
+// guess-the-worst-case window.
+func waitFor(t *testing.T, timeout time.Duration, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("condition not met within %s", timeout)
+}
+
 func TestStart_ReadyHealthShutdown(t *testing.T) {
 	f := &fakeSDK{}
 	stop, err := start(context.Background(), f, 5*time.Millisecond, discardLogger())
@@ -56,8 +71,11 @@ func TestStart_ReadyHealthShutdown(t *testing.T) {
 		t.Fatalf("start: %v", err)
 	}
 
-	// Give the health loop a few ticks.
-	time.Sleep(30 * time.Millisecond)
+	// Wait until the health loop has pinged at least once before stopping.
+	waitFor(t, time.Second, func() bool {
+		_, health, _ := f.counts()
+		return health > 0
+	})
 	stop()
 
 	ready, health, shutdown := f.counts()
