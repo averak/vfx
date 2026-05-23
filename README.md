@@ -11,7 +11,10 @@ vfx hosts realtime multiplayer matches. You write the game logic as a WebAssembl
 - **WebTransport (HTTP/3) realtime** — reliable streams and unreliable datagrams over one connection, for native and browser clients alike.
 - **Sandboxed game logic** — plugins run as WebAssembly under [`wazero`](https://wazero.io/), so you can write a game in any language that targets WASM (or link a Go plugin in directly).
 - **Kubernetes-native** — one process per match, with the room fleet's lifecycle managed by [Agones](https://agones.dev/).
+- **Authentication** — anonymous guest accounts and OIDC sign-in (Google, Apple), with account linking to upgrade a guest into a federated identity.
+- **Leaderboards** — configurable ascending or descending boards, keep-best scoring applied atomically, and ranked / around-player queries.
 - **Player & title storage** — owner-scoped save data and operator-published content. File bytes stream directly between the client and object storage over signed URLs; the gateway brokers only metadata and authorization, never the bytes.
+- **Friends & chat** — friend requests with mutual auto-accept and friend lists, plus 1:1 direct messaging with paginated history.
 
 ## Quickstart
 
@@ -40,7 +43,7 @@ A game implements the `plugin.v1` ABI — `Init`, `OnTick`, `OnGameEnd`. The roo
 
 ## How it works
 
-A client reaches the **control plane** — auth, matchmaking, storage — over Connect RPC on the stateless gateway, then opens a **data-plane** WebTransport session straight to the room hosting its match. [`docs/architecture.md`](./docs/architecture.md) covers the components, protocols, the match and reconnection lifecycles, deployment topology, and the internal layering.
+A client reaches the **control plane** — auth, matchmaking, leaderboards, friends, chat, and storage — over Connect RPC on the stateless gateway, then opens a **data-plane** WebTransport session straight to the room hosting its match. [`docs/architecture.md`](./docs/architecture.md) covers the components, protocols, the match and reconnection lifecycles, deployment topology, and the internal layering.
 
 ## Development
 
