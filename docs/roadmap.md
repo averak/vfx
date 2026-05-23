@@ -69,7 +69,7 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 
 Goal: feature breadth comparable to mature game backends.
 
-- [ ] OIDC providers: Google, Apple (anonymous device already shipped).
+- [x] OIDC providers: Google, Apple (ID-token verification via JWKS), with account linking to upgrade an anonymous player; anonymous device already shipped.
 - [x] Storage API — player data (owner-scoped) and title storage (operator-published, tag-gated); bytes in object storage via signed URLs, metadata in PostgreSQL.
 - [x] Leaderboard — config-defined boards (asc/desc), keep-best scores, ranked/around-player queries.
 - [ ] Friends / Groups / Parties.

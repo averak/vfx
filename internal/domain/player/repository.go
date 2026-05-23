@@ -11,6 +11,9 @@ import (
 var (
 	ErrPlayerNotFound   = errors.New("player: not found")
 	ErrIdentityNotFound = errors.New("player: identity not found")
+
+	// ErrIdentityAlreadyLinked is returned when linking a provider identity that already belongs to a different player.
+	ErrIdentityAlreadyLinked = errors.New("player: identity already linked to another player")
 )
 
 // Repository takes only a context: the usecase owns the transaction boundary (via a Transactor) and the active transaction rides on the context.

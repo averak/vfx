@@ -10,6 +10,7 @@ import (
 	"github.com/averak/vfx/internal/infra/repository"
 	"github.com/averak/vfx/internal/infra/token"
 	"github.com/averak/vfx/internal/stdx/clock"
+	"github.com/averak/vfx/internal/testutils/fakeoidc"
 	"github.com/averak/vfx/internal/testutils/testdb"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
 )
@@ -22,6 +23,7 @@ func newUsecase(t *testing.T) *usecaseauth.Usecase {
 		repository.NewPlayer(),
 		repository.NewRefreshToken(),
 		token.NewSigner("test-secret"),
+		fakeoidc.New(),
 		15*time.Minute,
 		720*time.Hour,
 	)

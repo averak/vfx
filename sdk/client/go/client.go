@@ -98,6 +98,34 @@ func (c *Client) LoginAnonymous(ctx context.Context, deviceID, nickname string) 
 	return nil
 }
 
+// LoginOIDC logs in with a provider ID token (Google or Apple); the same provider account always returns the same player.
+func (c *Client) LoginOIDC(ctx context.Context, provider authv1.Provider, idToken string) error {
+	resp, err := c.auth.Login(ctx, connect.NewRequest(&authv1.LoginRequest{
+		Credential: &authv1.LoginRequest_Oidc{Oidc: &authv1.OidcCredential{Provider: provider, IdToken: idToken}},
+	}))
+	if err != nil {
+		return fmt.Errorf("vfxclient: oidc login: %w", err)
+	}
+	c.accessToken = resp.Msg.GetAccessToken()
+	c.refreshToken = resp.Msg.GetRefreshToken()
+	c.player = resp.Msg.GetPlayer()
+	return nil
+}
+
+// LinkIdentity attaches a provider identity to the current player, upgrading an anonymous account; the player must be logged in.
+func (c *Client) LinkIdentity(ctx context.Context, provider authv1.Provider, idToken string) error {
+	req := connect.NewRequest(&authv1.LinkIdentityRequest{
+		Oidc: &authv1.OidcCredential{Provider: provider, IdToken: idToken},
+	})
+	c.authorize(req.Header())
+	resp, err := c.auth.LinkIdentity(ctx, req)
+	if err != nil {
+		return fmt.Errorf("vfxclient: link identity: %w", err)
+	}
+	c.player = resp.Msg.GetPlayer()
+	return nil
+}
+
 func (c *Client) CreateTicket(ctx context.Context, gameMode string) (string, error) {
 	req := connect.NewRequest(&matchv1.CreateTicketRequest{GameMode: gameMode})
 	c.authorize(req.Header())

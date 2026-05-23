@@ -30,6 +30,7 @@ import (
 	gatewaymatchhandler "github.com/averak/vfx/internal/presentation/gateway/match"
 	gatewaystoragehandler "github.com/averak/vfx/internal/presentation/gateway/storage"
 	"github.com/averak/vfx/internal/testutils/fakeblob"
+	"github.com/averak/vfx/internal/testutils/fakeoidc"
 	"github.com/averak/vfx/internal/testutils/testdb"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
 	usecaseleaderboard "github.com/averak/vfx/internal/usecase/leaderboard"
@@ -79,6 +80,7 @@ func New(t *testing.T) *Server {
 		repository.NewPlayer(),
 		repository.NewRefreshToken(),
 		signer,
+		fakeoidc.New(),
 		15*time.Minute,
 		720*time.Hour,
 	)

@@ -10,6 +10,8 @@ type Provider string
 
 const (
 	ProviderAnonymous Provider = "anonymous"
+	ProviderGoogle    Provider = "google"
+	ProviderApple     Provider = "apple"
 )
 
 type Identity struct {

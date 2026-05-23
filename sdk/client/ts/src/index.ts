@@ -17,7 +17,7 @@ import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { createClient, type Client } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 
-import { AuthService, type Player } from "./gen/vfx/v1/auth/auth_service_pb.js";
+import { AuthService, Provider, type Player } from "./gen/vfx/v1/auth/auth_service_pb.js";
 import { MatchService } from "./gen/vfx/v1/match/match_service_pb.js";
 import {
   FrameSchema,
@@ -32,6 +32,7 @@ import {
 } from "./gen/vfx/v1/storage/storage_service_pb.js";
 import { LeaderboardService, type RankEntry } from "./gen/vfx/v1/leaderboard/leaderboard_service_pb.js";
 
+export { Provider };
 export type { Player, Frame, FileMetadata, RankEntry };
 
 /** Options for constructing a VfxClient. */
@@ -86,6 +87,30 @@ export class VfxClient {
     this.player = resp.player;
     if (!this.player) {
       throw new Error("vfx: login response missing player");
+    }
+    return this.player;
+  }
+
+  /** Log in with a provider ID token (Google or Apple); the same provider account always returns the same player. */
+  async loginOidc(provider: Provider, idToken: string): Promise<Player> {
+    const resp = await this.auth.login({ credential: { case: "oidc", value: { provider, idToken } } });
+    this.accessToken = resp.accessToken;
+    this.player = resp.player;
+    if (!this.player) {
+      throw new Error("vfx: login response missing player");
+    }
+    return this.player;
+  }
+
+  /** Attach a provider identity to the current player, upgrading an anonymous account. */
+  async linkIdentity(provider: Provider, idToken: string): Promise<Player> {
+    const resp = await this.auth.linkIdentity(
+      { oidc: { provider, idToken } },
+      { headers: this.authHeaders() },
+    );
+    this.player = resp.player;
+    if (!this.player) {
+      throw new Error("vfx: link response missing player");
     }
     return this.player;
   }

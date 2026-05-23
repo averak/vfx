@@ -22,6 +22,7 @@ import (
 	"github.com/averak/vfx/internal/infra/db"
 	"github.com/averak/vfx/internal/infra/matchqueue"
 	"github.com/averak/vfx/internal/infra/metrics"
+	infraoidc "github.com/averak/vfx/internal/infra/oidc"
 	"github.com/averak/vfx/internal/infra/postgres"
 	"github.com/averak/vfx/internal/infra/repository"
 	"github.com/averak/vfx/internal/infra/token"
@@ -131,11 +132,16 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	signer := token.NewSigner(cfg.JWTSecret)
 	playerRepo := repository.NewPlayer()
 	refreshRepo := repository.NewRefreshToken()
+	oidcVerifier := infraoidc.New(ctx, infraoidc.Config{
+		player.ProviderGoogle: cfg.OIDCGoogleClientID,
+		player.ProviderApple:  cfg.OIDCAppleClientID,
+	})
 	authUC := usecaseauth.New(
 		session,
 		playerRepo,
 		refreshRepo,
 		signer,
+		oidcVerifier,
 		cfg.AccessTokenTTL,
 		cfg.RefreshTokenTTL,
 	)

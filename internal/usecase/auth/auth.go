@@ -1,14 +1,17 @@
 // Package auth orchestrates the AuthService.
 //
-// Anonymous login is the only credential currently supported.
-// A non-nil device_id returns the same Player across calls; a nil one mints a fresh Player whose identity carries a random server-side provider_uid and is therefore unrecoverable.
+// Two credentials are supported: anonymous (guest) and OIDC (Google / Apple).
+// Anonymous: a non-nil device_id returns the same Player across calls; a nil one mints a fresh Player whose identity carries a random server-side provider_uid and is therefore unrecoverable.
+// OIDC: the verified subject is the identity, so the same provider account always maps to the same Player; an anonymous Player can be upgraded by linking an OIDC identity.
 package auth
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -17,6 +20,9 @@ import (
 	"github.com/averak/vfx/internal/usecase/tx"
 )
 
+// ErrInvalidCredential is returned when an OIDC token fails verification (bad signature, wrong audience, expired, or an unconfigured provider).
+var ErrInvalidCredential = errors.New("auth: invalid credential")
+
 // TokenIssuer is a port, so the usecase depends on the capability rather than the crypto in infra.
 type TokenIssuer interface {
 	SignAccess(playerID uuid.UUID, now time.Time, ttl time.Duration) (string, error)
@@ -24,11 +30,26 @@ type TokenIssuer interface {
 	HashRefresh(raw string) []byte
 }
 
+// VerifiedIdentity is what an OIDCVerifier returns once a provider ID token checks out.
+type VerifiedIdentity struct {
+	// Subject is the provider's stable user id (the "sub" claim); it becomes the identity's provider_uid.
+	Subject string
+
+	// Name is an optional display name from the token, used as the initial nickname when a Player is first created.
+	Name string
+}
+
+// OIDCVerifier validates a provider ID token and extracts its identity; it is a port so the usecase stays free of JWKS/HTTP concerns.
+type OIDCVerifier interface {
+	Verify(ctx context.Context, provider player.Provider, idToken string) (*VerifiedIdentity, error)
+}
+
 type Usecase struct {
 	tx               tx.ReadWriter
 	playerRepo       player.Repository
 	refreshTokenRepo player.RefreshTokenRepository
 	tokens           TokenIssuer
+	verifier         OIDCVerifier
 	accessTokenTTL   time.Duration
 	refreshTokenTTL  time.Duration
 }
@@ -38,6 +59,7 @@ func New(
 	playerRepo player.Repository,
 	refreshTokenRepo player.RefreshTokenRepository,
 	tokens TokenIssuer,
+	verifier OIDCVerifier,
 	accessTokenTTL time.Duration,
 	refreshTokenTTL time.Duration,
 ) *Usecase {
@@ -46,6 +68,7 @@ func New(
 		playerRepo:       playerRepo,
 		refreshTokenRepo: refreshTokenRepo,
 		tokens:           tokens,
+		verifier:         verifier,
 		accessTokenTTL:   accessTokenTTL,
 		refreshTokenTTL:  refreshTokenTTL,
 	}
@@ -82,6 +105,75 @@ func (u *Usecase) LoginAnonymous(ctx context.Context, deviceID, nickname *string
 		return nil, err
 	}
 	return result, nil
+}
+
+// LoginOIDC verifies a provider ID token and logs in the matching Player, creating one on first sign-in.
+// The same provider account always maps to the same Player.
+func (u *Usecase) LoginOIDC(ctx context.Context, provider player.Provider, idToken string) (*LoginResult, error) {
+	identity, verifyErr := u.verifier.Verify(ctx, provider, idToken)
+	if verifyErr != nil {
+		return nil, ErrInvalidCredential
+	}
+	now := clock.Now(ctx)
+
+	var result *LoginResult
+	err := u.tx.RW(ctx, func(ctx context.Context) error {
+		p, err := u.findOrCreateByIdentity(ctx, provider, identity.Subject, nicknameOrNil(identity.Name), now)
+		if err != nil {
+			return err
+		}
+		accessToken, refreshTokenRaw, err := u.issueTokens(ctx, p.ID, now)
+		if err != nil {
+			return err
+		}
+		result = &LoginResult{AccessToken: accessToken, RefreshToken: refreshTokenRaw, Player: p}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// LinkIdentity attaches a verified OIDC identity to an existing (typically anonymous) Player, upgrading it.
+// It returns player.ErrIdentityAlreadyLinked when that identity already belongs to a different Player, and is idempotent when it already belongs to this one.
+func (u *Usecase) LinkIdentity(ctx context.Context, playerID uuid.UUID, provider player.Provider, idToken string) (*player.Player, error) {
+	identity, verifyErr := u.verifier.Verify(ctx, provider, idToken)
+	if verifyErr != nil {
+		return nil, ErrInvalidCredential
+	}
+	now := clock.Now(ctx)
+
+	var linked *player.Player
+	err := u.tx.RW(ctx, func(ctx context.Context) error {
+		owner, err := u.playerRepo.FindPlayerByIdentity(ctx, provider, identity.Subject)
+		switch {
+		case err == nil:
+			if owner.ID != playerID {
+				return player.ErrIdentityAlreadyLinked
+			}
+			linked = owner // already linked to this player; nothing to do
+			return nil
+		case errors.Is(err, player.ErrIdentityNotFound):
+			// fall through to link it
+		default:
+			return err
+		}
+
+		me, err := u.playerRepo.GetByID(ctx, playerID)
+		if err != nil {
+			return err
+		}
+		if err := u.playerRepo.SaveIdentity(ctx, player.NewIdentity(uuid.New(), playerID, provider, identity.Subject, now)); err != nil {
+			return fmt.Errorf("auth: link identity: %w", err)
+		}
+		linked = me
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return linked, nil
 }
 
 // Refresh rotates the refresh token: the old one is revoked atomically with the issue of the new pair.
@@ -186,6 +278,40 @@ func (u *Usecase) findOrCreatePlayer(ctx context.Context, deviceID, nickname *st
 		return nil, fmt.Errorf("auth: save identity: %w", err)
 	}
 	return p, nil
+}
+
+// findOrCreateByIdentity returns the Player owning (provider, providerUID), creating a fresh Player and identity on first sign-in.
+func (u *Usecase) findOrCreateByIdentity(ctx context.Context, provider player.Provider, providerUID string, nickname *string, now time.Time) (*player.Player, error) {
+	existing, err := u.playerRepo.FindPlayerByIdentity(ctx, provider, providerUID)
+	switch {
+	case err == nil:
+		return existing, nil
+	case errors.Is(err, player.ErrIdentityNotFound):
+		// fall through to creation
+	default:
+		return nil, err
+	}
+
+	p, err := player.New(uuid.New(), nickname, now)
+	if err != nil {
+		return nil, err
+	}
+	if err := u.playerRepo.Save(ctx, p); err != nil {
+		return nil, fmt.Errorf("auth: save player: %w", err)
+	}
+	if err := u.playerRepo.SaveIdentity(ctx, player.NewIdentity(uuid.New(), p.ID, provider, providerUID, now)); err != nil {
+		return nil, fmt.Errorf("auth: save identity: %w", err)
+	}
+	return p, nil
+}
+
+// nicknameOrNil adopts a provider-supplied display name only when it satisfies the Player nickname invariant; otherwise the Player starts unnamed and can set one via UpdateProfile.
+func nicknameOrNil(name string) *string {
+	name = strings.TrimSpace(name)
+	if name == "" || utf8.RuneCountInString(name) > player.MaxNicknameLength {
+		return nil
+	}
+	return &name
 }
 
 func (u *Usecase) issueTokens(ctx context.Context, playerID uuid.UUID, now time.Time) (accessToken, refreshTokenRaw string, err error) {

@@ -170,4 +170,93 @@ func TestUpdateProfile_InvalidNickname(t *testing.T) {
 	requireCode(t, err, connect.CodeInvalidArgument)
 }
 
+func oidcLogin(t *testing.T, srv *testconnect.Server, provider authv1.Provider, idToken string) *authv1.LoginResponse {
+	t.Helper()
+	resp, err := srv.Auth.Login(t.Context(), connect.NewRequest(&authv1.LoginRequest{
+		Credential: &authv1.LoginRequest_Oidc{Oidc: &authv1.OidcCredential{Provider: provider, IdToken: idToken}},
+	}))
+	if err != nil {
+		t.Fatalf("OIDC Login: %v", err)
+	}
+	return resp.Msg
+}
+
+// The same provider token always resolves to the same player.
+func TestLogin_OIDCSameTokenSamePlayer(t *testing.T) {
+	srv := testconnect.New(t)
+	first := oidcLogin(t, srv, authv1.Provider_PROVIDER_GOOGLE, "alice")
+	second := oidcLogin(t, srv, authv1.Provider_PROVIDER_GOOGLE, "alice")
+	if first.GetPlayer().GetId() != second.GetPlayer().GetId() {
+		t.Errorf("same token produced different players: %s vs %s", first.GetPlayer().GetId(), second.GetPlayer().GetId())
+	}
+	if first.GetAccessToken() == "" {
+		t.Error("empty access token")
+	}
+}
+
+func TestLogin_OIDCRejectsInvalidToken(t *testing.T) {
+	srv := testconnect.New(t)
+	_, err := srv.Auth.Login(t.Context(), connect.NewRequest(&authv1.LoginRequest{
+		Credential: &authv1.LoginRequest_Oidc{Oidc: &authv1.OidcCredential{Provider: authv1.Provider_PROVIDER_GOOGLE, IdToken: "invalid"}},
+	}))
+	requireCode(t, err, connect.CodeUnauthenticated)
+}
+
+func TestLogin_OIDCRejectsUnspecifiedProvider(t *testing.T) {
+	srv := testconnect.New(t)
+	_, err := srv.Auth.Login(t.Context(), connect.NewRequest(&authv1.LoginRequest{
+		Credential: &authv1.LoginRequest_Oidc{Oidc: &authv1.OidcCredential{Provider: authv1.Provider_PROVIDER_UNSPECIFIED, IdToken: "alice"}},
+	}))
+	requireCode(t, err, connect.CodeInvalidArgument)
+}
+
+func TestLinkIdentity_RequiresAuth(t *testing.T) {
+	srv := testconnect.New(t)
+	_, err := srv.Auth.LinkIdentity(t.Context(), connect.NewRequest(&authv1.LinkIdentityRequest{
+		Oidc: &authv1.OidcCredential{Provider: authv1.Provider_PROVIDER_GOOGLE, IdToken: "alice"},
+	}))
+	requireCode(t, err, connect.CodeUnauthenticated)
+}
+
+// Linking upgrades an anonymous player: afterwards an OIDC login with that token returns the same player.
+func TestLinkIdentity_UpgradesAnonymous(t *testing.T) {
+	srv := testconnect.New(t)
+	anon := mustLogin(t, srv, "anon-device")
+
+	linked, err := srv.Auth.LinkIdentity(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&authv1.LinkIdentityRequest{
+			Oidc: &authv1.OidcCredential{Provider: authv1.Provider_PROVIDER_GOOGLE, IdToken: "linktoken"},
+		}), anon.GetAccessToken()))
+	if err != nil {
+		t.Fatalf("LinkIdentity: %v", err)
+	}
+	if linked.Msg.GetPlayer().GetId() != anon.GetPlayer().GetId() {
+		t.Errorf("link changed the player id")
+	}
+
+	viaOIDC := oidcLogin(t, srv, authv1.Provider_PROVIDER_GOOGLE, "linktoken")
+	if viaOIDC.GetPlayer().GetId() != anon.GetPlayer().GetId() {
+		t.Errorf("OIDC login after link returned a different player")
+	}
+}
+
+func TestLinkIdentity_AlreadyLinkedToAnother(t *testing.T) {
+	srv := testconnect.New(t)
+	a := mustLogin(t, srv, "player-a")
+	b := mustLogin(t, srv, "player-b")
+
+	if _, err := srv.Auth.LinkIdentity(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&authv1.LinkIdentityRequest{
+			Oidc: &authv1.OidcCredential{Provider: authv1.Provider_PROVIDER_GOOGLE, IdToken: "shared"},
+		}), a.GetAccessToken())); err != nil {
+		t.Fatalf("first link: %v", err)
+	}
+
+	_, err := srv.Auth.LinkIdentity(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&authv1.LinkIdentityRequest{
+			Oidc: &authv1.OidcCredential{Provider: authv1.Provider_PROVIDER_GOOGLE, IdToken: "shared"},
+		}), b.GetAccessToken()))
+	requireCode(t, err, connect.CodeAlreadyExists)
+}
+
 func ptr[T any](v T) *T { return &v }

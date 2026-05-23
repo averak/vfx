@@ -6,8 +6,8 @@ import "google/protobuf/timestamp.proto";
 
 // AuthService は認証関連の RPC を提供する。
 //
-// 現状は匿名 (ゲスト) 認証のみをサポートする。
-// OAuth やメール認証を追加する場合は、同じ Player を維持したまま credential を紐付けられるようにする。
+// 匿名 (ゲスト) と OIDC (Google / Apple) をサポートする。
+// 同一 Player に複数の credential を紐付けられる (匿名で始めて後から OIDC を LinkIdentity で昇格)。
 service AuthService {
   // Login は credential を検証して access_token と refresh_token を発行する。
   rpc Login(LoginRequest) returns (LoginResponse);
@@ -20,12 +20,30 @@ service AuthService {
 
   // UpdateProfile は認証済みプレイヤーのプロフィールを更新する。
   rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+
+  // LinkIdentity は認証済みプレイヤー (典型的には匿名) に OIDC identity を紐付け、本アカウントへ昇格させる。
+  // その identity が既に別プレイヤーに紐付いている場合は AlreadyExists。
+  rpc LinkIdentity(LinkIdentityRequest) returns (LinkIdentityResponse);
+}
+
+// Provider は識別プロバイダ。
+enum Provider {
+  PROVIDER_UNSPECIFIED = 0;
+  PROVIDER_GOOGLE = 1;
+  PROVIDER_APPLE = 2;
+}
+
+// OidcCredential は OIDC プロバイダ (Google / Apple) の ID トークンによる認証。
+// id_token はクライアントが各プロバイダの SDK で取得したもの。サーバが JWKS で署名・iss・aud・exp を検証する。
+message OidcCredential {
+  Provider provider = 1;
+  string id_token = 2;
 }
 
 message LoginRequest {
-  // 現状は anonymous のみ対応。
   oneof credential {
     AnonymousCredential anonymous = 1;
+    OidcCredential oidc = 2;
   }
 }
 
@@ -75,6 +93,14 @@ message UpdateProfileRequest {
 }
 
 message UpdateProfileResponse {
+  Player player = 1;
+}
+
+message LinkIdentityRequest {
+  OidcCredential oidc = 1;
+}
+
+message LinkIdentityResponse {
   Player player = 1;
 }
 

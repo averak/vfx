@@ -26,6 +26,10 @@ type Gateway struct {
 	RefreshTokenTTL time.Duration `env:"VFX_REFRESH_TOKEN_TTL" envDefault:"720h"`
 	SessionTokenTTL time.Duration `env:"VFX_SESSION_TOKEN_TTL" envDefault:"5m"`
 
+	// OIDC audiences (client ids) tokens must carry; an empty value disables that provider's login/link.
+	OIDCGoogleClientID string `env:"VFX_OIDC_GOOGLE_CLIENT_ID"`
+	OIDCAppleClientID  string `env:"VFX_OIDC_APPLE_CLIENT_ID"`
+
 	// MatchmakerInterval is how often the worker scans the queue.
 	MatchmakerInterval time.Duration `env:"VFX_MATCHMAKER_INTERVAL" envDefault:"200ms"`
 
