@@ -24,6 +24,7 @@ require (
 	google.golang.org/protobuf v1.36.11
 	k8s.io/apimachinery v0.34.0
 	k8s.io/client-go v0.34.0
+	pgregory.net/rapid v1.3.0
 )
 
 require (
