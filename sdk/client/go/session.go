@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/webtransport-go"
@@ -19,8 +21,9 @@ import (
 )
 
 // Session is a live WebTransport connection to a room. Inbound frames
-// arrive on the channel returned by Frames; outbound input goes through
-// SendInput.
+// arrive on the channel returned by Frames — from both unreliable
+// datagrams (small deltas) and reliable unidirectional streams (large
+// snapshots) — and outbound input goes through SendInput.
 type Session struct {
 	wt     *webtransport.Session
 	frames chan *realtimev1.Frame
@@ -80,7 +83,14 @@ func (m *Match) Connect(ctx context.Context, opts ...SessionOption) (*Session, e
 		frames: make(chan *realtimev1.Frame, 16),
 		cancel: cancel,
 	}
-	go s.readLoop(loopCtx)
+
+	// Frames arrive on two transports; close the channel only once both
+	// readers have stopped so neither writes to a closed channel.
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); s.datagramLoop(loopCtx) }()
+	go func() { defer wg.Done(); s.streamLoop(loopCtx) }()
+	go func() { wg.Wait(); close(s.frames) }()
 	return s, nil
 }
 
@@ -113,22 +123,41 @@ func (s *Session) Close() error {
 	return nil
 }
 
-func (s *Session) readLoop(ctx context.Context) {
-	defer close(s.frames)
+// datagramLoop delivers unreliable datagram frames (small state deltas).
+func (s *Session) datagramLoop(ctx context.Context) {
 	for {
 		raw, err := s.wt.ReceiveDatagram(ctx)
 		if err != nil {
 			return
 		}
-		var frame realtimev1.Frame
-		if err := proto.Unmarshal(raw, &frame); err != nil {
-			continue
-		}
-		select {
-		case s.frames <- &frame:
-		case <-ctx.Done():
+		s.deliver(ctx, raw)
+	}
+}
+
+// streamLoop delivers frames sent over reliable unidirectional streams
+// (large snapshots). Each stream carries exactly one frame.
+func (s *Session) streamLoop(ctx context.Context) {
+	for {
+		stream, err := s.wt.AcceptUniStream(ctx)
+		if err != nil {
 			return
 		}
+		raw, err := io.ReadAll(stream)
+		if err != nil {
+			continue
+		}
+		s.deliver(ctx, raw)
+	}
+}
+
+func (s *Session) deliver(ctx context.Context, raw []byte) {
+	var frame realtimev1.Frame
+	if err := proto.Unmarshal(raw, &frame); err != nil {
+		return
+	}
+	select {
+	case s.frames <- &frame:
+	case <-ctx.Done():
 	}
 }
 

@@ -174,6 +174,7 @@ export class Session {
     this.writer = wt.datagrams.writable.getWriter();
     this.reader = wt.datagrams.readable.getReader();
     void this.readLoop();
+    void this.streamLoop();
   }
 
   /** Register a callback invoked for every inbound frame. */
@@ -205,15 +206,63 @@ export class Session {
         const { value, done } = await this.reader.read();
         if (done) return;
         if (!value) continue;
-        const frame = fromBinary(FrameSchema, value);
-        for (const handler of this.frameHandlers) {
-          handler(frame);
-        }
+        this.dispatch(value);
       }
     } catch {
       // Stream closed; nothing actionable.
     }
   }
+
+  // streamLoop reads frames sent over reliable unidirectional streams
+  // (large snapshots); each stream carries exactly one frame.
+  private async streamLoop(): Promise<void> {
+    try {
+      const streams = this.wt.incomingUnidirectionalStreams.getReader();
+      for (;;) {
+        const { value: stream, done } = await streams.read();
+        if (done) return;
+        if (!stream) continue;
+        void this.readStream(stream);
+      }
+    } catch {
+      // Session closed; nothing actionable.
+    }
+  }
+
+  private async readStream(stream: ReadableStream<Uint8Array>): Promise<void> {
+    try {
+      const reader = stream.getReader();
+      const chunks: Uint8Array[] = [];
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) chunks.push(value);
+      }
+      this.dispatch(concatChunks(chunks));
+    } catch {
+      // Malformed or interrupted stream; drop the frame.
+    }
+  }
+
+  private dispatch(data: Uint8Array): void {
+    const frame = fromBinary(FrameSchema, data);
+    for (const handler of this.frameHandlers) {
+      handler(frame);
+    }
+  }
+}
+
+/** Concatenate stream chunks into one buffer. */
+function concatChunks(chunks: Uint8Array[]): Uint8Array {
+  let total = 0;
+  for (const c of chunks) total += c.length;
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    out.set(c, offset);
+    offset += c.length;
+  }
+  return out;
 }
 
 /**

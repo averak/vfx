@@ -52,6 +52,13 @@ type Room struct {
 	// is HTTP/3 over UDP, so Prometheus scraping needs this separate
 	// plain-HTTP listener.
 	MetricsAddr string `env:"VFX_ROOM_METRICS_ADDR" envDefault:":9090"`
+
+	// DatagramMaxBytes is the largest marshalled frame sent as an
+	// unreliable datagram; larger frames (e.g. full snapshots) go over a
+	// reliable WebTransport stream instead. Defaults to a conservative
+	// size that fits a typical QUIC datagram. Lower it to exercise the
+	// stream path in tests.
+	DatagramMaxBytes int `env:"VFX_ROOM_DATAGRAM_MAX_BYTES" envDefault:"1200"`
 }
 
 // LoadRoom reads the room configuration from the environment.

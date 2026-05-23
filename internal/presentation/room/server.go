@@ -187,7 +187,7 @@ func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	playerIO := newPlayerSession(claims.PlayerID, matchID, session, s.logger)
+	playerIO := newPlayerSession(claims.PlayerID, matchID, session, s.logger, s.cfg.DatagramMaxBytes)
 	if err := match.Join(claims.PlayerID, playerIO); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "join failed")
