@@ -12,7 +12,6 @@ import (
 // Version is overridden at link time via -ldflags "-X ..."
 var Version = "0.0.0-dev"
 
-// NewRootCmd builds the root command with the supplied plugin registry threaded through to the subcommands that need it (today: room).
 func NewRootCmd(registry *plugin.Registry) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "vfx",

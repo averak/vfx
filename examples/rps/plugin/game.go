@@ -23,12 +23,10 @@ const (
 	winsToWin  = 2
 )
 
-// Game is one instance of a rock-paper-scissors match.
 type Game struct {
 	state *gameState
 }
 
-// NewGame returns a fresh Game ready for Init.
 func NewGame() *Game {
 	return &Game{state: newGameState()}
 }
@@ -79,7 +77,6 @@ func (g *Game) OnTick(req *pluginv1.OnTickRequest) (*pluginv1.OnTickResponse, er
 	return resp, nil
 }
 
-// OnGameEnd returns the final state and per-player results.
 func (g *Game) OnGameEnd(_ *pluginv1.OnGameEndRequest) (*pluginv1.OnGameEndResponse, error) {
 	final, err := g.state.encode()
 	if err != nil {
@@ -102,7 +99,6 @@ func (g *Game) OnGameEnd(_ *pluginv1.OnGameEndRequest) (*pluginv1.OnGameEndRespo
 	}, nil
 }
 
-// gameState carries everything the rules need between ticks.
 type gameState struct {
 	playerA string
 	playerB string

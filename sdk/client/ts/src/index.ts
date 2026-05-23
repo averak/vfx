@@ -244,7 +244,6 @@ export class Session {
   }
 }
 
-/** Concatenate stream chunks into one buffer. */
 function concatChunks(chunks: Uint8Array[]): Uint8Array {
   let total = 0;
   for (const c of chunks) total += c.length;

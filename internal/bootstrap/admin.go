@@ -17,7 +17,6 @@ import (
 	usecaseadmin "github.com/averak/vfx/internal/usecase/admin"
 )
 
-// Admin bundles everything the admin process needs at runtime.
 type Admin struct {
 	Config  *config.Admin
 	Pool    *pgxpool.Pool
@@ -25,7 +24,6 @@ type Admin struct {
 	Handler http.Handler
 }
 
-// NewAdmin constructs and validates the admin container.
 func NewAdmin(ctx context.Context) (*Admin, func(), error) {
 	cfg, err := config.LoadAdmin()
 	if err != nil {

@@ -29,7 +29,6 @@ import (
 
 const jwtSecret = "test-secret"
 
-// Server bundles the test HTTP server and ready-to-use clients.
 type Server struct {
 	Auth  authconnect.AuthServiceClient
 	Match matchconnect.MatchServiceClient
@@ -76,7 +75,6 @@ func New(t *testing.T) *Server {
 	}
 }
 
-// Authorize attaches a bearer access token to a request header.
 func Authorize[T any](req *connect.Request[T], accessToken string) *connect.Request[T] {
 	req.Header().Set("Authorization", "Bearer "+accessToken)
 	return req

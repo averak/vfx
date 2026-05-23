@@ -42,15 +42,12 @@ type Client struct {
 	player       *authv1.Player
 }
 
-// Option customises a Client at construction time.
 type Option func(*Client)
 
-// WithHTTPClient overrides the HTTP client used for Connect RPC calls.
 func WithHTTPClient(h *http.Client) Option {
 	return func(c *Client) { c.httpClient = h }
 }
 
-// New constructs a Client pointed at the given gateway base URL.
 func New(gatewayURL string, opts ...Option) *Client {
 	c := &Client{
 		gatewayURL: gatewayURL,
@@ -93,7 +90,6 @@ func (c *Client) LoginAnonymous(ctx context.Context, deviceID, nickname string) 
 	return nil
 }
 
-// CreateTicket enqueues a matchmaking ticket for the given game mode and returns its id.
 func (c *Client) CreateTicket(ctx context.Context, gameMode string) (string, error) {
 	req := connect.NewRequest(&matchv1.CreateTicketRequest{GameMode: gameMode})
 	c.authorize(req.Header())
@@ -104,7 +100,6 @@ func (c *Client) CreateTicket(ctx context.Context, gameMode string) (string, err
 	return resp.Msg.GetTicketId(), nil
 }
 
-// Match is the result of a successful matchmaking: where to connect and the token that authorises the connection.
 type Match struct {
 	client       *Client
 	Endpoint     string

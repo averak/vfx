@@ -28,7 +28,6 @@ type Session struct {
 	cancel context.CancelFunc
 }
 
-// SessionOption customises how a Session dials.
 type SessionOption func(*sessionConfig)
 
 type sessionConfig struct {

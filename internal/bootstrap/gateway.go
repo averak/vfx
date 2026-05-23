@@ -29,7 +29,6 @@ import (
 	usecasematch "github.com/averak/vfx/internal/usecase/match"
 )
 
-// Gateway bundles everything the gateway process needs at runtime.
 type Gateway struct {
 	Config *config.Gateway
 
@@ -92,8 +91,7 @@ func newAllocator(cfg *config.Gateway) (domainmatch.Allocator, error) {
 	}
 }
 
-// NewGateway constructs and validates the gateway container.
-// The returned cleanup function closes long-lived resources and must be called before the process exits.
+// NewGateway's returned cleanup closes long-lived resources and must be called before the process exits.
 func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	cfg, err := config.LoadGateway()
 	if err != nil {

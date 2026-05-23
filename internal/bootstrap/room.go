@@ -17,7 +17,6 @@ import (
 	usecaseroom "github.com/averak/vfx/internal/usecase/room"
 )
 
-// Room bundles the dependencies the room daemon needs at runtime.
 type Room struct {
 	Config  *config.Room
 	Signer  *token.Signer
