@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -64,13 +63,16 @@ func (m *Match) Connect(ctx context.Context, opts ...SessionOption) (*Session, e
 		},
 	}
 	u := url.URL{Scheme: "https", Host: m.Endpoint, Path: "/room/" + matchID}
-	header := http.Header{}
-	header.Set("Authorization", "Bearer "+m.SessionToken)
 
 	// The http.Response body wraps the upgrade stream; closing it would tear down the session, so it is deliberately left open.
-	_, wt, err := dialer.Dial(ctx, u.String(), header) //nolint:bodyclose // body wraps the WT session.
+	_, wt, err := dialer.Dial(ctx, u.String(), nil) //nolint:bodyclose // body wraps the WT session.
 	if err != nil {
 		return nil, fmt.Errorf("vfxclient: webtransport dial: %w", err)
+	}
+
+	// A browser cannot set the Authorization header on the CONNECT, so the token rides in a ClientHello sent before anything else.
+	if err := sendHello(ctx, wt, m.SessionToken); err != nil {
+		return nil, fmt.Errorf("vfxclient: %w", err)
 	}
 
 	loopCtx, cancel := context.WithCancel(ctx)
@@ -87,6 +89,25 @@ func (m *Match) Connect(ctx context.Context, opts ...SessionOption) (*Session, e
 	go func() { defer wg.Done(); s.streamLoop(loopCtx) }()
 	go func() { wg.Wait(); close(s.frames) }()
 	return s, nil
+}
+
+// sendHello writes the ClientHello over a fresh reliable stream and closes it, so the room reads exactly one frame and authenticates the session.
+func sendHello(ctx context.Context, wt *webtransport.Session, sessionToken string) error {
+	frame := &realtimev1.Frame{
+		Body: &realtimev1.Frame_Hello{Hello: &realtimev1.ClientHello{SessionToken: sessionToken}},
+	}
+	data, err := proto.Marshal(frame)
+	if err != nil {
+		return fmt.Errorf("marshal hello: %w", err)
+	}
+	stream, err := wt.OpenUniStreamSync(ctx)
+	if err != nil {
+		return fmt.Errorf("open hello stream: %w", err)
+	}
+	if _, err := stream.Write(data); err != nil {
+		return fmt.Errorf("write hello: %w", err)
+	}
+	return stream.Close()
 }
 
 // Frames returns the channel of inbound frames.

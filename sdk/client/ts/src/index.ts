@@ -23,6 +23,7 @@ import {
   FrameSchema,
   type Frame,
   PlayerInputSchema,
+  ClientHelloSchema,
 } from "./gen/vfx/v1/realtime/frame_pb.js";
 
 export type { Player, Frame };
@@ -147,8 +148,15 @@ export class Match {
     const wt = new WebTransport(url, init);
     await wt.ready;
 
-    // The room authorises the connection from the session token sent in the CONNECT request.
-    // The browser WebTransport API cannot set arbitrary headers, so the token also travels in the URL path's match id and is validated server-side; a future iteration adds a post-connect auth frame for browsers.
+    // Authenticate with a ClientHello before anything else: the browser WebTransport API cannot set the Authorization header on the CONNECT, so the token rides in the first reliable frame.
+    const hello = create(FrameSchema, {
+      body: { case: "hello", value: create(ClientHelloSchema, { sessionToken: this.sessionToken }) },
+    });
+    const stream = await wt.createUnidirectionalStream();
+    const writer = stream.getWriter();
+    await writer.write(toBinary(FrameSchema, hello));
+    await writer.close();
+
     return new Session(wt, this.sessionToken);
   }
 }

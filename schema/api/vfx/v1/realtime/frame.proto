@@ -12,6 +12,7 @@ message Frame {
 
   oneof body {
     // Client → Server
+    ClientHello hello = 12;
     PlayerInput input = 10;
     Heartbeat heartbeat = 11;
 
@@ -21,6 +22,13 @@ message Frame {
     SystemEvent event = 22;
     ErrorMessage error = 23;
   }
+}
+
+// ClientHello は接続直後にクライアントが最初に送る認証フレーム。
+// ブラウザの WebTransport API は CONNECT リクエストにヘッダを付けられないため、session_token は Authorization ヘッダではなくこのフレームで運ぶ。
+// room はこれを reliable stream で受け取り、検証してからプレイヤーを参加させる。
+message ClientHello {
+  string session_token = 1;
 }
 
 // PlayerInput はプレイヤーの操作を表す。

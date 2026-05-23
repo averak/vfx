@@ -1,7 +1,7 @@
 // Package room is the room daemon's HTTP entry point.
 //
 // The daemon serves a single path, /room/{match_id}, over WebTransport.
-// A client connects with the session token the gateway issued in the Authorization header, and after the handshake datagrams flow into the match orchestrator for that match id.
+// After the upgrade the client proves itself with a ClientHello frame carrying the gateway-issued session token; datagrams then flow into the match orchestrator for that match id.
 package room
 
 import (
@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -21,7 +22,9 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/protobuf/proto"
 
+	realtimev1 "github.com/averak/vfx/gen/go/vfx/v1/realtime"
 	"github.com/averak/vfx/internal/infra/config"
 	"github.com/averak/vfx/internal/infra/token"
 	usecaseroom "github.com/averak/vfx/internal/usecase/room"
@@ -118,19 +121,6 @@ func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims, err := s.authenticate(r)
-	if err != nil {
-		s.logger.Warn("room rejected unauthenticated connection", "err", err)
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-	if claims.MatchID != matchIDStr {
-		s.logger.Warn("room rejected mismatched session token",
-			"url_match", matchIDStr, "token_match", claims.MatchID)
-		http.Error(w, "match id mismatch", http.StatusForbidden)
-		return
-	}
-
 	session, err := s.wt.Upgrade(w, r)
 	if err != nil {
 		s.logger.Error("room upgrade failed", "err", err)
@@ -138,6 +128,18 @@ func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
 	}
 	//nolint:errcheck // Best-effort cleanup; client already disconnected.
 	defer func() { _ = session.CloseWithError(0, "session ended") }()
+
+	// A browser cannot set the Authorization header on a WebTransport CONNECT, so the client authenticates after the upgrade with a ClientHello frame instead.
+	claims, err := s.authenticate(session)
+	if err != nil {
+		s.logger.Warn("room rejected unauthenticated connection", "err", err)
+		return
+	}
+	if claims.MatchID != matchIDStr {
+		s.logger.Warn("room rejected mismatched session token",
+			"url_match", matchIDStr, "token_match", claims.MatchID)
+		return
+	}
 
 	s.logger.Info("room session opened",
 		"match_id", matchID,
@@ -189,11 +191,27 @@ func (s *Server) handleRoom(w http.ResponseWriter, r *http.Request) {
 	playerIO.readLoop(sessionCtx, match)
 }
 
-func (s *Server) authenticate(r *http.Request) (*token.SessionClaims, error) {
-	raw := r.Header.Get("Authorization")
-	rawToken, ok := strings.CutPrefix(raw, "Bearer ")
-	if !ok || rawToken == "" {
-		return nil, errors.New("missing bearer token")
+// authenticate reads the client's ClientHello from the first reliable stream and verifies the session token it carries.
+// HandshakeTimeout bounds the wait so an idle or hostile connection cannot hold a slot open.
+func (s *Server) authenticate(session *webtransport.Session) (*token.SessionClaims, error) {
+	ctx, cancel := context.WithTimeout(session.Context(), s.cfg.HandshakeTimeout)
+	defer cancel()
+
+	stream, err := session.AcceptUniStream(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("accept hello stream: %w", err)
 	}
-	return s.signer.VerifySession(rawToken)
+	raw, err := io.ReadAll(stream)
+	if err != nil {
+		return nil, fmt.Errorf("read hello: %w", err)
+	}
+	var frame realtimev1.Frame
+	if err := proto.Unmarshal(raw, &frame); err != nil {
+		return nil, fmt.Errorf("unmarshal hello: %w", err)
+	}
+	hello := frame.GetHello()
+	if hello == nil {
+		return nil, errors.New("first frame was not a ClientHello")
+	}
+	return s.signer.VerifySession(hello.GetSessionToken())
 }
