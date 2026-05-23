@@ -25,6 +25,7 @@ import (
 	authv1 "github.com/averak/vfx/gen/go/vfx/v1/auth"
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/chat/chatconnect"
+	"github.com/averak/vfx/gen/go/vfx/v1/group/groupconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/leaderboard/leaderboardconnect"
 	matchv1 "github.com/averak/vfx/gen/go/vfx/v1/match"
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
@@ -45,6 +46,7 @@ type Client struct {
 	leaderboard  leaderboardconnect.LeaderboardServiceClient
 	social       socialconnect.SocialServiceClient
 	chat         chatconnect.ChatServiceClient
+	group        groupconnect.GroupServiceClient
 
 	accessToken  string
 	refreshToken string
@@ -72,6 +74,7 @@ func New(gatewayURL string, opts ...Option) *Client {
 	c.leaderboard = leaderboardconnect.NewLeaderboardServiceClient(c.httpClient, gatewayURL)
 	c.social = socialconnect.NewSocialServiceClient(c.httpClient, gatewayURL)
 	c.chat = chatconnect.NewChatServiceClient(c.httpClient, gatewayURL)
+	c.group = groupconnect.NewGroupServiceClient(c.httpClient, gatewayURL)
 	return c
 }
 

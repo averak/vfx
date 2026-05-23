@@ -39,10 +39,11 @@ import {
   type BlockedPlayer,
 } from "./gen/vfx/v1/social/social_service_pb.js";
 import { ChatService, type Message as ChatMessage } from "./gen/vfx/v1/chat/chat_service_pb.js";
+import { GroupService, type Group, type Member } from "./gen/vfx/v1/group/group_service_pb.js";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 
 export { Provider, RequestStatus };
-export type { Player, Frame, FileMetadata, RankEntry, Friend, FriendRequest, BlockedPlayer, ChatMessage };
+export type { Player, Frame, FileMetadata, RankEntry, Friend, FriendRequest, BlockedPlayer, ChatMessage, Group, Member };
 
 /** Options for constructing a VfxClient. */
 export interface VfxClientOptions {
@@ -59,6 +60,7 @@ export class VfxClient {
   private readonly leaderboard: Client<typeof LeaderboardService>;
   private readonly social: Client<typeof SocialService>;
   private readonly chat: Client<typeof ChatService>;
+  private readonly group: Client<typeof GroupService>;
   // The same fetch is used for the direct object-store transfers (PUT/GET on signed URLs), which do not go through the Connect transport.
   private readonly fetchImpl: typeof globalThis.fetch;
   private accessToken = "";
@@ -76,6 +78,7 @@ export class VfxClient {
     this.leaderboard = createClient(LeaderboardService, transport);
     this.social = createClient(SocialService, transport);
     this.chat = createClient(ChatService, transport);
+    this.group = createClient(GroupService, transport);
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
@@ -315,6 +318,35 @@ export class VfxClient {
       { headers: this.authHeaders() },
     );
     return resp.messages;
+  }
+
+  /** Create a group with the caller as owner and first member. */
+  async createGroup(name: string): Promise<Group | undefined> {
+    const resp = await this.group.createGroup({ name }, { headers: this.authHeaders() });
+    return resp.group;
+  }
+
+  /** Disband a group the caller owns. */
+  async deleteGroup(groupId: string): Promise<void> {
+    await this.group.deleteGroup({ groupId }, { headers: this.authHeaders() });
+  }
+
+  async joinGroup(groupId: string): Promise<void> {
+    await this.group.joinGroup({ groupId }, { headers: this.authHeaders() });
+  }
+
+  async leaveGroup(groupId: string): Promise<void> {
+    await this.group.leaveGroup({ groupId }, { headers: this.authHeaders() });
+  }
+
+  async listMyGroups(): Promise<Group[]> {
+    const resp = await this.group.listMyGroups({}, { headers: this.authHeaders() });
+    return resp.groups;
+  }
+
+  async listGroupMembers(groupId: string): Promise<Member[]> {
+    const resp = await this.group.listMembers({ groupId }, { headers: this.authHeaders() });
+    return resp.members;
   }
 
   private authHeaders(): HeadersInit {

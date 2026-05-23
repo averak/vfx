@@ -29,12 +29,14 @@ import (
 	"github.com/averak/vfx/internal/infra/valkey"
 	gatewayauthhandler "github.com/averak/vfx/internal/presentation/gateway/auth"
 	gatewaychathandler "github.com/averak/vfx/internal/presentation/gateway/chat"
+	gatewaygrouphandler "github.com/averak/vfx/internal/presentation/gateway/group"
 	gatewayleaderboardhandler "github.com/averak/vfx/internal/presentation/gateway/leaderboard"
 	gatewaymatchhandler "github.com/averak/vfx/internal/presentation/gateway/match"
 	gatewaysocialhandler "github.com/averak/vfx/internal/presentation/gateway/social"
 	gatewaystoragehandler "github.com/averak/vfx/internal/presentation/gateway/storage"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
 	usecasechat "github.com/averak/vfx/internal/usecase/chat"
+	usecasegroup "github.com/averak/vfx/internal/usecase/group"
 	usecaseleaderboard "github.com/averak/vfx/internal/usecase/leaderboard"
 	usecasematch "github.com/averak/vfx/internal/usecase/match"
 	usecasesocial "github.com/averak/vfx/internal/usecase/social"
@@ -79,6 +81,9 @@ type Gateway struct {
 
 	ChatUsecase *usecasechat.Usecase
 	ChatHandler *gatewaychathandler.Handler
+
+	GroupUsecase *usecasegroup.Usecase
+	GroupHandler *gatewaygrouphandler.Handler
 }
 
 // matchmakerMetrics adapts the Prometheus registry to the usecasematch.Metrics interface, keeping the usecase layer free of a concrete metrics dependency.
@@ -243,6 +248,9 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	})
 	chatHandler := gatewaychathandler.New(chatUC)
 
+	groupUC := usecasegroup.New(session, session, repository.NewGroup())
+	groupHandler := gatewaygrouphandler.New(groupUC)
+
 	cleanup := func() {
 		blobCleanup()
 		valkeyClient.Close()
@@ -280,6 +288,9 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 
 		ChatUsecase: chatUC,
 		ChatHandler: chatHandler,
+
+		GroupUsecase: groupUC,
+		GroupHandler: groupHandler,
 	}, cleanup, nil
 }
 

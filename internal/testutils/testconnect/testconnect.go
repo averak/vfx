@@ -15,6 +15,7 @@ import (
 
 	"github.com/averak/vfx/gen/go/vfx/v1/auth/authconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/chat/chatconnect"
+	"github.com/averak/vfx/gen/go/vfx/v1/group/groupconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/leaderboard/leaderboardconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
 	"github.com/averak/vfx/gen/go/vfx/v1/social/socialconnect"
@@ -29,6 +30,7 @@ import (
 	"github.com/averak/vfx/internal/infra/token"
 	gatewayauthhandler "github.com/averak/vfx/internal/presentation/gateway/auth"
 	gatewaychathandler "github.com/averak/vfx/internal/presentation/gateway/chat"
+	gatewaygrouphandler "github.com/averak/vfx/internal/presentation/gateway/group"
 	gatewayleaderboardhandler "github.com/averak/vfx/internal/presentation/gateway/leaderboard"
 	gatewaymatchhandler "github.com/averak/vfx/internal/presentation/gateway/match"
 	gatewaysocialhandler "github.com/averak/vfx/internal/presentation/gateway/social"
@@ -38,6 +40,7 @@ import (
 	"github.com/averak/vfx/internal/testutils/testdb"
 	usecaseauth "github.com/averak/vfx/internal/usecase/auth"
 	usecasechat "github.com/averak/vfx/internal/usecase/chat"
+	usecasegroup "github.com/averak/vfx/internal/usecase/group"
 	usecaseleaderboard "github.com/averak/vfx/internal/usecase/leaderboard"
 	usecasematch "github.com/averak/vfx/internal/usecase/match"
 	usecasesocial "github.com/averak/vfx/internal/usecase/social"
@@ -66,6 +69,7 @@ type Server struct {
 	Leaderboard leaderboardconnect.LeaderboardServiceClient
 	Social      socialconnect.SocialServiceClient
 	Chat        chatconnect.ChatServiceClient
+	Group       groupconnect.GroupServiceClient
 
 	// Blob is the in-memory object store behind the storage services; tests Put an object to simulate a finished upload before CommitFile.
 	Blob *fakeblob.Store
@@ -140,6 +144,10 @@ func New(t *testing.T) *Server {
 	chatPath, chatHandler := chatconnect.NewChatServiceHandler(gatewaychathandler.New(chatUC), interceptors)
 	mux.Handle(chatPath, chatHandler)
 
+	groupUC := usecasegroup.New(session, session, repository.NewGroup())
+	groupPath, groupHandler := groupconnect.NewGroupServiceHandler(gatewaygrouphandler.New(groupUC), interceptors)
+	mux.Handle(groupPath, groupHandler)
+
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
@@ -151,6 +159,7 @@ func New(t *testing.T) *Server {
 		Leaderboard: leaderboardconnect.NewLeaderboardServiceClient(srv.Client(), srv.URL),
 		Social:      socialconnect.NewSocialServiceClient(srv.Client(), srv.URL),
 		Chat:        chatconnect.NewChatServiceClient(srv.Client(), srv.URL),
+		Group:       groupconnect.NewGroupServiceClient(srv.Client(), srv.URL),
 		Blob:        blob,
 		session:     session,
 		httpServer:  srv,

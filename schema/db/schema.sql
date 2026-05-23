@@ -243,3 +243,29 @@ CREATE TABLE player_blocks (
 -- Covers the reverse-direction check (has the other player blocked me?).
 CREATE INDEX idx_player_blocks_blocked
   ON player_blocks (blocked_id);
+
+-- ============================================================================
+-- groups / group_members
+--   A player-owned group (clan/guild) and its membership. Deleting a group cascades its memberships.
+-- ============================================================================
+
+CREATE TABLE groups (
+  id          UUID         PRIMARY KEY,
+  name        TEXT         NOT NULL,
+  owner_id    UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_groups_owner
+  ON groups (owner_id);
+
+CREATE TABLE group_members (
+  id         UUID         PRIMARY KEY,
+  group_id   UUID         NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  player_id  UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  joined_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  UNIQUE (group_id, player_id)
+);
+
+CREATE INDEX idx_group_members_player
+  ON group_members (player_id);
