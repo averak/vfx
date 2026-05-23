@@ -6,6 +6,7 @@ import (
 	agonesv1 "agones.dev/agones/pkg/apis/agones/v1"
 	allocationv1 "agones.dev/agones/pkg/apis/allocation/v1"
 	"agones.dev/agones/pkg/client/clientset/versioned/fake"
+	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stesting "k8s.io/client-go/testing"
 )
@@ -39,7 +40,7 @@ func TestAgones_AllocateReturnsEndpoint(t *testing.T) {
 	if alloc.Endpoint != "10.0.0.5:7654" {
 		t.Errorf("endpoint = %q, want 10.0.0.5:7654", alloc.Endpoint)
 	}
-	if alloc.MatchID == "" {
+	if alloc.MatchID == uuid.Nil {
 		t.Error("empty match id")
 	}
 }

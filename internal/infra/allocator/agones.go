@@ -78,7 +78,7 @@ func (a *Agones) Allocate(ctx context.Context, gameMode string, _ int) (*match.R
 	}
 
 	return &match.RoomAllocation{
-		MatchID:  uuid.NewString(),
+		MatchID:  uuid.New(),
 		Endpoint: fmt.Sprintf("%s:%d", result.Status.Address, result.Status.Ports[0].Port),
 	}, nil
 }

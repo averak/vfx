@@ -28,7 +28,7 @@ func NewStub(endpoint string) *Stub {
 
 func (s *Stub) Allocate(_ context.Context, _ string, _ int) (*match.RoomAllocation, error) {
 	return &match.RoomAllocation{
-		MatchID:  uuid.NewString(),
+		MatchID:  uuid.New(),
 		Endpoint: s.endpoint,
 	}, nil
 }

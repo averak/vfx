@@ -207,7 +207,7 @@ func (m *Matchmaker) pair(ctx context.Context, mode string, tickets []*match.Tic
 
 	paired := 0
 	for _, t := range tickets {
-		sessionToken, signErr := m.signer.SignSession(t.PlayerID, allocation.MatchID, matchPlayers, now, m.sessionTokenTTL)
+		sessionToken, signErr := m.signer.SignSession(t.PlayerID, allocation.MatchID.String(), matchPlayers, now, m.sessionTokenTTL)
 		if signErr != nil {
 			// Tell the player it failed; do not leak which signing step broke.
 			//nolint:errcheck // Best-effort notification; the match is already failing for this player.
@@ -219,7 +219,7 @@ func (m *Matchmaker) pair(ctx context.Context, mode string, tickets []*match.Tic
 		}
 
 		assignment := &match.Assignment{
-			MatchID:      uuidMustParse(allocation.MatchID),
+			MatchID:      allocation.MatchID,
 			Endpoint:     allocation.Endpoint,
 			SessionToken: sessionToken,
 			ExpiresAt:    expiresAt,
@@ -251,16 +251,4 @@ func (m *Matchmaker) pair(ctx context.Context, mode string, tickets []*match.Tic
 		m.metrics.MatchAllocated()
 	}
 	return nil
-}
-
-// uuidMustParse is local to the matchmaker because the allocation
-// carries the match id as a string for convenience; we always want a
-// uuid.UUID once we hand it on to the rest of the system.
-func uuidMustParse(s string) uuid.UUID {
-	id, err := uuid.Parse(s)
-	if err != nil {
-		// allocator must produce valid UUIDs; a bad value is a bug.
-		panic("matchmaker: allocator returned invalid match id: " + s)
-	}
-	return id
 }
