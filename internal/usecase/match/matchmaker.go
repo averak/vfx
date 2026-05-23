@@ -16,10 +16,11 @@ import (
 // Matchmaker is the long-running worker that pairs queued tickets and
 // reserves rooms via the Allocator.
 //
-// Phase 1 uses the simplest possible policy: as soon as two tickets in
-// the same game_mode are waiting, pair them up. Rating/region/party
-// hints on Ticket are recorded but not yet used for filtering or tier
-// relaxation; that lands when the rock-paper-scissors example demands it.
+// It pairs tickets by game mode using a rating window that widens with
+// wait time and region constraints that relax after a deadline (see
+// selectBatch). The queue's atomic Claim keeps pairing safe when the
+// matchmaker runs on more than one replica.
+
 // Metrics is the subset of telemetry the matchmaker emits. It is an
 // interface so the usecase layer stays free of the concrete Prometheus
 // registry; bootstrap supplies an adapter, tests use the no-op default.

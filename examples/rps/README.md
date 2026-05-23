@@ -1,6 +1,6 @@
 # Rock-paper-scissors
 
-The canonical Phase 1 sample game.
+The canonical sample game for vfx.
 
 ## What this demonstrates
 

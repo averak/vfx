@@ -98,7 +98,7 @@ WebTransport provides:
 - **Connection migration** via QUIC, which improves mobile experience.
 - **TLS by default**, removing an entire class of misconfiguration.
 
-A WebSocket fallback path is anticipated for environments without HTTP/3 support, but is out of scope for Phase 1.
+A WebSocket fallback path for environments without HTTP/3 support is not currently implemented.
 
 ### Message envelope
 

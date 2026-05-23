@@ -29,8 +29,8 @@ type Room struct {
 	TickRateHz int `env:"VFX_ROOM_TICK_RATE_HZ" envDefault:"30"`
 
 	// PluginPath is the filesystem path to the WASM plugin loaded at
-	// startup. Phase 1 ships a single plugin per process; multi-plugin
-	// support lands when Agones GameServer templating arrives.
+	// startup. A daemon hosts a single plugin per process; running
+	// multiple game modes uses one Fleet (and image) per mode.
 	PluginPath string `env:"VFX_ROOM_PLUGIN_PATH"`
 
 	// HandshakeTimeout caps how long the daemon will wait for the

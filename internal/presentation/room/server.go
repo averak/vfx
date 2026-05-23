@@ -81,8 +81,8 @@ func NewServer(cfg *config.Room, signer *token.Signer, manager *usecaseroom.Mana
 	s.wt = &webtransport.Server{
 		H3: h3,
 		CheckOrigin: func(_ *http.Request) bool {
-			// Phase 1: accept any origin. Production deployments add a
-			// list once the client domain is known.
+			// Accept any origin; a deployment restricts this to the known
+			// client domains once they are configured.
 			return true
 		},
 	}

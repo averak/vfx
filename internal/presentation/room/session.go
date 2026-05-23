@@ -97,8 +97,8 @@ func (s *playerSession) readLoop(ctx context.Context, match *usecaseroom.Match) 
 		}
 		input := frame.GetInput()
 		if input == nil {
-			// Phase 1 only consumes PlayerInput from clients; other
-			// kinds (heartbeats) are accepted silently.
+			// Only PlayerInput is consumed from clients; other kinds
+			// (heartbeats) are accepted silently.
 			continue
 		}
 		match.SubmitInput(s.playerID, input.GetTick(), input.GetPayload())

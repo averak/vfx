@@ -4,13 +4,12 @@
 // The interface mirrors the proto ABI (Init, OnTick, OnGameEnd) but
 // stays in Go terms so two backends can satisfy it:
 //
-//   - Phase 1: Go-native plugins linked into a custom vfx-room binary.
-//     Faster to author, easier to debug, defers the WASM toolchain
-//     until a plugin author actually needs sandboxing.
-//   - Phase 2: WASM modules loaded by wazero. Same Plugin interface, a
-//     different Factory implementation. Plugin authors switch by
-//     recompiling their code with TinyGo and pointing the room at the
-//     .wasm file.
+//   - Go-native plugins linked into a custom vfx-room binary. Faster to
+//     author and easier to debug, with no WASM toolchain needed.
+//   - WASM modules loaded by wazero. Same Plugin interface, a different
+//     Factory implementation. Authors switch by recompiling their code
+//     with TinyGo and pointing the room at the .wasm file for sandboxed
+//     execution.
 package plugin
 
 import (

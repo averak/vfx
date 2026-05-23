@@ -15,9 +15,9 @@ type RoomAllocation struct {
 
 // Allocator reserves a room for an upcoming match.
 //
-// Phase 1 ships a deterministic stub that always points clients at the
-// same local endpoint. Production deployments swap in an Agones-backed
-// implementation that calls the Allocator API.
+// A deterministic stub implementation always points clients at the same
+// local endpoint, for local and compose runs; the Agones-backed
+// implementation reserves a GameServer per match in a cluster.
 type Allocator interface {
 	Allocate(ctx context.Context, gameMode string, playerCount int) (*RoomAllocation, error)
 }

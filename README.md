@@ -4,7 +4,7 @@ A lightweight, WebTransport-native, and WASM-driven game server engine.
 
 ## Status
 
-Early development. The Phase 1 MVP runs end-to-end locally — see
+Early development. The engine runs end-to-end locally — see
 [`examples/rps`](./examples/rps) for a complete rock-paper-scissors
 match played between two CLI clients against a live gateway and room
 daemon.

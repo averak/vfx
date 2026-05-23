@@ -7,9 +7,9 @@ import (
 )
 
 // Provider names the authentication provider that issued the
-// provider_uid.  Anonymous is the only one supported in Phase 1; OAuth
-// providers (google, apple, github, ...) will be added later as
-// additional constants.
+// provider_uid. Anonymous is the only one currently supported; OAuth
+// providers (google, apple, github, ...) would be added as additional
+// constants.
 type Provider string
 
 // Supported provider identifiers. Add new constants here when wiring

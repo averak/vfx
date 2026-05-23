@@ -6,9 +6,8 @@ import "google/protobuf/timestamp.proto";
 
 // AuthService は認証関連の RPC を提供する。
 //
-// Phase 1 では匿名 (ゲスト) 認証のみをサポートする。OAuth やメール認証は
-// Phase 2 で追加予定で、その際は同じ Player を維持したまま credential を
-// 紐付けられるようにする (LinkCredential RPC を追加予定)。
+// 現状は匿名 (ゲスト) 認証のみをサポートする。OAuth やメール認証を追加する
+// 場合は、同じ Player を維持したまま credential を紐付けられるようにする。
 service AuthService {
   // Login は credential を検証して access_token と refresh_token を発行する。
   rpc Login(LoginRequest) returns (LoginResponse);
@@ -24,7 +23,7 @@ service AuthService {
 }
 
 message LoginRequest {
-  // 現状は anonymous のみ。Phase 2 で OAuth / Email を追加する。
+  // 現状は anonymous のみ対応。
   oneof credential {
     AnonymousCredential anonymous = 1;
   }

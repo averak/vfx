@@ -31,7 +31,7 @@ func New(uc *usecaseauth.Usecase) *Handler {
 	return &Handler{uc: uc}
 }
 
-// Login dispatches by credential kind. Phase 1 only supports anonymous.
+// Login dispatches by credential kind. Only anonymous is supported.
 func (h *Handler) Login(ctx context.Context, req *connect.Request[authv1.LoginRequest]) (*connect.Response[authv1.LoginResponse], error) {
 	anon := req.Msg.GetAnonymous()
 	if anon == nil {

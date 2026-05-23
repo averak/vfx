@@ -1,11 +1,10 @@
 // Package matchqueue holds queue implementations of the match.Queue
 // contract.
 //
-// inmem is the Phase 1 backend: a single-process in-memory queue with
-// fan-out pub/sub per ticket. It is correct for a single-gateway
-// deployment and good enough to drive the rock-paper-scissors example.
-// A Valkey-backed implementation will replace it when matchmaking has
-// to span gateway replicas.
+// InMem is the single-process backend: an in-memory queue with fan-out
+// pub/sub per ticket. It is correct for a single-gateway deployment; the
+// Valkey-backed implementation is used when matchmaking has to span
+// gateway replicas.
 package matchqueue
 
 import (
@@ -229,8 +228,8 @@ func isTerminal(e match.Event) bool {
 	return false
 }
 
-// sortByCreatedAt orders tickets oldest-first. Stable sort is fine for
-// the queue sizes we expect at Phase 1.
+// sortByCreatedAt orders tickets oldest-first. An insertion sort is fine
+// for the small queue sizes a single gateway holds in memory.
 func sortByCreatedAt(ts []*match.Ticket) {
 	for i := 1; i < len(ts); i++ {
 		for j := i; j > 0 && ts[j-1].CreatedAt.After(ts[j].CreatedAt); j-- {

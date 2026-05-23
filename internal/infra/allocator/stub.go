@@ -1,10 +1,9 @@
 // Package allocator implements [match.Allocator].
 //
-// Stub is the Phase 1 implementation: it does not talk to a real
-// orchestrator. Every Allocate returns the same hardcoded endpoint and
-// a fresh match id, which is enough to demonstrate the end-to-end
-// gateway flow before the room daemon and Agones integration are in
-// place.
+// Stub does not talk to a real orchestrator: every Allocate returns the
+// same configured endpoint and a fresh match id. It is used for local
+// and compose runs where a single room daemon serves every match; the
+// Agones allocator is used in a cluster.
 package allocator
 
 import (
