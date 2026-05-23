@@ -1,10 +1,7 @@
-// Package testdb provides a PostgreSQL pool for tests that exercise the
-// repository and usecase layers against a real database.
+// Package testdb provides a PostgreSQL pool for tests that exercise the repository and usecase layers against a real database.
 //
-// Tests call Pool(t); if DATABASE_URL is unset the test is skipped, so
-// `go test -short` or a machine without a database still passes the
-// pure-logic suites. CI sets DATABASE_URL to the compose-managed
-// PostgreSQL, so the integration tests run there.
+// Tests call Pool(t); if DATABASE_URL is unset the test is skipped, so a machine without a database still passes the pure-logic suites.
+// CI sets DATABASE_URL to the compose-managed PostgreSQL, so the integration tests run there.
 package testdb
 
 import (
@@ -24,9 +21,8 @@ var tables = []string{
 	"players",
 }
 
-// Pool returns a connection pool to the test database, or skips the
-// test when DATABASE_URL is not configured. The pool is closed via
-// t.Cleanup.
+// Pool returns a connection pool to the test database, or skips the test when DATABASE_URL is not configured.
+// The pool is closed via t.Cleanup.
 func Pool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
@@ -49,8 +45,8 @@ func Pool(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
-// Truncate empties every vfx table so each test starts from a clean
-// slate. It is registered to run again on cleanup.
+// Truncate empties every vfx table so each test starts from a clean slate.
+// It is registered to run again on cleanup.
 func Truncate(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	truncate := func() {

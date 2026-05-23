@@ -1,12 +1,7 @@
-// Package testconnect spins up an in-process Connect-RPC server wired
-// with the real gateway handlers and interceptors, for component tests
-// that exercise the HTTP/RPC boundary.
+// Package testconnect spins up an in-process Connect-RPC server wired with the real gateway handlers and interceptors, for component tests that exercise the HTTP/RPC boundary.
 //
-// It deliberately wires the handlers by hand rather than calling
-// bootstrap.NewGateway, because bootstrap also dials Valkey and reads
-// process config — concerns a handler test should not depend on. The
-// connect protocol streams over HTTP/1.1, so a plain httptest server is
-// enough for both unary and server-streaming RPCs.
+// It deliberately wires the handlers by hand rather than calling bootstrap.NewGateway, because bootstrap also dials Valkey and reads process config, which a handler test should not depend on.
+// The connect protocol streams over HTTP/1.1, so a plain httptest server is enough for both unary and server-streaming RPCs.
 package testconnect
 
 import (
@@ -42,8 +37,7 @@ type Server struct {
 	httpServer *httptest.Server
 }
 
-// New wires the gateway handlers against a clean test database and
-// starts an httptest server. The server is torn down via t.Cleanup.
+// New wires the gateway handlers against a clean test database and starts an httptest server, torn down via t.Cleanup.
 // Tests that do not set DATABASE_URL are skipped (see testdb.Pool).
 func New(t *testing.T) *Server {
 	t.Helper()

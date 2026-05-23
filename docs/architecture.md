@@ -78,6 +78,25 @@ flowchart TB
 - Wraps `atlas` to apply database migrations.
 - Designed to run as a Kubernetes Job during deploy.
 
+## Code Architecture
+
+Within each binary the Go packages follow a Clean Architecture layering. The dependency rule — code may depend only on layers inward of it — is enforced mechanically by `depguard` in `golangci-lint`, not left to convention: the domain may not import infrastructure, and the usecase layer may not import infra, presentation, or any persistence technology.
+
+- **domain** — entities and the rules intrinsic to them (enterprise business rules). `domain/match` owns matchmaking eligibility and tier relaxation (`Ticket.CompatibleWith`, the `Matcher` service); `domain/player` owns the `Player` and its invariants, such as the nickname rule. The domain imports no infrastructure and no persistence type — repository interfaces here take only a `context.Context`.
+- **usecase** — application business rules: orchestration that coordinates domain objects but makes no enterprise decisions of its own. Each usecase declares the narrow ports it needs (`Transactor`, `TokenIssuer`, `SessionSigner`), so it depends on capabilities rather than concrete infrastructure.
+- **infra** — adapters that implement those ports: PostgreSQL repositories, the Valkey-backed queue and stores, the JWT signer, the Agones allocator, the wazero plugin host.
+- **presentation** — the Connect handlers and the WebTransport server, translating between the wire protocol and the usecases.
+- **bootstrap** — manual dependency wiring per subcommand; no DI framework.
+- **stdx** — small, dependency-free utilities (such as the context clock) usable from any layer.
+
+### Enterprise vs application rules
+
+Each rule is placed by asking whether it is intrinsic to an entity or merely how the application coordinates a flow. Pairing eligibility is intrinsic to a ticket, so it lives in `domain/match`; "claim a group, allocate a room, then notify" is coordination, so it lives in the matchmaker usecase. A valid nickname is part of what a `Player` is, so `player.New` and `SetNickname` enforce it; deciding *when* to rename a player is the auth usecase's concern.
+
+### Transactions
+
+The transaction boundary belongs to the usecase, not the repositories. A usecase calls its `Transactor` port (`RW` or `RO`); the infra implementation opens a pgx transaction and places it on the `context.Context` the work receives, and repositories retrieve it with `db.Tx(ctx)`. Because the transaction rides on the context rather than a method parameter, a single usecase method can open more than one transaction — for example splitting a slim read-write transaction from a separate read-only one — without changing any repository signature.
+
 ## Protocols
 
 ### Control plane: Connect RPC over HTTP/2
@@ -293,7 +312,7 @@ In a cloud cluster the GameServer's address is the node's external IP and the po
 Matchmaking is implemented inside the gateway as a worker goroutine. It is intentionally a small piece of code rather than a separate dependency.
 
 - Tickets are stored in Valkey, scored by game mode, region, and rating.
-- The worker scans the queue at a fixed interval (100ms by default).
+- The worker scans the queue at a fixed interval (200ms by default).
 - Compatible tickets are grouped according to a `MatchingPolicy` that defines tier-based relaxation: after N seconds of waiting, the rating spread and region constraints loosen.
 - On success the worker calls the Agones Allocator, signs a short-lived session token, and notifies the players through their `WatchTicket` server stream.
 
@@ -301,23 +320,23 @@ This design keeps matchmaking visible and tunable in regular Go code. A pluggabl
 
 ## Testing Strategy
 
-Three layers, with different speed and infrastructure requirements.
+Tests are written in standard Go style — table-driven cases on the standard `testing` package, with no assertion or BDD framework. Three techniques are applied deliberately:
 
-| Layer | Scope | Speed | Infrastructure |
-| --- | --- | --- | --- |
-| Unit | Pure functions, domain types | ~1ms per test | `go test` |
-| Component | Connect RPC handlers, repositories | ~100ms per test | `testcontainers` for PostgreSQL and Valkey |
-| End-to-end | gateway + room + Agones | seconds per test | kind cluster with Agones installed |
+- **Boundary-value and equivalence-partition tests** for rules with edges: the matcher's rating window and region-relax thresholds, the nickname length limit, refresh-token expiry at exactly its deadline.
+- **Property-based tests** (`pgregory.net/rapid`) for invariants that must hold across all inputs: the rock-paper-scissors rule's algebra, token sign/verify round trips, the matcher's group shape, and the all-or-nothing contract of the queue's atomic claim.
+- **Race detection** — the suite runs under `go test -race`.
 
-Tests are written in standard Go style: table-driven cases with `testing` and `testify`. No BDD framework is required.
+| Layer | Scope | Infrastructure |
+| --- | --- | --- |
+| Unit | Pure functions, domain rules, in-memory adapters | none (`go test`) |
+| Component | Connect RPC handlers, PostgreSQL repositories | a database via `DATABASE_URL`; skipped when unset |
+| Integration | Valkey queue and leader lock, Agones SDK lifecycle | Valkey via `VALKEY_URL`, or a fake Agones SDK; skipped when unset |
+| End-to-end | gateway + room over the real protocols | compose (single room) and a kind cluster with Agones |
 
 Shared test utilities live under `internal/testutils/`:
 
-- `testconnect` — boots an in-process Connect RPC server with the production wiring.
-- `testwt` — boots a WebTransport server for room handler tests.
-- `testagones` — fake Agones SDK for unit tests; the real SDK is used in E2E.
-- `testwasm` — loads a WASM plugin in isolation for plugin-author testing.
-- `fixture` — declarative test data builders.
+- `testconnect` — boots an in-process Connect RPC server with the production handler wiring.
+- `testdb` — a PostgreSQL pool that truncates between tests and skips when `DATABASE_URL` is unset.
 - `faker` — deterministic IDs (`UUIDv5("name")`) for stable assertions.
 
 ## Observability
