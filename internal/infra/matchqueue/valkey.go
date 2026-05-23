@@ -32,9 +32,9 @@ func NewValkey(client valkeygo.Client) *Valkey {
 	return &Valkey{client: client, ttl: time.Hour}
 }
 
-func ticketKey(id uuid.UUID) string  { return "vfx:mq:ticket:" + id.String() }
-func eventKey(id uuid.UUID) string   { return "vfx:mq:event:" + id.String() }
-func channelKey(id uuid.UUID) string { return "vfx:mq:channel:" + id.String() }
+func ticketKey(id uuid.UUID) string { return "vfx:mq:ticket:" + id.String() }
+func eventKey(id uuid.UUID) string  { return "vfx:mq:event:" + id.String() }
+func streamKey(id uuid.UUID) string { return "vfx:mq:stream:" + id.String() }
 func pendingKey(gameMode string) string {
 	return "vfx:mq:pending:" + gameMode
 }
@@ -205,6 +205,9 @@ func (q *Valkey) Enqueue(ctx context.Context, t *match.Ticket) error {
 	if err := q.setEvent(ctx, t.ID, queued); err != nil {
 		return err
 	}
+	if err := q.xaddEvent(ctx, t.ID, queued); err != nil {
+		return err
+	}
 
 	score := float64(t.CreatedAt.UnixNano())
 	if err := q.client.Do(ctx, q.client.B().Zadd().Key(pendingKey(t.GameMode)).ScoreMember().ScoreMember(score, t.ID.String()).Build()).Error(); err != nil {
@@ -239,8 +242,9 @@ func (q *Valkey) Publish(ctx context.Context, ticketID uuid.UUID, event match.Ev
 	return q.publish(ctx, t, event)
 }
 
-// publish writes the snapshot, removes the ticket from the pending pool
-// on a terminal event, and fans the event out to live subscribers.
+// publish records the snapshot, removes the ticket from the pending pool
+// on a terminal event, and appends the event to the ticket's stream for
+// subscribers to read.
 func (q *Valkey) publish(ctx context.Context, t *match.Ticket, event match.Event) error {
 	if err := q.setEvent(ctx, t.ID, event); err != nil {
 		return err
@@ -250,14 +254,7 @@ func (q *Valkey) publish(ctx context.Context, t *match.Ticket, event match.Event
 			return fmt.Errorf("matchqueue: zrem pending: %w", err)
 		}
 	}
-	data, err := marshalEvent(event)
-	if err != nil {
-		return err
-	}
-	if err := q.client.Do(ctx, q.client.B().Publish().Channel(channelKey(t.ID)).Message(string(data)).Build()).Error(); err != nil {
-		return fmt.Errorf("matchqueue: publish: %w", err)
-	}
-	return nil
+	return q.xaddEvent(ctx, t.ID, event)
 }
 
 func (q *Valkey) Pending(ctx context.Context, gameMode string) ([]*match.Ticket, error) {
@@ -317,39 +314,45 @@ func (q *Valkey) Subscribe(ctx context.Context, ticketID uuid.UUID) (<-chan matc
 		return nil, err
 	}
 
-	ch := make(chan match.Event, 4)
-	latest, err := q.latestEvent(ctx, ticketID)
-	if err != nil {
-		return nil, err
-	}
-	if latest != nil {
-		ch <- latest
-		if isTerminalEvent(latest) {
-			close(ch)
-			return ch, nil
-		}
-	}
-
+	ch := make(chan match.Event, 8)
 	subCtx, cancel := context.WithCancel(ctx)
 	go func() {
 		defer close(ch)
 		defer cancel()
-		// Receive blocks on a dedicated connection until subCtx is done.
-		// A terminal event cancels subCtx, which unsubscribes and returns;
-		// the error it returns then is the expected context cancellation.
-		_ = q.client.Receive(subCtx, q.client.B().Subscribe().Channel(channelKey(ticketID)).Build(), func(msg valkeygo.PubSubMessage) { //nolint:errcheck // unsubscribe-on-cancel returns ctx.Err, which is expected.
-			ev, decErr := unmarshalEvent(msg.Message)
-			if decErr != nil {
+		// Read the ticket's stream from the very beginning ("0"), so the
+		// Queued event seeded at enqueue and everything published before
+		// this subscriber attached are delivered — no gap between a
+		// snapshot read and going live, unlike pub/sub. BLOCK lets the
+		// read wait for new events; a timeout returns nil and we re-issue.
+		lastID := "0"
+		for {
+			if subCtx.Err() != nil {
 				return
 			}
-			select {
-			case ch <- ev:
-			default:
+			streams, err := q.client.Do(subCtx,
+				q.client.B().Xread().Count(64).Block(1000).Streams().Key(streamKey(ticketID)).Id(lastID).Build()).AsXRead()
+			if err != nil {
+				if valkeygo.IsValkeyNil(err) {
+					continue // BLOCK timed out with no new events
+				}
+				return // ctx cancelled or a real error
 			}
-			if isTerminalEvent(ev) {
-				cancel()
+			for _, entry := range streams[streamKey(ticketID)] {
+				lastID = entry.ID
+				ev, decErr := unmarshalEvent(entry.FieldValues["event"])
+				if decErr != nil {
+					continue
+				}
+				select {
+				case ch <- ev:
+				case <-subCtx.Done():
+					return
+				}
+				if isTerminalEvent(ev) {
+					return
+				}
 			}
-		})
+		}
 	}()
 	return ch, nil
 }
@@ -363,6 +366,23 @@ func (q *Valkey) setEvent(ctx context.Context, ticketID uuid.UUID, event match.E
 	}
 	if err := q.client.Do(ctx, q.client.B().Set().Key(eventKey(ticketID)).Value(string(data)).ExSeconds(q.ttlSeconds()).Build()).Error(); err != nil {
 		return fmt.Errorf("matchqueue: set event: %w", err)
+	}
+	return nil
+}
+
+// xaddEvent appends an event to the ticket's stream and refreshes the
+// stream's TTL so it is reclaimed alongside the ticket.
+func (q *Valkey) xaddEvent(ctx context.Context, ticketID uuid.UUID, event match.Event) error {
+	data, err := marshalEvent(event)
+	if err != nil {
+		return err
+	}
+	key := streamKey(ticketID)
+	if err := q.client.Do(ctx, q.client.B().Xadd().Key(key).Id("*").FieldValue().FieldValue("event", string(data)).Build()).Error(); err != nil {
+		return fmt.Errorf("matchqueue: xadd: %w", err)
+	}
+	if err := q.client.Do(ctx, q.client.B().Expire().Key(key).Seconds(q.ttlSeconds()).Build()).Error(); err != nil {
+		return fmt.Errorf("matchqueue: stream expire: %w", err)
 	}
 	return nil
 }

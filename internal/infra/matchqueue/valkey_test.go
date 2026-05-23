@@ -165,14 +165,17 @@ func TestValkeyQueue_CancelPublishesFailed(t *testing.T) {
 	if len(pending) != 0 {
 		t.Errorf("pending = %d after cancel, want 0", len(pending))
 	}
-	// A late subscriber sees the terminal Failed snapshot and a closed channel.
+	// A late subscriber replays the stream history (Queued) and then the
+	// terminal Failed, after which the channel closes.
 	ch, err := q.Subscribe(t.Context(), ticket.ID)
 	if err != nil {
 		t.Fatalf("Subscribe: %v", err)
 	}
-	ev := recvEvent(t, ch)
-	if _, ok := ev.(domainmatch.EventFailed); !ok {
-		t.Errorf("event = %T, want Failed", ev)
+	var sawFailed bool
+	for !sawFailed {
+		if _, ok := recvEvent(t, ch).(domainmatch.EventFailed); ok {
+			sawFailed = true
+		}
 	}
 }
 
