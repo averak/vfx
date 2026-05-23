@@ -33,6 +33,7 @@ node_modules/
 .env.local
 *.local.yaml
 *.local.toml
+CLAUDE.local.md
 
 # Docker / Compose volumes (just in case)
 .volumes/

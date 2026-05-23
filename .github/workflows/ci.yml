@@ -128,6 +128,10 @@ jobs:
       - name: apply migrations
         run: mise run db-migrate
 
+      # quic-go needs large UDP buffers; the runner default is small enough to drop packets, which delays a lost CONNECTION_CLOSE in the room E2E test.
+      - name: raise UDP buffer sizes for quic-go
+        run: sudo sysctl -w net.core.rmem_max=7340032 net.core.wmem_max=7340032
+
       - name: go test
         run: go test -race -count=1 ./...
 

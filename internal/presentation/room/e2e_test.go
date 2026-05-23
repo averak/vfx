@@ -14,10 +14,7 @@ import (
 	vfxclient "github.com/averak/vfx/sdk/client/go"
 )
 
-// endAfterTicksFactory hosts a plugin that ends the match after a few ticks
-// on its own, so an E2E test can drive a full connect → play → game_ended
-// cycle deterministically without depending on unreliable datagram input
-// arriving server-side.
+// endAfterTicksFactory hosts a plugin that ends the match after a few ticks on its own, so an E2E test drives a full connect → play → game_ended cycle without depending on unreliable datagram input reaching the server.
 type endAfterTicksFactory struct{}
 
 func (endAfterTicksFactory) Name() string { return "testwt" }
@@ -60,10 +57,7 @@ func dial(ctx context.Context, t *testing.T, endpoint, sessionToken string) *vfx
 	}
 }
 
-// A valid session token authenticates over the ClientHello handshake, the
-// match runs its tick loop, and the game_ended SystemEvent is delivered to
-// the client over a reliable stream before the frame channel closes —
-// exercising the real WebTransport handshake and downstream data plane.
+// Exercises the real WebTransport handshake and downstream data plane: a valid token authenticates over the ClientHello, the match ticks, and the game_ended SystemEvent reaches the client over a reliable stream.
 func TestRoomE2E_ConnectPlayEnd(t *testing.T) {
 	rm := testwt.New(t, endAfterTicksFactory{})
 	matchID := uuid.New()
@@ -79,9 +73,7 @@ func TestRoomE2E_ConnectPlayEnd(t *testing.T) {
 	session := dial(ctx, t, rm.Endpoint, tok)
 	defer func() { _ = session.Close() }()
 
-	// The room keeps the session open after a match ends (the client drives
-	// the disconnect), so success is observing the game_ended event, not the
-	// channel closing.
+	// The room keeps the session open after a match ends (the client drives the disconnect), so success is observing the game_ended event, not the channel closing.
 	deadline := time.After(15 * time.Second)
 	for {
 		select {
@@ -98,8 +90,7 @@ func TestRoomE2E_ConnectPlayEnd(t *testing.T) {
 	}
 }
 
-// A token signed with the wrong secret fails the ClientHello check, so the
-// room closes the session without ever delivering a frame.
+// A token signed with the wrong secret fails the ClientHello check, so the room closes the session without ever delivering a frame.
 func TestRoomE2E_RejectsForeignToken(t *testing.T) {
 	rm := testwt.New(t, endAfterTicksFactory{})
 	matchID := uuid.New()
@@ -110,13 +101,15 @@ func TestRoomE2E_RejectsForeignToken(t *testing.T) {
 		t.Fatalf("SignSession: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 
 	session := dial(ctx, t, rm.Endpoint, tok)
 	defer func() { _ = session.Close() }()
 
-	deadline := time.After(10 * time.Second)
+	// The client observes the rejection as the frame channel closing.
+	// A clean network delivers the CONNECTION_CLOSE at once; if it is dropped, the QUIC idle timeout (~30s) still tears the session down, so the deadline sits above it.
+	deadline := time.After(40 * time.Second)
 	for {
 		select {
 		case frame, ok := <-session.Frames():

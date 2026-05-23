@@ -107,9 +107,7 @@ func TestRefresh_RotatesAndInvalidatesOldToken(t *testing.T) {
 	}
 }
 
-// Refreshing the same token concurrently must rotate it exactly once: the
-// conditional revoke serializes the racers so a leaked-once token cannot be
-// redeemed twice in parallel.
+// Refreshing the same token concurrently must rotate it exactly once: the conditional revoke serializes the racers so a leaked-once token cannot be redeemed twice in parallel.
 func TestRefresh_ConcurrentReuseAllowsOnlyOne(t *testing.T) {
 	uc := newUsecase(t)
 	ctx := ctxWithClock(t)

@@ -9,9 +9,7 @@ WHERE token_hash = $1
   AND revoked_at IS NULL
   AND expires_at > $2;
 
--- Conditional on revoked_at IS NULL so concurrent refreshes of the same token
--- serialize on the row: the second UPDATE re-checks the predicate after the
--- first commits, matches no row, and the caller treats that as invalid.
+-- Conditional on revoked_at IS NULL so concurrent refreshes of the same token serialize on the row: the second UPDATE re-checks the predicate after the first commits, matches no row, and the caller treats that as invalid.
 -- name: RevokeRefreshToken :execrows
 UPDATE refresh_tokens
 SET revoked_at = $2
