@@ -26,6 +26,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
+      {{- if and .Values.storage.enabled .Values.storage.gcpServiceAccount }}
+      serviceAccountName: {{ include "vfx.adminServiceAccountName" . }}
+      {{- end }}
       containers:
         - name: admin
           image: {{ include "vfx.image" . }}
@@ -43,6 +46,12 @@ spec:
             {{- with .Values.admin.authToken }}
             - name: VFX_ADMIN_AUTH_TOKEN
               value: {{ . | quote }}
+            {{- end }}
+            {{- if .Values.storage.enabled }}
+            - name: VFX_STORAGE_BUCKET
+              value: {{ required "storage.bucket is required when storage.enabled" .Values.storage.bucket | quote }}
+            - name: VFX_STORAGE_TITLE_PREFIX
+              value: {{ .Values.storage.titlePrefix | quote }}
             {{- end }}
           ports:
             - name: http

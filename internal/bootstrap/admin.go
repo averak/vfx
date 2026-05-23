@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	valkeygo "github.com/valkey-io/valkey-go"
 
+	"github.com/averak/vfx/internal/infra/blobstore"
 	"github.com/averak/vfx/internal/infra/config"
 	"github.com/averak/vfx/internal/infra/db"
 	"github.com/averak/vfx/internal/infra/postgres"
@@ -15,6 +16,7 @@ import (
 	"github.com/averak/vfx/internal/infra/valkey"
 	adminhandler "github.com/averak/vfx/internal/presentation/admin"
 	usecaseadmin "github.com/averak/vfx/internal/usecase/admin"
+	usecasestorage "github.com/averak/vfx/internal/usecase/storage"
 )
 
 type Admin struct {
@@ -49,9 +51,33 @@ func NewAdmin(ctx context.Context) (*Admin, func(), error) {
 	}
 
 	uc := usecaseadmin.New(db.NewSession(pool), repository.NewPlayer(), matchQueue)
-	handler := adminhandler.NewHandler(uc, pool, cfg.AuthToken)
+
+	var (
+		storageUC   *usecasestorage.Usecase
+		blobCleanup = func() {}
+	)
+	if cfg.StorageBucket != "" {
+		blobs, cleanup, blobErr := blobstore.NewGCS(ctx, blobstore.Config{
+			Bucket:   cfg.StorageBucket,
+			Emulated: cfg.StorageEmulatorHost != "",
+		})
+		if blobErr != nil {
+			valkeyClient.Close()
+			pool.Close()
+			return nil, nil, blobErr
+		}
+		blobCleanup = cleanup
+		session := db.NewSession(pool)
+		// Only the title-file methods are exercised here, so player-data prefix/quota knobs are left at their zero values.
+		storageUC = usecasestorage.New(session, session, repository.NewPlayerFile(), repository.NewTitleFile(), blobs, usecasestorage.Config{
+			TitlePrefix: cfg.StorageTitlePrefix,
+		})
+	}
+
+	handler := adminhandler.NewHandler(uc, storageUC, pool, cfg.AuthToken)
 
 	cleanup := func() {
+		blobCleanup()
 		valkeyClient.Close()
 		pool.Close()
 	}

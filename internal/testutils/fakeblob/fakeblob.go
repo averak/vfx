@@ -5,7 +5,9 @@ package fakeblob
 
 import (
 	"context"
+	"hash/fnv"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -46,6 +48,14 @@ func (s *Store) SignUpload(_ context.Context, key string, ttl time.Duration) (us
 
 func (s *Store) SignDownload(_ context.Context, key string, ttl time.Duration) (usecasestorage.SignedURL, error) {
 	return usecasestorage.SignedURL{URL: "https://blob.test/" + key, Method: http.MethodGet, Expires: time.Now().Add(ttl)}, nil
+}
+
+func (s *Store) Upload(_ context.Context, key string, data []byte, _ string) error {
+	// A non-crypto content hash is enough for a fake; the real adapter reports the store's md5, exercised by the live E2E.
+	h := fnv.New64a()
+	_, _ = h.Write(data) // hash.Hash.Write never returns an error
+	s.Put(key, usecasestorage.ObjectAttrs{Size: uint64(len(data)), Hash: strconv.FormatUint(h.Sum64(), 16)})
+	return nil
 }
 
 func (s *Store) Stat(_ context.Context, key string) (usecasestorage.ObjectAttrs, error) {

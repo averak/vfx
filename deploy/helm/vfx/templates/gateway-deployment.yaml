@@ -26,7 +26,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      {{- if .Values.agones.enabled }}
+      {{- if (or .Values.agones.enabled (and .Values.storage.enabled .Values.storage.gcpServiceAccount)) }}
       serviceAccountName: {{ include "vfx.gatewayServiceAccountName" . }}
       {{- end }}
       containers:

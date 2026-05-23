@@ -196,6 +196,52 @@ func TestDelete_BestEffortOnBlobError(t *testing.T) {
 	}
 }
 
+// Title publish uploads the bytes server-side and records metadata + tags read back from the store; the client then reads it like any title file.
+func TestPublishTitleFile(t *testing.T) {
+	blob := fakeblob.New()
+	uc, _ := newUsecase(t, blob)
+	ctx := ctxWithClock(t)
+
+	body := []byte(`{"motd":"hi"}`)
+	file, err := uc.PublishTitleFile(ctx, "motd.json", []string{"prod"}, body, "application/json")
+	if err != nil {
+		t.Fatalf("PublishTitleFile: %v", err)
+	}
+	if file.Size != uint64(len(body)) || file.Hash == "" {
+		t.Errorf("published metadata = %+v", file)
+	}
+	if !blob.Has("title/motd.json") {
+		t.Error("bytes were not uploaded to the title key")
+	}
+
+	files, err := uc.QueryTitleFiles(ctx, []string{"prod"})
+	if err != nil {
+		t.Fatalf("QueryTitleFiles: %v", err)
+	}
+	if len(files) != 1 || files[0].Filename != "motd.json" {
+		t.Fatalf("QueryTitleFiles = %+v", files)
+	}
+}
+
+func TestDeleteTitleFile(t *testing.T) {
+	blob := fakeblob.New()
+	uc, _ := newUsecase(t, blob)
+	ctx := ctxWithClock(t)
+
+	if _, err := uc.PublishTitleFile(ctx, "cfg.json", nil, []byte("{}"), "application/json"); err != nil {
+		t.Fatalf("PublishTitleFile: %v", err)
+	}
+	if err := uc.DeleteTitleFile(ctx, "cfg.json"); err != nil {
+		t.Fatalf("DeleteTitleFile: %v", err)
+	}
+	if blob.Has("title/cfg.json") {
+		t.Error("delete left the title blob behind")
+	}
+	if err := uc.DeleteTitleFile(ctx, "cfg.json"); !errors.Is(err, domainstorage.ErrFileNotFound) {
+		t.Errorf("delete of unpublished title file: err = %v, want ErrFileNotFound", err)
+	}
+}
+
 func TestDelete_UnknownFileIsNotFound(t *testing.T) {
 	uc, s := newUsecase(t, fakeblob.New())
 	ctx := ctxWithClock(t)

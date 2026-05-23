@@ -1,7 +1,6 @@
-{{- if and .Values.gateway.enabled .Values.agones.enabled }}
-{{- /* The Agones allocator creates GameServerAllocations through the
-Kubernetes API, so the gateway needs a ServiceAccount bound to a Role
-that permits exactly that — nothing more. */}}
+{{- $gatewayNeedsSA := and .Values.gateway.enabled (or .Values.agones.enabled (and .Values.storage.enabled .Values.storage.gcpServiceAccount)) -}}
+{{- if $gatewayNeedsSA }}
+{{- /* The gateway gets a ServiceAccount when it needs the Agones allocator (RBAC below) and/or Workload Identity for storage URL signing (the annotation). */}}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -9,6 +8,15 @@ metadata:
   labels:
     {{- include "vfx.labels" . | nindent 4 }}
     app.kubernetes.io/component: gateway
+  {{- if and .Values.storage.enabled .Values.storage.gcpServiceAccount }}
+  annotations:
+    iam.gke.io/gcp-service-account: {{ .Values.storage.gcpServiceAccount | quote }}
+  {{- end }}
+{{- end }}
+{{- if and .Values.gateway.enabled .Values.agones.enabled }}
+{{- /* The Agones allocator creates GameServerAllocations through the
+Kubernetes API, so the gateway needs a Role that permits exactly that —
+nothing more. */}}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

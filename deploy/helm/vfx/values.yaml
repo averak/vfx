@@ -79,6 +79,9 @@ storage:
   urlTTL: 15m
   maxBytesPerPlayer: 10485760 # 10 MiB
   maxFilesPerPlayer: 64
+  # gcpServiceAccount, when set, annotates the gateway (and admin) ServiceAccount for GKE Workload Identity (iam.gke.io/gcp-service-account), so signed URLs are produced via IAM SignBlob without a key on disk.
+  # Bind this GCP service account to the Kubernetes ServiceAccount and grant it object access on the bucket; leave empty outside GKE.
+  gcpServiceAccount: ""
 
 # agones, when enabled, runs the room tier as an Agones Fleet (instead of a plain Deployment) and switches the gateway to the Agones allocator, granting it RBAC to create GameServerAllocations.
 # Requires Agones installed in the cluster.

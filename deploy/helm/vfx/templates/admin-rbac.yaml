@@ -1,0 +1,12 @@
+{{- if and .Values.admin.enabled .Values.storage.enabled .Values.storage.gcpServiceAccount }}
+{{- /* The admin publishes title files, which uploads bytes to the object store, so it needs Workload Identity just like the gateway. */}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "vfx.adminServiceAccountName" . }}
+  labels:
+    {{- include "vfx.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin
+  annotations:
+    iam.gke.io/gcp-service-account: {{ .Values.storage.gcpServiceAccount | quote }}
+{{- end }}

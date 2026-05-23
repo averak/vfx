@@ -26,10 +26,15 @@ type ObjectAttrs struct {
 }
 
 // BlobStore is the object-storage capability the usecase orchestrates.
-// The gateway signs URLs and verifies objects through it but never reads or writes the bytes themselves.
+//
+// For player data the gateway only signs URLs and verifies objects, never touching the bytes.
+// Title content is the exception: operators publish small files through the gateway, so Upload writes the bytes server-side (no client round-trip and no per-operator bucket credentials).
 type BlobStore interface {
 	SignUpload(ctx context.Context, key string, ttl time.Duration) (SignedURL, error)
 	SignDownload(ctx context.Context, key string, ttl time.Duration) (SignedURL, error)
+
+	// Upload writes data at key with the given content type, overwriting any existing object.
+	Upload(ctx context.Context, key string, data []byte, contentType string) error
 
 	// Stat returns ErrObjectNotFound when key holds no object.
 	Stat(ctx context.Context, key string) (ObjectAttrs, error)

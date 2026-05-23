@@ -98,6 +98,21 @@ func (g *GCS) sign(key, method string, ttl time.Duration) (usecasestorage.Signed
 	return usecasestorage.SignedURL{URL: u, Method: method, Expires: expires}, nil
 }
 
+func (g *GCS) Upload(ctx context.Context, key string, data []byte, contentType string) error {
+	w := g.client.Bucket(g.bucket).Object(key).NewWriter(ctx)
+	w.ContentType = contentType
+	if _, err := w.Write(data); err != nil {
+		//nolint:errcheck // The write already failed; the close error adds nothing.
+		_ = w.Close()
+		return fmt.Errorf("blobstore: upload write: %w", err)
+	}
+	// The object is only durably written once Close succeeds, so its error is the authoritative one.
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("blobstore: upload close: %w", err)
+	}
+	return nil
+}
+
 func (g *GCS) Stat(ctx context.Context, key string) (usecasestorage.ObjectAttrs, error) {
 	attrs, err := g.client.Bucket(g.bucket).Object(key).Attrs(ctx)
 	if err != nil {

@@ -1,26 +1,35 @@
 // Package admin is the operations API's HTTP entry point.
 //
 // Unlike the player-facing gateway (Connect RPC), the admin API is a small plain-HTTP/JSON surface: it is an internal operations tool, not a typed client contract, and a future web UI will consume the same JSON.
-// It is read-only and expected to sit behind a separate auth boundary (network policy, ingress auth) provided by the deployment.
+// It is mostly read-only inspection (players, queues); the one write surface is title-file publishing, which is an operator action with no player-facing equivalent.
+// The API is expected to sit behind a separate auth boundary (network policy, ingress auth) provided by the deployment.
 package admin
 
 import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/averak/vfx/internal/domain/player"
+	domainstorage "github.com/averak/vfx/internal/domain/storage"
 	usecaseadmin "github.com/averak/vfx/internal/usecase/admin"
+	usecasestorage "github.com/averak/vfx/internal/usecase/storage"
 )
+
+// maxTitleFileBytes caps an in-request title upload; title content is small config/assets, and the operator API proxies the bytes rather than streaming, so a bound keeps memory predictable.
+const maxTitleFileBytes = 8 << 20 // 8 MiB
 
 // NewHandler builds the admin HTTP handler.
 // When authToken is non-empty, every /api request must present it as a bearer token; the health probes stay open so orchestrators reach them without credentials.
-func NewHandler(uc *usecaseadmin.Usecase, pool *pgxpool.Pool, authToken string) http.Handler {
+// storageUC may be nil, in which case the title-file endpoints are not mounted (no object store configured).
+func NewHandler(uc *usecaseadmin.Usecase, storageUC *usecasestorage.Usecase, pool *pgxpool.Pool, authToken string) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -66,7 +75,70 @@ func NewHandler(uc *usecaseadmin.Usecase, pool *pgxpool.Pool, authToken string) 
 		writeJSON(w, http.StatusOK, queueView{GameMode: mode, QueueDepth: depth})
 	}))
 
+	if storageUC != nil {
+		// Publish (or replace) a title file: body is the raw bytes, ?tags=a,b sets its tags, Content-Type is preserved for download.
+		mux.HandleFunc("PUT /api/title-files/{name}", requireToken(authToken, func(w http.ResponseWriter, r *http.Request) {
+			name := r.PathValue("name")
+			tags := splitTags(r.URL.Query().Get("tags"))
+			data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxTitleFileBytes))
+			if err != nil {
+				writeError(w, http.StatusRequestEntityTooLarge, "title file too large or unreadable")
+				return
+			}
+			contentType := r.Header.Get("Content-Type")
+			if contentType == "" {
+				contentType = "application/octet-stream"
+			}
+			file, err := storageUC.PublishTitleFile(r.Context(), name, tags, data, contentType)
+			if err != nil {
+				writeStorageError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, titleFileView{
+				Filename:  file.Filename,
+				Size:      file.Size,
+				Hash:      file.Hash,
+				Tags:      tags,
+				UpdatedAt: file.UpdatedAt,
+			})
+		}))
+
+		mux.HandleFunc("DELETE /api/title-files/{name}", requireToken(authToken, func(w http.ResponseWriter, r *http.Request) {
+			if err := storageUC.DeleteTitleFile(r.Context(), r.PathValue("name")); err != nil {
+				writeStorageError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		}))
+	}
+
 	return mux
+}
+
+// splitTags parses the comma-separated ?tags value, dropping empties so "" yields no tags (not [""]).
+func splitTags(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	tags := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			tags = append(tags, t)
+		}
+	}
+	return tags
+}
+
+func writeStorageError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, domainstorage.ErrInvalidFilename), errors.Is(err, domainstorage.ErrFileTooLarge):
+		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, domainstorage.ErrFileNotFound):
+		writeError(w, http.StatusNotFound, "title file not found")
+	default:
+		writeError(w, http.StatusInternalServerError, "title file operation failed")
+	}
 }
 
 // requireToken wraps h with a bearer-token check.
@@ -96,6 +168,14 @@ type playerView struct {
 type queueView struct {
 	GameMode   string `json:"game_mode"`
 	QueueDepth int32  `json:"queue_depth"`
+}
+
+type titleFileView struct {
+	Filename  string    `json:"filename"`
+	Size      uint64    `json:"size"`
+	Hash      string    `json:"hash"`
+	Tags      []string  `json:"tags"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

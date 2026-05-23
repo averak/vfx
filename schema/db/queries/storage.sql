@@ -45,3 +45,7 @@ SET size = EXCLUDED.size,
     tags = EXCLUDED.tags,
     updated_at = EXCLUDED.updated_at
 RETURNING *;
+
+-- name: DeleteTitleFile :exec
+DELETE FROM title_files
+WHERE filename = $1;

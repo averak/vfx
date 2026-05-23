@@ -34,3 +34,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- define "vfx.gatewayServiceAccountName" -}}
 {{ include "vfx.fullname" . }}-gateway
 {{- end -}}
+
+{{- define "vfx.adminServiceAccountName" -}}
+{{ include "vfx.fullname" . }}-admin
+{{- end -}}

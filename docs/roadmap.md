@@ -69,8 +69,8 @@ Goal: prove that WebTransport + WASM + Agones works as a usable game server foun
 
 Goal: feature breadth comparable to mature game backends.
 
-- [ ] OAuth providers: Google, Apple, GitHub, anonymous device.
-- [ ] Storage API (KV with per-record permissions).
+- [ ] OIDC providers: Google, Apple (anonymous device already shipped).
+- [x] Storage API — player data (owner-scoped) and title storage (operator-published, tag-gated); bytes in object storage via signed URLs, metadata in PostgreSQL.
 - [ ] Leaderboard.
 - [ ] Friends / Groups / Parties.
 - [ ] Chat (channels, DMs).

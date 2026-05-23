@@ -93,7 +93,7 @@ func (PlayerFile) Usage(ctx context.Context, ownerID uuid.UUID) (totalSize uint6
 	return uint64(row.TotalSize), int(row.FileCount), nil
 }
 
-// TitleFile is the storage implementation of [storage.TitleFileRepository], plus a SaveFile that is not part of the read-only port and exists for operator-side seeding (admin tooling, tests).
+// TitleFile is the storage implementation of [storage.TitleFileRepository].
 type TitleFile struct{}
 
 var _ storage.TitleFileRepository = (*TitleFile)(nil)
@@ -135,6 +135,15 @@ func (TitleFile) GetFile(ctx context.Context, filename string) (*storage.File, e
 		return nil, err
 	}
 	return titleFileToDomain(row), nil
+}
+
+func (TitleFile) DeleteFile(ctx context.Context, filename string) error {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	// Deleting an absent row is a no-op, matching the port's idempotency contract.
+	return dbgen.New(tx).DeleteTitleFile(ctx, filename)
 }
 
 func (TitleFile) SaveFile(ctx context.Context, f *storage.File, tags []string) error {

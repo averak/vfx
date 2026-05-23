@@ -24,11 +24,18 @@ type PlayerFileRepository interface {
 	Usage(ctx context.Context, ownerID uuid.UUID) (totalSize uint64, count int, err error)
 }
 
-// TitleFileRepository reads operator-written title files; there is no write method because clients never write here.
+// TitleFileRepository persists operator-published title files.
+// Clients only ever read these (List/Get); SaveFile and DeleteFile are the operator-side publish/unpublish path, invoked from the operations API rather than a player RPC.
 type TitleFileRepository interface {
 	// ListFiles returns files carrying every tag in tags; an empty tags returns all files.
 	ListFiles(ctx context.Context, tags []string) ([]*File, error)
 
 	// GetFile returns ErrFileNotFound when no title file by that name exists.
 	GetFile(ctx context.Context, filename string) (*File, error)
+
+	// SaveFile upserts on filename, replacing the file's tags.
+	SaveFile(ctx context.Context, f *File, tags []string) error
+
+	// DeleteFile is idempotent: removing a name that is already gone returns nil.
+	DeleteFile(ctx context.Context, filename string) error
 }

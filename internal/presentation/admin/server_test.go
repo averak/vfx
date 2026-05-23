@@ -1,6 +1,7 @@
 package admin_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -16,8 +17,10 @@ import (
 	"github.com/averak/vfx/internal/infra/matchqueue"
 	"github.com/averak/vfx/internal/infra/repository"
 	adminhandler "github.com/averak/vfx/internal/presentation/admin"
+	"github.com/averak/vfx/internal/testutils/fakeblob"
 	"github.com/averak/vfx/internal/testutils/testdb"
 	usecaseadmin "github.com/averak/vfx/internal/usecase/admin"
+	usecasestorage "github.com/averak/vfx/internal/usecase/storage"
 )
 
 func newServer(t *testing.T) *httptest.Server {
@@ -36,7 +39,9 @@ func newServerAndPool(t *testing.T, token string) (*httptest.Server, *pgxpool.Po
 	t.Helper()
 	pool := testdb.Pool(t)
 	uc := usecaseadmin.New(db.NewSession(pool), repository.NewPlayer(), matchqueue.NewInMem())
-	srv := httptest.NewServer(adminhandler.NewHandler(uc, pool, token))
+	session := db.NewSession(pool)
+	storageUC := usecasestorage.New(session, session, repository.NewPlayerFile(), repository.NewTitleFile(), fakeblob.New(), usecasestorage.Config{TitlePrefix: "title"})
+	srv := httptest.NewServer(adminhandler.NewHandler(uc, storageUC, pool, token))
 	t.Cleanup(srv.Close)
 	return srv, pool
 }
@@ -54,6 +59,72 @@ func seedPlayer(t *testing.T, pool *pgxpool.Pool, nickname string) uuid.UUID {
 		t.Fatalf("seed player: %v", err)
 	}
 	return id
+}
+
+func TestAdmin_PublishAndDeleteTitleFile(t *testing.T) {
+	srv := newServer(t)
+	body := []byte(`{"motd":"hello"}`)
+
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPut, srv.URL+"/api/title-files/motd.json?tags=prod,config", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatalf("PUT: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("PUT status = %d, want 200", resp.StatusCode)
+	}
+	var view struct {
+		Filename string   `json:"filename"`
+		Size     uint64   `json:"size"`
+		Hash     string   `json:"hash"`
+		Tags     []string `json:"tags"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&view); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if view.Filename != "motd.json" || view.Size != uint64(len(body)) || view.Hash == "" {
+		t.Errorf("published view = %+v", view)
+	}
+	if len(view.Tags) != 2 || view.Tags[0] != "prod" || view.Tags[1] != "config" {
+		t.Errorf("tags = %v, want [prod config]", view.Tags)
+	}
+
+	del := func() int {
+		dreq, _ := http.NewRequestWithContext(t.Context(), http.MethodDelete, srv.URL+"/api/title-files/motd.json", http.NoBody)
+		dresp, derr := srv.Client().Do(dreq)
+		if derr != nil {
+			t.Fatalf("DELETE: %v", derr)
+		}
+		_ = dresp.Body.Close()
+		return dresp.StatusCode
+	}
+	if got := del(); got != http.StatusNoContent {
+		t.Errorf("DELETE status = %d, want 204", got)
+	}
+	// A second delete is a NotFound: the metadata is gone.
+	if got := del(); got != http.StatusNotFound {
+		t.Errorf("second DELETE status = %d, want 404", got)
+	}
+}
+
+// With no object store configured the title-file endpoints are not mounted at all.
+func TestAdmin_TitleFilesUnmountedWithoutStorage(t *testing.T) {
+	pool := testdb.Pool(t)
+	uc := usecaseadmin.New(db.NewSession(pool), repository.NewPlayer(), matchqueue.NewInMem())
+	srv := httptest.NewServer(adminhandler.NewHandler(uc, nil, pool, ""))
+	t.Cleanup(srv.Close)
+
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPut, srv.URL+"/api/title-files/x.json", bytes.NewReader([]byte("{}")))
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatalf("PUT: %v", err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("PUT with storage disabled = %d, want 404 (route unmounted)", resp.StatusCode)
+	}
 }
 
 func TestAdmin_HealthEndpoints(t *testing.T) {

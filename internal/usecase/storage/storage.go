@@ -179,6 +179,55 @@ func (u *Usecase) QueryTitleFiles(ctx context.Context, tags []string) ([]*domain
 	return files, err
 }
 
+// PublishTitleFile is the operator-side write: it uploads the bytes server-side, then records the metadata and tags.
+// Unlike player writes there is no quota and no commit step, since the operator is trusted and the gateway holds the bytes the whole time.
+func (u *Usecase) PublishTitleFile(ctx context.Context, filename string, tags []string, data []byte, contentType string) (*domainstorage.File, error) {
+	if err := domainstorage.ValidateFilename(filename); err != nil {
+		return nil, err
+	}
+	if err := domainstorage.ValidateSize(uint64(len(data))); err != nil {
+		return nil, err
+	}
+	key := u.titleKey(filename)
+	if err := u.blobs.Upload(ctx, key, data, contentType); err != nil {
+		return nil, err
+	}
+	// Read size and hash back from the store rather than computing them here, so title metadata is produced the same way as player metadata (and the usecase needs no checksum primitive).
+	attrs, err := u.blobs.Stat(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	file, err := domainstorage.NewFile(filename, attrs.Size, attrs.Hash, clock.Now(ctx))
+	if err != nil {
+		return nil, err
+	}
+	if err := u.rw.RW(ctx, func(ctx context.Context) error {
+		return u.titleRepo.SaveFile(ctx, file, tags)
+	}); err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
+// DeleteTitleFile unpublishes a title file, returning domainstorage.ErrFileNotFound when no such file exists.
+func (u *Usecase) DeleteTitleFile(ctx context.Context, filename string) error {
+	if err := domainstorage.ValidateFilename(filename); err != nil {
+		return err
+	}
+	if err := u.rw.RW(ctx, func(ctx context.Context) error {
+		if _, err := u.titleRepo.GetFile(ctx, filename); err != nil {
+			return err
+		}
+		return u.titleRepo.DeleteFile(ctx, filename)
+	}); err != nil {
+		return err
+	}
+	// Same metadata-first, best-effort ordering as DeletePlayerFile: the row is the source of truth, the orphaned blob is reclaimed by the bucket lifecycle/sweep.
+	//nolint:errcheck // Best-effort by design; a leftover blob is reclaimed out of band.
+	_ = u.blobs.Delete(ctx, u.titleKey(filename))
+	return nil
+}
+
 func (u *Usecase) ReadTitleFile(ctx context.Context, filename string) (*domainstorage.File, *SignedURL, error) {
 	if err := domainstorage.ValidateFilename(filename); err != nil {
 		return nil, nil, err
