@@ -149,6 +149,29 @@ func (c *Client) WaitForMatch(ctx context.Context, ticketID string) (*Match, err
 	return nil, errors.New("vfxclient: ticket stream closed without a match")
 }
 
+// GetCurrentMatch returns the player's active match assignment, or nil
+// if they are not in one. It is how a client recovers after a dropped
+// WebTransport session: when Session.Frames closes unexpectedly (rather
+// than after a game_ended event), call this and reconnect to the
+// returned Match without re-queuing.
+func (c *Client) GetCurrentMatch(ctx context.Context) (*Match, error) {
+	req := connect.NewRequest(&matchv1.GetCurrentMatchRequest{})
+	c.authorize(req.Header())
+	resp, err := c.match.GetCurrentMatch(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("vfxclient: get current match: %w", err)
+	}
+	m := resp.Msg.GetMatch()
+	if m == nil {
+		return nil, nil //nolint:nilnil // no active match is a normal "nothing to reconnect to".
+	}
+	return &Match{
+		client:       c,
+		Endpoint:     m.GetEndpoint(),
+		SessionToken: m.GetSessionToken(),
+	}, nil
+}
+
 func (c *Client) authorize(h http.Header) {
 	if c.accessToken != "" {
 		h.Set("Authorization", "Bearer "+c.accessToken)

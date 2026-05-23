@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pluginv1 "github.com/averak/vfx/gen/go/plugin/v1"
@@ -225,9 +226,26 @@ func (m *Match) tick(ctx context.Context) (bool, error) {
 
 func (m *Match) finalise(ctx context.Context) {
 	endReq := &pluginv1.OnGameEndRequest{FinalTick: m.currentTick}
-	if _, err := m.plugin.OnGameEnd(ctx, endReq); err != nil {
+	resp, err := m.plugin.OnGameEnd(ctx, endReq)
+	if err != nil {
 		m.logger.Error("match: OnGameEnd failed", "err", err)
 	}
+
+	// Tell clients the match is over before closing their sessions. This
+	// is a SystemEvent, so SendFrame delivers it reliably over a stream;
+	// the OnGameEnd result (final ranks) rides along as the payload.
+	var payload []byte
+	if resp != nil {
+		if data, mErr := proto.Marshal(resp); mErr == nil {
+			payload = data
+		}
+	}
+	m.broadcast(&realtimev1.Frame{
+		Body: &realtimev1.Frame_Event{
+			Event: &realtimev1.SystemEvent{Type: "game_ended", Payload: payload},
+		},
+	})
+
 	m.closeAllPlayers()
 }
 

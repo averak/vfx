@@ -70,15 +70,21 @@ func run() error {
 	defer func() { _ = session.Close() }()
 	fmt.Printf("[rps-cli] connected to room\n")
 
-	go printFrames(session)
+	matchCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go watchFrames(cancel, session)
 
 	if *auto {
-		return playAuto(ctx, session)
+		return playAuto(matchCtx, session)
 	}
-	return playInteractive(ctx, session)
+	return playInteractive(matchCtx, session)
 }
 
-func printFrames(session *vfxclient.Session) {
+// watchFrames prints inbound frames and stops the client when the match
+// ends (a "game_ended" system event) or the session closes — cancelling
+// the play loop via cancel.
+func watchFrames(cancel context.CancelFunc, session *vfxclient.Session) {
+	defer cancel()
 	for frame := range session.Frames() {
 		switch body := frame.GetBody().(type) {
 		case *realtimev1.Frame_Delta:
@@ -95,6 +101,10 @@ func printFrames(session *vfxclient.Session) {
 			fmt.Printf("[rps-cli] state delta:\n%s\n", pretty)
 		case *realtimev1.Frame_Event:
 			fmt.Printf("[rps-cli] event %q: %s\n", body.Event.GetType(), body.Event.GetPayload())
+			if body.Event.GetType() == "game_ended" {
+				fmt.Println("[rps-cli] match ended; disconnecting")
+				return
+			}
 		case *realtimev1.Frame_Error:
 			fmt.Printf("[rps-cli] server error %q: %s\n", body.Error.GetCode(), body.Error.GetMessage())
 		}

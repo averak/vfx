@@ -51,13 +51,25 @@ func (s *playerSession) SendFrame(frame *realtimev1.Frame) error {
 	if err != nil {
 		return fmt.Errorf("room: marshal frame: %w", err)
 	}
-	if len(data) > s.datagramMax {
+	if reliableFrame(frame) || len(data) > s.datagramMax {
 		return s.sendStream(data)
 	}
 	if err := s.session.SendDatagram(data); err != nil {
 		return s.sendStream(data)
 	}
 	return nil
+}
+
+// reliableFrame reports whether a frame must not be dropped and so is
+// sent over a stream regardless of size: system events (e.g. game end),
+// full snapshots, and errors. High-frequency deltas stay on datagrams.
+func reliableFrame(frame *realtimev1.Frame) bool {
+	switch frame.GetBody().(type) {
+	case *realtimev1.Frame_Event, *realtimev1.Frame_Snapshot, *realtimev1.Frame_Error:
+		return true
+	default:
+		return false
+	}
 }
 
 // sendStream delivers one frame over a fresh unidirectional stream and
