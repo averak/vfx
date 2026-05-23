@@ -2,6 +2,7 @@ package auth_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -103,6 +104,44 @@ func TestRefresh_RotatesAndInvalidatesOldToken(t *testing.T) {
 	// The old refresh token must no longer work.
 	if _, err := uc.Refresh(ctx, login.RefreshToken); err == nil {
 		t.Error("the old refresh token still works after rotation")
+	}
+}
+
+// Refreshing the same token concurrently must rotate it exactly once: the
+// conditional revoke serializes the racers so a leaked-once token cannot be
+// redeemed twice in parallel.
+func TestRefresh_ConcurrentReuseAllowsOnlyOne(t *testing.T) {
+	uc := newUsecase(t)
+	ctx := ctxWithClock(t)
+
+	login, err := uc.LoginAnonymous(ctx, ptr("device-concurrent"), nil)
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	const n = 8
+	var wg sync.WaitGroup
+	results := make([]error, n)
+	start := make(chan struct{})
+	for i := range results {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			_, results[i] = uc.Refresh(ctx, login.RefreshToken)
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	successes := 0
+	for _, e := range results {
+		if e == nil {
+			successes++
+		}
+	}
+	if successes != 1 {
+		t.Errorf("concurrent refresh of one token succeeded %d times, want exactly 1", successes)
 	}
 }
 

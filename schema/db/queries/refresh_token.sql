@@ -9,10 +9,14 @@ WHERE token_hash = $1
   AND revoked_at IS NULL
   AND expires_at > $2;
 
--- name: RevokeRefreshToken :exec
+-- Conditional on revoked_at IS NULL so concurrent refreshes of the same token
+-- serialize on the row: the second UPDATE re-checks the predicate after the
+-- first commits, matches no row, and the caller treats that as invalid.
+-- name: RevokeRefreshToken :execrows
 UPDATE refresh_tokens
 SET revoked_at = $2
-WHERE id = $1;
+WHERE id = $1
+  AND revoked_at IS NULL;
 
 -- name: RevokeAllRefreshTokensForPlayer :exec
 UPDATE refresh_tokens

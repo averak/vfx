@@ -54,13 +54,14 @@ func NewManager(ctx context.Context, factory plugin.Factory, logger *slog.Logger
 // Close cancels every running match and is safe to call multiple times.
 func (mgr *Manager) Close() { mgr.cancelAll() }
 
-// FindOrCreate serialises creation under the manager lock, so two simultaneous joins for a new match still see the same instance.
+// FindOrCreate returns the active Match for matchID, creating one if needed.
 func (mgr *Manager) FindOrCreate(ctx context.Context, matchID uuid.UUID, players []uuid.UUID) (*Match, error) {
 	mgr.mu.Lock()
 	if existing, ok := mgr.matches[matchID]; ok {
 		mgr.mu.Unlock()
 		return existing, nil
 	}
+	mgr.mu.Unlock()
 
 	// Span covers the cold-start cost: instantiating the plugin and running its Init.
 	ctx, span := tracer.Start(ctx, "room.match.create", trace.WithAttributes(
@@ -69,14 +70,14 @@ func (mgr *Manager) FindOrCreate(ctx context.Context, matchID uuid.UUID, players
 	))
 	defer span.End()
 
+	// Build the plugin outside the lock: a cold start can be slow, and holding the lock through it would stall every other join, Get, and cleanup.
+	// Two arrivals for the same new match may both build one; the re-check below keeps the first and discards the loser.
 	pl, err := mgr.factory.Create(ctx)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "plugin create failed")
-		mgr.mu.Unlock()
 		return nil, err
 	}
-
 	initReq := &pluginv1.InitRequest{}
 	for _, id := range players {
 		initReq.PlayerIds = append(initReq.PlayerIds, id.String())
@@ -88,31 +89,41 @@ func (mgr *Manager) FindOrCreate(ctx context.Context, matchID uuid.UUID, players
 		if closeErr := pl.Close(); closeErr != nil {
 			mgr.logger.Warn("manager: close after init failure", "err", closeErr)
 		}
-		mgr.mu.Unlock()
 		return nil, err
 	}
-
 	match := NewMatch(matchID, pl, initResp.GetTickRateHz(), mgr.logger, mgr.metrics)
+
+	mgr.mu.Lock()
+	if existing, ok := mgr.matches[matchID]; ok {
+		mgr.mu.Unlock()
+		if closeErr := pl.Close(); closeErr != nil {
+			mgr.logger.Warn("manager: close discarded race loser", "err", closeErr)
+		}
+		return existing, nil
+	}
 	mgr.matches[matchID] = match
 	mgr.metrics.IncActiveMatches()
+	mgr.mu.Unlock()
 
 	// match.Run uses the manager's long-lived ctx, never the caller's request ctx: a player disconnecting must not tear down the whole match for everyone else.
 	go func() {
 		if err := match.Run(mgr.matchCtx); err != nil && !errors.Is(err, context.Canceled) {
 			mgr.logger.Error("match run failed", "match_id", matchID, "err", err)
 		}
-		mgr.cleanup(matchID)
+		mgr.cleanup(matchID, match)
 		mgr.metrics.DecActiveMatches()
 	}()
 
-	mgr.mu.Unlock()
 	return match, nil
 }
 
-func (mgr *Manager) cleanup(matchID uuid.UUID) {
+// cleanup removes the match only if it is still the instance self, so a finished match's late cleanup cannot evict a newer one that reused the id.
+func (mgr *Manager) cleanup(matchID uuid.UUID, self *Match) {
 	mgr.mu.Lock()
-	delete(mgr.matches, matchID)
-	mgr.mu.Unlock()
+	defer mgr.mu.Unlock()
+	if m, ok := mgr.matches[matchID]; ok && m == self {
+		delete(mgr.matches, matchID)
+	}
 }
 
 func (mgr *Manager) Get(matchID uuid.UUID) (*Match, bool) {

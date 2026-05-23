@@ -67,10 +67,18 @@ func (RefreshToken) Revoke(ctx context.Context, id uuid.UUID, now time.Time) err
 	if err != nil {
 		return err
 	}
-	return dbgen.New(tx).RevokeRefreshToken(ctx, dbgen.RevokeRefreshTokenParams{
+	affected, err := dbgen.New(tx).RevokeRefreshToken(ctx, dbgen.RevokeRefreshTokenParams{
 		ID:        id,
 		RevokedAt: toTimestamptz(now),
 	})
+	if err != nil {
+		return err
+	}
+	// No row revoked means it was already revoked, which under concurrent refresh of the same token is the loser of the race.
+	if affected == 0 {
+		return player.ErrRefreshTokenInvalid
+	}
+	return nil
 }
 
 func (RefreshToken) RevokeAllForPlayer(ctx context.Context, playerID uuid.UUID, now time.Time) error {
