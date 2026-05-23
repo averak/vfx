@@ -112,6 +112,29 @@ func TestSelectBatch_MissingRatingSkipsCheck(t *testing.T) {
 	}
 }
 
+func TestSelectBatch_SkipsIncompatibleOutlierSeed(t *testing.T) {
+	mm := newMM()
+	now := time.Now()
+	us, eu := s("us"), s("eu")
+	// The oldest ticket is a fresh us-region outlier with no us partner.
+	// The two eu tickets behind it must still pair instead of being
+	// blocked by the head-of-line outlier.
+	pending := []*match.Ticket{
+		ticketAt(now, f(1000), us),
+		ticketAt(now, f(1000), eu),
+		ticketAt(now, f(1010), eu),
+	}
+	group := mm.selectBatch(now, pending)
+	if group == nil {
+		t.Fatal("eu pair behind a us outlier failed to form")
+	}
+	for _, tk := range group {
+		if tk.Region != nil && *tk.Region == "us" {
+			t.Fatal("the us outlier was wrongly included in the group")
+		}
+	}
+}
+
 func TestSelectBatch_NilWhenNoPartner(t *testing.T) {
 	mm := newMM()
 	now := time.Now()

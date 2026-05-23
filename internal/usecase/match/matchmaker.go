@@ -172,14 +172,32 @@ func (m *Matchmaker) processMode(ctx context.Context, mode string) error {
 // governs who it can pair with, which keeps the oldest ticket from
 // starving.
 func (m *Matchmaker) selectBatch(now time.Time, pending []*match.Ticket) []*match.Ticket {
-	seed := pending[0]
+	// Try each ticket as the seed, oldest first, so the longest-waiting
+	// ticket is preferred but a single incompatible outlier at the head
+	// does not block compatible groups behind it from forming.
+	for i := range pending {
+		if group := m.groupFromSeed(now, pending, i); group != nil {
+			return group
+		}
+	}
+	return nil
+}
+
+// groupFromSeed builds a group governed by pending[seedIdx]'s tier,
+// drawing the remaining members from anywhere else in the pool. Returns
+// nil if a full group cannot be formed around that seed.
+func (m *Matchmaker) groupFromSeed(now time.Time, pending []*match.Ticket, seedIdx int) []*match.Ticket {
+	seed := pending[seedIdx]
 	waited := now.Sub(seed.CreatedAt)
 	window := m.baseRatingWindow + m.ratingWindowGrowthPerSec*waited.Seconds()
 	ignoreRegion := waited >= m.regionRelaxAfter
 
 	group := make([]*match.Ticket, 0, m.playersPerMatch)
 	group = append(group, seed)
-	for _, t := range pending[1:] {
+	for j, t := range pending {
+		if j == seedIdx {
+			continue
+		}
 		if len(group) == m.playersPerMatch {
 			break
 		}
