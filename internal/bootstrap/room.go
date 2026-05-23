@@ -26,8 +26,7 @@ type Room struct {
 	Metrics *metrics.Registry
 }
 
-// roomMetrics adapts the Prometheus registry to usecaseroom.Metrics so
-// the usecase layer carries no concrete metrics dependency.
+// roomMetrics adapts the Prometheus registry to usecaseroom.Metrics so the usecase layer carries no concrete metrics dependency.
 type roomMetrics struct {
 	reg *metrics.Registry
 }
@@ -39,13 +38,9 @@ func (m roomMetrics) ObserveTick(d time.Duration) { m.reg.RoomTickDuration.Obser
 // NewRoom constructs and validates the room container.
 //
 // Plugin selection follows VFX_ROOM_PLUGIN_PATH:
-//   - a path ending in .wasm is compiled and run by the wazero host,
-//     which is the production sandboxed path;
-//   - any other value is treated as the name of a plugin registered
-//     into the supplied registry (the in-process Go path used by the
-//     example vfx-rps binary);
-//   - empty falls back to the first registered plugin so a single-
-//     plugin quickstart binary needs no configuration.
+//   - a path ending in .wasm is compiled and run by the wazero host, the production sandboxed path;
+//   - any other value names a plugin registered into the supplied registry (the in-process Go path used by the example vfx-rps binary);
+//   - empty falls back to the first registered plugin, so a single-plugin quickstart binary needs no configuration.
 func NewRoom(ctx context.Context, registry *plugin.Registry, logger *slog.Logger) (*Room, func(), error) {
 	cfg, err := config.LoadRoom()
 	if err != nil {

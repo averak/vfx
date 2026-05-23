@@ -1,7 +1,6 @@
 // Package vfxclient is the Go client SDK for vfx.
 //
-// It wraps the generated Connect RPC clients and the WebTransport
-// handshake behind a small, task-oriented API:
+// It wraps the generated Connect RPC clients and the WebTransport handshake behind a small, task-oriented API:
 //
 //	c := vfxclient.New("http://localhost:8080")
 //	if err := c.LoginAnonymous(ctx, "device-1", "Alice"); err != nil { ... }
@@ -11,8 +10,7 @@
 //	session.SendInput(0, []byte{'R'})
 //	for frame := range session.Frames() { ... }
 //
-// The SDK is used by the example rps-cli and by integration tests; it
-// is the reference for how a native (non-browser) client talks to vfx.
+// The SDK is used by the example rps-cli and by integration tests; it is the reference for how a native (non-browser) client talks to vfx.
 package vfxclient
 
 import (
@@ -30,8 +28,8 @@ import (
 	"github.com/averak/vfx/gen/go/vfx/v1/match/matchconnect"
 )
 
-// Client is a logged-in (or about-to-be) vfx client. It is not safe for
-// concurrent use across goroutines; create one per player.
+// Client is a logged-in (or about-to-be) vfx client.
+// It is not safe for concurrent use across goroutines; create one per player.
 type Client struct {
 	gatewayURL string
 	httpClient *http.Client
@@ -72,9 +70,9 @@ func (c *Client) Player() *authv1.Player { return c.player }
 // AccessToken returns the current access token, or "" before login.
 func (c *Client) AccessToken() string { return c.accessToken }
 
-// LoginAnonymous logs in with an anonymous credential. A stable
-// deviceID returns the same player across calls; an empty deviceID
-// mints a fresh player. nickname is applied only on first registration.
+// LoginAnonymous logs in with an anonymous credential.
+// A stable deviceID returns the same player across calls; an empty deviceID mints a fresh player.
+// nickname is applied only on first registration.
 func (c *Client) LoginAnonymous(ctx context.Context, deviceID, nickname string) error {
 	cred := &authv1.AnonymousCredential{}
 	if deviceID != "" {
@@ -95,8 +93,7 @@ func (c *Client) LoginAnonymous(ctx context.Context, deviceID, nickname string) 
 	return nil
 }
 
-// CreateTicket enqueues a matchmaking ticket for the given game mode
-// and returns its id.
+// CreateTicket enqueues a matchmaking ticket for the given game mode and returns its id.
 func (c *Client) CreateTicket(ctx context.Context, gameMode string) (string, error) {
 	req := connect.NewRequest(&matchv1.CreateTicketRequest{GameMode: gameMode})
 	c.authorize(req.Header())
@@ -107,17 +104,15 @@ func (c *Client) CreateTicket(ctx context.Context, gameMode string) (string, err
 	return resp.Msg.GetTicketId(), nil
 }
 
-// Match is the result of a successful matchmaking: where to connect and
-// the token that authorises the connection.
+// Match is the result of a successful matchmaking: where to connect and the token that authorises the connection.
 type Match struct {
 	client       *Client
 	Endpoint     string
 	SessionToken string
 }
 
-// WaitForMatch follows the WatchTicket stream until the ticket is
-// matched, then returns the connection details. It returns an error if
-// matchmaking fails or the context is cancelled.
+// WaitForMatch follows the WatchTicket stream until the ticket is matched, then returns the connection details.
+// It returns an error if matchmaking fails or the context is cancelled.
 func (c *Client) WaitForMatch(ctx context.Context, ticketID string) (*Match, error) {
 	req := connect.NewRequest(&matchv1.WatchTicketRequest{TicketId: ticketID})
 	c.authorize(req.Header())
@@ -149,11 +144,8 @@ func (c *Client) WaitForMatch(ctx context.Context, ticketID string) (*Match, err
 	return nil, errors.New("vfxclient: ticket stream closed without a match")
 }
 
-// GetCurrentMatch returns the player's active match assignment, or nil
-// if they are not in one. It is how a client recovers after a dropped
-// WebTransport session: when Session.Frames closes unexpectedly (rather
-// than after a game_ended event), call this and reconnect to the
-// returned Match without re-queuing.
+// GetCurrentMatch returns the player's active match assignment, or nil if they are not in one.
+// It is how a client recovers after a dropped WebTransport session: when Session.Frames closes unexpectedly (rather than after a game_ended event), call this and reconnect to the returned Match without re-queuing.
 func (c *Client) GetCurrentMatch(ctx context.Context) (*Match, error) {
 	req := connect.NewRequest(&matchv1.GetCurrentMatchRequest{})
 	c.authorize(req.Header())

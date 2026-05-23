@@ -20,10 +20,8 @@ import (
 	realtimev1 "github.com/averak/vfx/gen/go/vfx/v1/realtime"
 )
 
-// Session is a live WebTransport connection to a room. Inbound frames
-// arrive on the channel returned by Frames — from both unreliable
-// datagrams (small deltas) and reliable unidirectional streams (large
-// snapshots) — and outbound input goes through SendInput.
+// Session is a live WebTransport connection to a room.
+// Inbound frames arrive on the channel returned by Frames, from both unreliable datagrams (small deltas) and reliable unidirectional streams (large snapshots); outbound input goes through SendInput.
 type Session struct {
 	wt     *webtransport.Session
 	frames chan *realtimev1.Frame
@@ -37,14 +35,14 @@ type sessionConfig struct {
 	insecureSkipVerify bool
 }
 
-// WithInsecureSkipVerify disables TLS verification. Use only against a
-// self-signed development server.
+// WithInsecureSkipVerify disables TLS verification.
+// Use only against a self-signed development server.
 func WithInsecureSkipVerify() SessionOption {
 	return func(c *sessionConfig) { c.insecureSkipVerify = true }
 }
 
-// Connect opens a WebTransport session to the matched room. The caller
-// owns the returned Session and must Close it.
+// Connect opens a WebTransport session to the matched room.
+// The caller owns the returned Session and must Close it.
 func (m *Match) Connect(ctx context.Context, opts ...SessionOption) (*Session, error) {
 	cfg := &sessionConfig{}
 	for _, opt := range opts {
@@ -70,8 +68,7 @@ func (m *Match) Connect(ctx context.Context, opts ...SessionOption) (*Session, e
 	header := http.Header{}
 	header.Set("Authorization", "Bearer "+m.SessionToken)
 
-	// The http.Response body wraps the upgrade stream; closing it would
-	// tear down the session, so it is deliberately left open.
+	// The http.Response body wraps the upgrade stream; closing it would tear down the session, so it is deliberately left open.
 	_, wt, err := dialer.Dial(ctx, u.String(), header) //nolint:bodyclose // body wraps the WT session.
 	if err != nil {
 		return nil, fmt.Errorf("vfxclient: webtransport dial: %w", err)
@@ -84,8 +81,7 @@ func (m *Match) Connect(ctx context.Context, opts ...SessionOption) (*Session, e
 		cancel: cancel,
 	}
 
-	// Frames arrive on two transports; close the channel only once both
-	// readers have stopped so neither writes to a closed channel.
+	// Frames arrive on two transports; close the channel only once both readers have stopped so neither writes to a closed channel.
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() { defer wg.Done(); s.datagramLoop(loopCtx) }()
@@ -94,8 +90,8 @@ func (m *Match) Connect(ctx context.Context, opts ...SessionOption) (*Session, e
 	return s, nil
 }
 
-// Frames returns the channel of inbound frames. It is closed when the
-// session ends.
+// Frames returns the channel of inbound frames.
+// It is closed when the session ends.
 func (s *Session) Frames() <-chan *realtimev1.Frame { return s.frames }
 
 // SendInput sends a PlayerInput frame as an unreliable datagram.
@@ -134,8 +130,8 @@ func (s *Session) datagramLoop(ctx context.Context) {
 	}
 }
 
-// streamLoop delivers frames sent over reliable unidirectional streams
-// (large snapshots). Each stream carries exactly one frame.
+// streamLoop delivers frames sent over reliable unidirectional streams (large snapshots).
+// Each stream carries exactly one frame.
 func (s *Session) streamLoop(ctx context.Context) {
 	for {
 		stream, err := s.wt.AcceptUniStream(ctx)
@@ -161,9 +157,8 @@ func (s *Session) deliver(ctx context.Context, raw []byte) {
 	}
 }
 
-// matchIDFromToken pulls the match id ("mid" claim) out of the session
-// token's JWT payload. The client does not verify the signature — the
-// room does that on accept — it only needs the id to build the URL.
+// matchIDFromToken pulls the match id ("mid" claim) out of the session token's JWT payload.
+// The client does not verify the signature (the room does that on accept); it only needs the id to build the URL.
 func matchIDFromToken(tokenStr string) (string, error) {
 	parts := strings.Split(tokenStr, ".")
 	if len(parts) != 3 {

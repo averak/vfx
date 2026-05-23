@@ -1,8 +1,7 @@
 // Package main is the RPS CLI client.
 //
-// It uses the vfx Go client SDK to log in, queue a ticket, wait for a
-// match, and play rock-paper-scissors over WebTransport. Two instances
-// against the same vfx-rps deployment play a complete match.
+// It uses the vfx Go client SDK to log in, queue a ticket, wait for a match, and play rock-paper-scissors over WebTransport.
+// Two instances against the same vfx-rps deployment play a complete match.
 package main
 
 import (
@@ -80,9 +79,7 @@ func run() error {
 	return playInteractive(matchCtx, session)
 }
 
-// watchFrames prints inbound frames and stops the client when the match
-// ends (a "game_ended" system event) or the session closes — cancelling
-// the play loop via cancel.
+// watchFrames prints inbound frames and stops the client when the match ends (a "game_ended" system event) or the session closes, cancelling the play loop via cancel.
 func watchFrames(cancel context.CancelFunc, session *vfxclient.Session) {
 	defer cancel()
 	for frame := range session.Frames() {

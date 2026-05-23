@@ -1,9 +1,7 @@
 // Package bootstrap wires every dependency a subcommand needs.
 //
-// Each subcommand has its own container so unused dependencies do not
-// participate in startup. The container is intentionally a plain struct
-// constructed by a top-down function — manual wiring keeps the
-// dependency graph visible without pulling in a DI library.
+// Each subcommand has its own container so unused dependencies do not participate in startup.
+// The container is intentionally a plain struct constructed by a top-down function: manual wiring keeps the dependency graph visible without pulling in a DI library.
 package bootstrap
 
 import (
@@ -57,9 +55,7 @@ type Gateway struct {
 	MatchHandler *gatewaymatchhandler.Handler
 }
 
-// matchmakerMetrics adapts the Prometheus registry to the
-// usecasematch.Metrics interface, keeping the usecase layer free of a
-// concrete metrics dependency.
+// matchmakerMetrics adapts the Prometheus registry to the usecasematch.Metrics interface, keeping the usecase layer free of a concrete metrics dependency.
 type matchmakerMetrics struct {
 	reg *metrics.Registry
 }
@@ -72,9 +68,7 @@ func (m matchmakerMetrics) SetQueueDepth(gameMode string, depth int) {
 	m.reg.QueueDepth.WithLabelValues(gameMode).Set(float64(depth))
 }
 
-// newMatchQueue picks the matchmaking queue by mode: in-memory (single
-// process) or Valkey-backed (shared across gateway replicas, and the one
-// the admin API reads to report queue depth).
+// newMatchQueue picks the matchmaking queue by mode: in-memory (single process) or Valkey-backed (shared across gateway replicas, and the one the admin API reads to report queue depth).
 func newMatchQueue(mode string, valkeyClient valkeygo.Client) (domainmatch.Queue, error) {
 	switch mode {
 	case "valkey":
@@ -86,9 +80,7 @@ func newMatchQueue(mode string, valkeyClient valkeygo.Client) (domainmatch.Queue
 	}
 }
 
-// newAllocator picks the room allocator from config: the stub (single
-// fixed endpoint, for compose/local) or Agones (a GameServerAllocation
-// per match against the in-cluster API).
+// newAllocator picks the room allocator from config: the stub (single fixed endpoint, for compose/local) or Agones (a GameServerAllocation per match against the in-cluster API).
 func newAllocator(cfg *config.Gateway) (domainmatch.Allocator, error) {
 	switch cfg.Allocator {
 	case "agones":
@@ -100,9 +92,8 @@ func newAllocator(cfg *config.Gateway) (domainmatch.Allocator, error) {
 	}
 }
 
-// NewGateway constructs and validates the gateway container. The
-// returned cleanup function closes long-lived resources and must be
-// called before the process exits.
+// NewGateway constructs and validates the gateway container.
+// The returned cleanup function closes long-lived resources and must be called before the process exits.
 func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	cfg, err := config.LoadGateway()
 	if err != nil {

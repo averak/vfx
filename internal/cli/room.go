@@ -69,9 +69,8 @@ func runRoom(ctx context.Context, registry *plugin.Registry) error {
 	return container.Server.ListenAndServe(ctx)
 }
 
-// startRoomMetricsServer runs the room's plain-HTTP listener for
-// Prometheus scraping and orchestrator probes, alongside the
-// WebTransport (HTTP/3) tier. It returns a shutdown function.
+// startRoomMetricsServer runs the room's plain-HTTP listener for Prometheus scraping and orchestrator probes, alongside the WebTransport (HTTP/3) tier.
+// It returns a shutdown function.
 func startRoomMetricsServer(addr string, container *bootstrap.Room, logger *slog.Logger) func() {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", container.Metrics.Handler())

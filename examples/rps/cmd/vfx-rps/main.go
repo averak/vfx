@@ -1,10 +1,7 @@
 // Package main is the example binary that ships the RPS plugin.
 //
-// It is identical to cmd/vfx except for one line: rps.NewFactory is
-// registered with the plugin registry before the cobra root command is
-// built. `vfx-rps room` therefore boots a WebTransport server hosting
-// rock-paper-scissors matches. The other subcommands (gateway / admin /
-// migrate) behave exactly like the vanilla binary.
+// It is identical to cmd/vfx except for one line: rps.NewFactory is registered with the plugin registry before the cobra root command is built.
+// `vfx-rps room` therefore boots a WebTransport server hosting rock-paper-scissors matches, while the other subcommands (gateway/admin/migrate) behave exactly like the vanilla binary.
 package main
 
 import (

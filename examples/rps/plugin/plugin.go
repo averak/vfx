@@ -7,14 +7,11 @@ import (
 	"github.com/averak/vfx/internal/domain/plugin"
 )
 
-// Factory satisfies plugin.Factory for the Go-native (in-process) RPS
-// plugin used by the vfx-rps binary. The WASM build of the same Game
-// is loaded by the room's wazero host instead and does not go through
-// this Factory.
+// Factory satisfies plugin.Factory for the Go-native (in-process) RPS plugin used by the vfx-rps binary.
+// The WASM build of the same Game is loaded by the room's wazero host instead and does not go through this Factory.
 type Factory struct{}
 
-// NewFactory returns a Factory ready to register with a vfx plugin
-// Registry.
+// NewFactory returns a Factory ready to register with a vfx plugin Registry.
 func NewFactory() *Factory { return &Factory{} }
 
 // Name is the identifier matched against VFX_ROOM_PLUGIN_PATH.
@@ -25,9 +22,7 @@ func (*Factory) Create(_ context.Context) (plugin.Plugin, error) {
 	return &hostAdapter{game: NewGame()}, nil
 }
 
-// hostAdapter wraps the transport-free Game in the host Plugin
-// interface, supplying the context parameters and Close that the
-// in-process contract requires but the pure game logic does not.
+// hostAdapter wraps the transport-free Game in the host Plugin interface, supplying the context parameters and Close that the in-process contract requires but the pure game logic does not.
 type hostAdapter struct {
 	game *Game
 }

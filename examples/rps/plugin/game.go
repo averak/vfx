@@ -1,16 +1,12 @@
 // Package plugin implements rock-paper-scissors as a vfx plugin.
 //
-// The rules live in Game, which is free of any host- or guest-transport
-// concern: it takes and returns the plugin proto messages directly.
+// The rules live in Game, which is free of any host- or guest-transport concern: it takes and returns the plugin proto messages directly.
 // Two thin shells drive the same Game:
 //
-//   - plugin.go adapts Game to the host-side plugin.Plugin interface so
-//     the vfx-rps binary can run it natively (Go).
-//   - cmd/wasm registers Game with the guest SDK and is compiled to
-//     WebAssembly by TinyGo, then loaded by the room's wazero host.
+//   - plugin.go adapts Game to the host-side plugin.Plugin interface so the vfx-rps binary can run it natively (Go).
+//   - cmd/wasm registers Game with the guest SDK and is compiled to WebAssembly by TinyGo, then loaded by the room's wazero host.
 //
-// Because Game has no host function calls and no goroutines, the same
-// source compiles identically for both paths.
+// Because Game has no host function calls and no goroutines, the same source compiles identically for both paths.
 package plugin
 
 import (
@@ -50,15 +46,14 @@ func (g *Game) Init(req *pluginv1.InitRequest) (*pluginv1.InitResponse, error) {
 		return nil, err
 	}
 	return &pluginv1.InitResponse{
-		// 0 means event-driven; the room daemon still wakes up every
-		// 50ms to drain inputs, which is plenty for a turn-based game.
+		// 0 means event-driven; the room daemon still wakes up every 50ms to drain inputs, which is plenty for a turn-based game.
 		TickRateHz:      0,
 		InitialSnapshot: snapshot,
 	}, nil
 }
 
-// OnTick applies queued actions and emits a state delta when a round
-// resolves. It sets game_ended once a match winner is decided.
+// OnTick applies queued actions and emits a state delta when a round resolves.
+// It sets game_ended once a match winner is decided.
 func (g *Game) OnTick(req *pluginv1.OnTickRequest) (*pluginv1.OnTickResponse, error) {
 	progressed := false
 	for _, action := range req.GetActions() {
@@ -149,8 +144,7 @@ func (s *gameState) applyAction(action *pluginv1.PlayerAction) bool {
 		return false
 	}
 	if _, already := s.Choices[action.GetPlayerId()]; already {
-		// First choice each round is authoritative; ignore re-submissions
-		// until the round resolves.
+		// First choice each round is authoritative; ignore re-submissions until the round resolves.
 		return false
 	}
 	s.Choices[action.GetPlayerId()] = choice
@@ -215,8 +209,7 @@ func (s *gameState) encode() ([]byte, error) {
 	return json.Marshal(s)
 }
 
-// decideRound implements the canonical RPS rules: R beats S, S beats P,
-// P beats R; equal inputs tie.
+// decideRound implements the canonical RPS rules: R beats S, S beats P, P beats R; equal inputs tie.
 func decideRound(a, b byte, idA, idB string) string {
 	if a == b {
 		return ""

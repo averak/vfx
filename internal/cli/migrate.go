@@ -10,10 +10,8 @@ import (
 )
 
 const (
-	// defaultMigrationsDir points at where the Docker image stores the
-	// migrations (see Dockerfile), so `vfx migrate` works out of the box
-	// in a container. Running it from a source checkout needs
-	// --dir file://schema/db/migrations (or just use `mise run db-migrate`).
+	// defaultMigrationsDir points at where the Docker image stores the migrations (see Dockerfile), so `vfx migrate` works out of the box in a container.
+	// Running it from a source checkout needs --dir file://schema/db/migrations (or just use `mise run db-migrate`).
 	defaultMigrationsDir = "file:///etc/vfx/migrations"
 	atlasBinary          = "atlas"
 )
@@ -78,8 +76,7 @@ func newMigrateDownCmd(dir, url *string) *cobra.Command {
 }
 
 func runAtlas(ctx context.Context, args ...string) error {
-	// atlasBinary is a fixed constant and args originate from cobra's parsed
-	// flag values, not raw user input, so the variable invocation is safe.
+	// atlasBinary is a fixed constant and args originate from cobra's parsed flag values, not raw user input, so the variable invocation is safe.
 	//nolint:gosec // G204: trusted subprocess invocation.
 	c := exec.CommandContext(ctx, atlasBinary, args...)
 	c.Stdout = os.Stdout

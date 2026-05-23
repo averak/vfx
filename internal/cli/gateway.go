@@ -75,9 +75,8 @@ func runGateway(ctx context.Context) error {
 	matchmakerCtx, stopMatchmaker := context.WithCancel(ctx)
 	defer stopMatchmaker()
 	go func() {
-		// Only the leader replica runs the matchmaker loop; the rest stand
-		// by. Correctness across a brief leadership overlap is guaranteed
-		// by the queue's atomic Claim, so this is a work-dedup optimisation.
+		// Only the leader replica runs the matchmaker loop; the rest stand by.
+		// Correctness across a brief leadership overlap is guaranteed by the queue's atomic Claim, so this is a work-dedup optimisation.
 		err := leaderlock.Run(matchmakerCtx, container.Valkey, leaderlock.Config{
 			Key:    "vfx:matchmaker:leader",
 			TTL:    container.Config.MatchmakerLeaderTTL,
