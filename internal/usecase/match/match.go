@@ -61,7 +61,10 @@ type TicketInput struct {
 // CreateTicket enqueues a fresh ticket for the player.
 func (u *Usecase) CreateTicket(ctx context.Context, in *TicketInput) (uuid.UUID, error) {
 	now := clock.Now(ctx)
-	t := match.NewTicket(uuid.New(), in.PlayerID, in.GameMode, now)
+	t, err := match.NewTicket(uuid.New(), in.PlayerID, in.GameMode, now)
+	if err != nil {
+		return uuid.Nil, err
+	}
 	t.Rating = in.Rating
 	t.Region = in.Region
 	t.PartyMembers = in.PartyMembers

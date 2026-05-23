@@ -12,7 +12,15 @@ import (
 )
 
 func newTicket(gameMode string) *match.Ticket {
-	return match.NewTicket(uuid.New(), uuid.New(), gameMode, time.Now())
+	return newTicketAt(gameMode, time.Now())
+}
+
+func newTicketAt(gameMode string, created time.Time) *match.Ticket {
+	t, err := match.NewTicket(uuid.New(), uuid.New(), gameMode, created)
+	if err != nil {
+		panic(err) // test inputs are always valid
+	}
+	return t
 }
 
 func TestInMem_SubscribeReplaysQueuedState(t *testing.T) {
@@ -84,8 +92,8 @@ func TestInMem_CancelPublishesFailed(t *testing.T) {
 func TestInMem_PendingIsFIFOAndModeScoped(t *testing.T) {
 	q := matchqueue.NewInMem()
 
-	older := match.NewTicket(uuid.New(), uuid.New(), "rps", time.Now().Add(-time.Second))
-	newer := match.NewTicket(uuid.New(), uuid.New(), "rps", time.Now())
+	older := newTicketAt("rps", time.Now().Add(-time.Second))
+	newer := newTicketAt("rps", time.Now())
 	other := newTicket("chess")
 	for _, ticket := range []*match.Ticket{newer, older, other} {
 		_ = q.Enqueue(context.Background(), ticket)

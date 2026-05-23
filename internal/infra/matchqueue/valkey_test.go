@@ -31,7 +31,10 @@ func uniqueMode() string { return "test-" + uuid.NewString() }
 
 func enqueue(t *testing.T, q *matchqueue.Valkey, mode string) *domainmatch.Ticket {
 	t.Helper()
-	ticket := domainmatch.NewTicket(uuid.New(), uuid.New(), mode, time.Now())
+	ticket, err := domainmatch.NewTicket(uuid.New(), uuid.New(), mode, time.Now())
+	if err != nil {
+		t.Fatalf("NewTicket: %v", err)
+	}
 	if err := q.Enqueue(t.Context(), ticket); err != nil {
 		t.Fatalf("Enqueue: %v", err)
 	}
