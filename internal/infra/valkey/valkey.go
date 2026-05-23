@@ -7,8 +7,7 @@ import (
 	"github.com/valkey-io/valkey-go"
 )
 
-// NewClient parses a redis:// URL and returns a connected Valkey client.
-// The caller must Close it on shutdown.
+// NewClient parses a redis:// URL; the caller must Close the returned client.
 func NewClient(url string) (valkey.Client, error) {
 	opts, err := valkey.ParseURL(url)
 	if err != nil {

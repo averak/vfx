@@ -12,7 +12,6 @@ import (
 	"github.com/averak/vfx/internal/domain/match"
 )
 
-// Stub satisfies match.Allocator without contacting any external system.
 type Stub struct {
 	endpoint string
 }

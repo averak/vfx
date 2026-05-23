@@ -6,8 +6,6 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
-// Admin holds the configuration for the operations API.
-// It runs behind a separate auth boundary from the player-facing gateway and exposes read-only operational endpoints.
 type Admin struct {
 	ListenAddr string `env:"VFX_ADMIN_LISTEN_ADDR" envDefault:":8090"`
 
@@ -22,7 +20,6 @@ type Admin struct {
 	AuthToken string `env:"VFX_ADMIN_AUTH_TOKEN"`
 }
 
-// LoadAdmin reads the admin configuration from the environment.
 func LoadAdmin() (*Admin, error) {
 	var cfg Admin
 	if err := env.Parse(&cfg); err != nil {

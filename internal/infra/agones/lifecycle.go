@@ -20,7 +20,7 @@ type healthSender interface {
 	Shutdown() error
 }
 
-// Start connects to the Agones SDK sidecar, marks the game server Ready, and launches a health-ping loop until ctx is cancelled or the returned stop func runs.
+// Start marks the game server Ready and pings Agones health until ctx is cancelled or the returned stop func runs.
 // stop sends Shutdown so Agones can recycle the pod.
 func Start(ctx context.Context, healthInterval time.Duration, logger *slog.Logger) (func(), error) {
 	s, err := agonessdk.NewSDK()

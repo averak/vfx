@@ -16,10 +16,8 @@ import (
 // ErrNoTx is returned by Tx when called outside a Session transaction.
 var ErrNoTx = errors.New("db: no transaction in context")
 
-// txKey is the private context key under which the active tx is stored.
 type txKey struct{}
 
-// Session wraps a pgx pool and exposes transaction lifecycle helpers.
 type Session struct {
 	pool *pgxpool.Pool
 }
@@ -28,14 +26,12 @@ func NewSession(pool *pgxpool.Pool) *Session {
 	return &Session{pool: pool}
 }
 
-// RW runs fn inside a read-write transaction, available to fn (and the repositories it calls) via the context.
-// The transaction commits if fn returns nil, otherwise it rolls back; fn's error is returned as-is so domain errors stay distinguishable.
+// RW commits if fn returns nil, otherwise rolls back; fn's error is returned as-is so domain errors stay distinguishable.
 func (s *Session) RW(ctx context.Context, fn func(context.Context) error) error {
 	return s.run(ctx, pgx.TxOptions{}, fn)
 }
 
-// RO runs fn inside a read-only transaction.
-// Read paths acquire a connection predictably here, and any future replica routing can hook in at this single seam.
+// RO runs fn inside a read-only transaction, the single seam where future replica routing can hook in.
 func (s *Session) RO(ctx context.Context, fn func(context.Context) error) error {
 	return s.run(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly}, fn)
 }

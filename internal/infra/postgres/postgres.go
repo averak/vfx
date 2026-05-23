@@ -8,8 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// NewPool opens a pgxpool to the configured database and verifies it is reachable.
-// The caller owns the returned pool and must Close it on shutdown.
+// NewPool pings to verify reachability; the caller must Close the returned pool.
 func NewPool(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {

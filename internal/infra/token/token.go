@@ -24,8 +24,6 @@ type AccessClaims struct {
 	jwt.RegisteredClaims
 }
 
-// SessionClaims are embedded in a short-lived room-connection token.
-// The room daemon verifies these to gate WebTransport handshakes.
 type SessionClaims struct {
 	PlayerID uuid.UUID `json:"sub"`
 	MatchID  string    `json:"mid"`
@@ -37,7 +35,6 @@ type SessionClaims struct {
 	jwt.RegisteredClaims
 }
 
-// Signer issues and verifies access tokens.
 type Signer struct {
 	secret []byte
 }
@@ -62,9 +59,7 @@ func (s *Signer) SignAccess(playerID uuid.UUID, now time.Time, ttl time.Duration
 	return signed, nil
 }
 
-// SignSession issues a short-lived token clients use to connect to the assigned room.
-// The room daemon trusts these because it shares the signing secret with the gateway.
-// matchPlayers is the full paired roster; the room reads it from the first joining player to initialise the plugin with the right player set.
+// SignSession issues a token the room daemon trusts because it shares the signing secret with the gateway.
 func (s *Signer) SignSession(playerID uuid.UUID, matchID string, matchPlayers []string, now time.Time, ttl time.Duration) (string, error) {
 	claims := SessionClaims{
 		PlayerID:     playerID,
@@ -83,7 +78,6 @@ func (s *Signer) SignSession(playerID uuid.UUID, matchID string, matchPlayers []
 	return signed, nil
 }
 
-// VerifySession parses and validates a session token, returning its claims when the signature, algorithm, and expiry all check out.
 func (s *Signer) VerifySession(tokenStr string) (*SessionClaims, error) {
 	claims := &SessionClaims{}
 	_, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
@@ -98,7 +92,6 @@ func (s *Signer) VerifySession(tokenStr string) (*SessionClaims, error) {
 	return claims, nil
 }
 
-// Verify parses and validates an access token string, returning its claims when the signature, algorithm, and expiry all check out.
 func (s *Signer) Verify(tokenStr string) (*AccessClaims, error) {
 	claims := &AccessClaims{}
 	_, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
@@ -113,15 +106,11 @@ func (s *Signer) Verify(tokenStr string) (*AccessClaims, error) {
 	return claims, nil
 }
 
-// Refresh holds both halves of a freshly minted refresh token.
 type Refresh struct {
-	// Raw is the value sent to the client. It is never persisted.
-	Raw string
-	// Hash is what gets stored in the refresh_tokens table.
-	Hash []byte
+	Raw  string // sent to the client, never persisted
+	Hash []byte // stored in the refresh_tokens table
 }
 
-// NewRefresh generates a cryptographically random refresh token.
 func NewRefresh() (*Refresh, error) {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
@@ -131,15 +120,12 @@ func NewRefresh() (*Refresh, error) {
 	return &Refresh{Raw: raw, Hash: HashRefresh(raw)}, nil
 }
 
-// HashRefresh returns the SHA-256 of the raw token.
-// This is the form stored in the database and looked up on refresh.
 func HashRefresh(raw string) []byte {
 	sum := sha256.Sum256([]byte(raw))
 	return sum[:]
 }
 
-// NewRefresh returns a fresh refresh token's raw value and stored hash.
-// The method form lets *Signer satisfy the auth usecase's TokenIssuer port, which works in primitives rather than the Refresh type.
+// NewRefresh is the method form that lets *Signer satisfy the TokenIssuer port, which works in primitives rather than the Refresh type.
 func (s *Signer) NewRefresh() (raw string, hash []byte, err error) {
 	r, err := NewRefresh()
 	if err != nil {

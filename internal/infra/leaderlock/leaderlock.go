@@ -14,7 +14,6 @@ import (
 	valkeygo "github.com/valkey-io/valkey-go"
 )
 
-// Config tunes the election.
 type Config struct {
 	Key    string
 	TTL    time.Duration

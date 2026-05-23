@@ -19,7 +19,6 @@ import (
 // keyPrefix namespaces assignment keys so they never collide with other vfx state sharing the same Valkey database.
 const keyPrefix = "vfx:assignment:"
 
-// Valkey persists assignments in a Valkey/Redis-compatible store.
 type Valkey struct {
 	client valkeygo.Client
 }

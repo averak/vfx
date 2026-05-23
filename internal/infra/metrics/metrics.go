@@ -29,7 +29,6 @@ type Registry struct {
 	RoomTickDuration  prometheus.Histogram
 }
 
-// NewRegistry builds a fresh registry pre-loaded with the standard Go and process collectors plus the vfx-specific ones.
 func NewRegistry() *Registry {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(
@@ -87,7 +86,6 @@ func NewRegistry() *Registry {
 	return r
 }
 
-// Handler returns an http.Handler that exports the registry in the Prometheus text format.
 func (r *Registry) Handler() http.Handler {
 	return promhttp.HandlerFor(r.Registry, promhttp.HandlerOpts{
 		Registry: r.Registry,

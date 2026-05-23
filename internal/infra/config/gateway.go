@@ -11,9 +11,7 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
-// Gateway holds every value the gateway process needs to start.
-//
-// Common variables (DATABASE_URL, VALKEY_URL) follow the unprefixed convention shared with atlas, psql, redis-cli, and the like, so the same env file works for tooling.
+// Gateway's common variables (DATABASE_URL, VALKEY_URL) follow the unprefixed convention shared with atlas, psql, redis-cli, and the like, so the same env file works for tooling.
 // vfx-specific knobs carry the VFX_ prefix to avoid collisions in shared environments.
 type Gateway struct {
 	ListenAddr string `env:"VFX_GATEWAY_LISTEN_ADDR" envDefault:":8080"`
@@ -61,7 +59,6 @@ type Gateway struct {
 	AgonesNamespace string `env:"VFX_AGONES_NAMESPACE" envDefault:"default"`
 }
 
-// LoadGateway reads the gateway configuration from the environment.
 func LoadGateway() (*Gateway, error) {
 	var cfg Gateway
 	if err := env.Parse(&cfg); err != nil {

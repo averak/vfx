@@ -7,7 +7,6 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
-// Room holds every value the room daemon needs to start.
 type Room struct {
 	// ListenAddr is the UDP address the WebTransport server binds to.
 	ListenAddr string `env:"VFX_ROOM_LISTEN_ADDR" envDefault:":7777"`
@@ -49,7 +48,6 @@ type Room struct {
 	DatagramMaxBytes int `env:"VFX_ROOM_DATAGRAM_MAX_BYTES" envDefault:"1200"`
 }
 
-// LoadRoom reads the room configuration from the environment.
 func LoadRoom() (*Room, error) {
 	var cfg Room
 	if err := env.Parse(&cfg); err != nil {

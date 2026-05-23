@@ -18,8 +18,7 @@ import (
 // The Helm chart sets it; the allocator filters on it.
 const GameModeLabel = "vfx.dev/game-mode"
 
-// Agones allocates rooms by asking Agones for a Ready GameServer of the requested game mode.
-// It creates a GameServerAllocation through the in-cluster Kubernetes API; Agones flips a Ready GameServer to Allocated and returns its externally reachable address and port.
+// Agones reserves a Ready GameServer of the requested game mode via a GameServerAllocation against the in-cluster API.
 type Agones struct {
 	client    versioned.Interface
 	namespace string
@@ -27,8 +26,7 @@ type Agones struct {
 
 var _ match.Allocator = (*Agones)(nil)
 
-// NewAgones builds an allocator using the in-cluster service account.
-// It must run inside a pod whose service account may create allocation.agones.dev/gameserverallocations (the Helm chart grants this to the gateway).
+// NewAgones must run inside a pod whose service account may create allocation.agones.dev/gameserverallocations (the Helm chart grants this to the gateway).
 func NewAgones(namespace string) (*Agones, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {

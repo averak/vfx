@@ -22,7 +22,6 @@ import (
 // Kept in sync with the guest SDK (sdk/plugin/go), which returns packed(ptr<<32 | len) pointing at the frame.
 const statusOK = 0
 
-// Factory compiles a WASM module once and instantiates a fresh copy per match.
 type Factory struct {
 	name     string
 	runtime  wazero.Runtime

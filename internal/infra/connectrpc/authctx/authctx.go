@@ -10,12 +10,10 @@ import (
 
 type ctxKey struct{}
 
-// With returns a context carrying the given authenticated player id.
 func With(ctx context.Context, playerID uuid.UUID) context.Context {
 	return context.WithValue(ctx, ctxKey{}, playerID)
 }
 
-// From returns the authenticated player id and ok=true when one is present, or uuid.Nil and ok=false otherwise.
 func From(ctx context.Context) (uuid.UUID, bool) {
 	id, ok := ctx.Value(ctxKey{}).(uuid.UUID)
 	return id, ok
