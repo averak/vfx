@@ -232,7 +232,7 @@ Durable data lives in two substrates chosen by shape: structured records in Post
 
 - Holds the file bytes for two buckets: **player data** (owner-scoped save data) and **title storage** (operator-published, read-only, tag-gated content and remote config).
 - Transfers go directly between the client and the store over V4 signed URLs, so large blobs never traverse the gateway. The gateway authorizes the request, enforces per-player quotas, issues the URL, and — for writes — verifies the uploaded object before recording its metadata.
-- A metadata row exists only after a committed upload; an interrupted upload leaves an orphan object with no row, reclaimed by the bucket's lifecycle/sweep. Deletes remove the metadata row first (the source of truth) and best-effort the object second.
+- A metadata row exists only after a committed upload; an interrupted upload leaves an orphan object with no row. An orphan is harmless — with no metadata it is invisible to every API — so it is not deleted eagerly (no commit-time rewrite, no full-bucket scan). If reclamation is wanted, it is done targeted: a pending-upload intent recorded at WriteFile and a sweep that removes only stale, still-uncommitted intents. Deletes remove the metadata row first (the source of truth) and best-effort the object second.
 - Signing uses IAM SignBlob (Workload Identity) in production, so no service-account key is placed on disk; local development and CI run [fake-gcs-server](https://github.com/fsouza/fake-gcs-server).
 
 ### Valkey
