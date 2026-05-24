@@ -9,9 +9,8 @@ import (
 
 func toPlayerPb(p *player.Player) *authv1.Player {
 	return &authv1.Player{
-		Id:        p.ID.String(),
-		Nickname:  p.Nickname,
-		CreatedAt: timestamppb.New(p.CreatedAt),
-		UpdatedAt: timestamppb.New(p.UpdatedAt),
+		Id:           p.ID.String(),
+		Nickname:     p.Nickname,
+		RegisteredAt: timestamppb.New(p.RegisteredAt),
 	}
 }

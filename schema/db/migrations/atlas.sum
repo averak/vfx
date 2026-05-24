@@ -1,4 +1,4 @@
-h1:1CRt3uXrvxxH+wqQ8lgdoqFtPqbTVQFmb2JCEHPI3xs=
+h1:oi3pGWnlQA3hDr0Pr5uogQ8QivgLKxaba47D/a28dR8=
 20260520183527_init.sql h1:TvbRsr5n4acFSe0wdnUjDJvCyqAkO3X9cBeSxkwFBfQ=
 20260523152707_storage.sql h1:RjRt+7kgmRMYlxy1OFpJS9gf2Hps8vYrwp7DktexXHY=
 20260523165536_leaderboard.sql h1:3QfvVqStYJ3aLmNmLPfBxq2Gr38i19A4cYzpeg4In3g=
@@ -10,3 +10,4 @@ h1:1CRt3uXrvxxH+wqQ8lgdoqFtPqbTVQFmb2JCEHPI3xs=
 20260524052110_leaderboard_achieved_at.sql h1:2DAPU3rCM3GMLGwLkcdxO1RLlCmqYT/b8PQDOgCadUU=
 20260524052653_storage_modified_at.sql h1:NzuKPSbFaCUpEY+s01kfSrU8yXnybv7bYUyLumNb1Hw=
 20260524053039_groups_founded_at.sql h1:UMb3br8nwXqqd23Dfv1Y1aLvkOnWB12h7l6r4R86Ghc=
+20260524053244_players_registered_at.sql h1:i6LMWu4ygYfK9ubMSOQbW416nKicoa7zo2/+ekkb2kk=

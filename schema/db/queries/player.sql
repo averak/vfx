@@ -3,12 +3,13 @@ SELECT * FROM players
 WHERE id = $1;
 
 -- Player is the aggregate root, so it is persisted whole: one upsert serves both creation and profile updates, rather than per-field update queries.
+-- registered_at is set once at creation (domain data); updated_at is row audit, refreshed by the database on every write.
 -- name: UpsertPlayer :one
-INSERT INTO players (id, nickname, created_at, updated_at)
-VALUES ($1, $2, $3, $4)
+INSERT INTO players (id, nickname, registered_at)
+VALUES ($1, $2, $3)
 ON CONFLICT (id) DO UPDATE
 SET nickname = EXCLUDED.nickname,
-    updated_at = EXCLUDED.updated_at
+    updated_at = NOW()
 RETURNING *;
 
 -- name: FindIdentity :one

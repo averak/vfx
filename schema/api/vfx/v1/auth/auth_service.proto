@@ -113,6 +113,9 @@ message Player {
   // 未設定の場合はクライアント側で適切にフォールバック表示する。
   optional string nickname = 2;
 
-  google.protobuf.Timestamp created_at = 3;
-  google.protobuf.Timestamp updated_at = 4;
+  // アカウント登録日時。
+  google.protobuf.Timestamp registered_at = 3;
+
+  reserved 4;
+  reserved "updated_at";
 }

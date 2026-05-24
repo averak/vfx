@@ -41,8 +41,8 @@ func TestNew_NicknameInvariant(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if p.CreatedAt != now || p.UpdatedAt != now {
-				t.Errorf("timestamps not set to now")
+			if p.RegisteredAt != now {
+				t.Errorf("RegisteredAt = %v, want %v", p.RegisteredAt, now)
 			}
 		})
 	}
@@ -71,25 +71,20 @@ func TestNew_NicknameLengthBoundary(t *testing.T) {
 }
 
 func TestSetNickname_UpdatesAndValidates(t *testing.T) {
-	created := time.Now()
-	later := created.Add(time.Hour)
-	p, err := player.New(uuid.New(), ptr("Alice"), created)
+	p, err := player.New(uuid.New(), ptr("Alice"), time.Now())
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 
-	if err := p.SetNickname(ptr("Bob"), later); err != nil {
+	if err := p.SetNickname(ptr("Bob")); err != nil {
 		t.Fatalf("SetNickname: %v", err)
 	}
 	if p.Nickname == nil || *p.Nickname != "Bob" {
 		t.Errorf("nickname not updated: %v", p.Nickname)
 	}
-	if p.UpdatedAt != later {
-		t.Errorf("UpdatedAt = %v, want %v", p.UpdatedAt, later)
-	}
 
 	// A nil nickname clears the field rather than being rejected.
-	if err := p.SetNickname(nil, later); err != nil {
+	if err := p.SetNickname(nil); err != nil {
 		t.Fatalf("clearing nickname with nil failed: %v", err)
 	}
 	if p.Nickname != nil {
@@ -98,7 +93,7 @@ func TestSetNickname_UpdatesAndValidates(t *testing.T) {
 
 	// An invalid nickname is rejected and leaves the player untouched.
 	bad := strings.Repeat("x", player.MaxNicknameLength+1)
-	if err := p.SetNickname(&bad, later); !errors.Is(err, player.ErrInvalidNickname) {
+	if err := p.SetNickname(&bad); !errors.Is(err, player.ErrInvalidNickname) {
 		t.Errorf("over-length SetNickname err = %v, want ErrInvalidNickname", err)
 	}
 	if p.Nickname != nil {

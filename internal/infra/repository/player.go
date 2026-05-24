@@ -53,19 +53,17 @@ func (Player) Save(ctx context.Context, p *player.Player) error {
 		return err
 	}
 	_, err = dbgen.New(tx).UpsertPlayer(ctx, dbgen.UpsertPlayerParams{
-		ID:        p.ID,
-		Nickname:  p.Nickname,
-		CreatedAt: toTimestamptz(p.CreatedAt),
-		UpdatedAt: toTimestamptz(p.UpdatedAt),
+		ID:           p.ID,
+		Nickname:     p.Nickname,
+		RegisteredAt: toTimestamptz(p.RegisteredAt),
 	})
 	return err
 }
 
 func playerFromRow(row dbgen.Player) *player.Player {
 	return &player.Player{
-		ID:        row.ID,
-		Nickname:  row.Nickname,
-		CreatedAt: row.CreatedAt.Time,
-		UpdatedAt: row.UpdatedAt.Time,
+		ID:           row.ID,
+		Nickname:     row.Nickname,
+		RegisteredAt: row.RegisteredAt.Time,
 	}
 }

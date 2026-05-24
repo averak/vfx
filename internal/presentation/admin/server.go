@@ -58,9 +58,9 @@ func NewHandler(uc *usecaseadmin.Usecase, storageUC *usecasestorage.Usecase, poo
 			return
 		}
 		writeJSON(w, http.StatusOK, playerView{
-			ID:        p.ID.String(),
-			Nickname:  p.Nickname,
-			CreatedAt: p.CreatedAt,
+			ID:           p.ID.String(),
+			Nickname:     p.Nickname,
+			RegisteredAt: p.RegisteredAt,
 		})
 	}))
 
@@ -159,9 +159,9 @@ func requireToken(token string, h http.HandlerFunc) http.HandlerFunc {
 }
 
 type playerView struct {
-	ID        string    `json:"id"`
-	Nickname  *string   `json:"nickname"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	Nickname     *string   `json:"nickname"`
+	RegisteredAt time.Time `json:"registered_at"`
 }
 
 type queueView struct {

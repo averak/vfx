@@ -236,8 +236,6 @@ func (u *Usecase) Logout(ctx context.Context, playerID uuid.UUID) error {
 
 // UpdateProfile leaves a field unchanged when its argument is nil, so the RPC can grow to set other optional fields without becoming destructive.
 func (u *Usecase) UpdateProfile(ctx context.Context, playerID uuid.UUID, nickname *string) (*player.Player, error) {
-	now := clock.Now(ctx)
-
 	var updated *player.Player
 	err := u.tx.RW(ctx, func(ctx context.Context) error {
 		p, err := u.playerRepo.GetByID(ctx, playerID)
@@ -245,7 +243,7 @@ func (u *Usecase) UpdateProfile(ctx context.Context, playerID uuid.UUID, nicknam
 			return err
 		}
 		if nickname != nil {
-			if err := p.SetNickname(nickname, now); err != nil {
+			if err := p.SetNickname(nickname); err != nil {
 				return err
 			}
 		}

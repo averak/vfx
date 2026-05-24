@@ -18,10 +18,9 @@ const MaxNicknameLength = 32
 var ErrInvalidNickname = errors.New("player: invalid nickname")
 
 type Player struct {
-	ID        uuid.UUID
-	Nickname  *string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           uuid.UUID
+	Nickname     *string
+	RegisteredAt time.Time
 }
 
 // A nil nickname leaves the player unnamed.
@@ -30,20 +29,18 @@ func New(id uuid.UUID, nickname *string, now time.Time) (*Player, error) {
 		return nil, err
 	}
 	return &Player{
-		ID:        id,
-		Nickname:  nickname,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:           id,
+		Nickname:     nickname,
+		RegisteredAt: now,
 	}, nil
 }
 
 // A nil nickname clears it.
-func (p *Player) SetNickname(nickname *string, now time.Time) error {
+func (p *Player) SetNickname(nickname *string) error {
 	if err := validateNickname(nickname); err != nil {
 		return err
 	}
 	p.Nickname = nickname
-	p.UpdatedAt = now
 	return nil
 }
 

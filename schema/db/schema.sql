@@ -19,7 +19,8 @@
 CREATE TABLE players (
   id          UUID         PRIMARY KEY,
   nickname    VARCHAR(32),
-  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  -- registered_at is when the account was created (domain data the API surfaces); updated_at is row audit.
+  registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
