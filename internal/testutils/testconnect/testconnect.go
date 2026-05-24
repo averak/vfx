@@ -56,6 +56,9 @@ const (
 
 const jwtSecret = "test-secret"
 
+// MaxPartySize bounds party validation in handler tests; a party larger than this is rejected at CreateTicket.
+const MaxPartySize = 4
+
 // Storage limits are kept tiny so quota and size rejections are easy to trigger from a handler test.
 const (
 	StorageMaxBytesPerPlayer = 1024
@@ -97,7 +100,8 @@ func New(t *testing.T) *Server {
 		15*time.Minute,
 		720*time.Hour,
 	)
-	matchUC := usecasematch.New(matchqueue.NewInMem(), assignmentstore.NewInMem())
+	// The test harness does not run the matchmaker, so this size only bounds party validation at CreateTicket.
+	matchUC := usecasematch.New(matchqueue.NewInMem(), assignmentstore.NewInMem(), MaxPartySize)
 
 	blob := fakeblob.New()
 	storageUC := usecasestorage.New(

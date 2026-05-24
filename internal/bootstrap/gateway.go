@@ -176,7 +176,7 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 		return nil, nil, err
 	}
 	matchAssignments := assignmentstore.NewValkey(valkeyClient)
-	matchUC := usecasematch.New(matchQueue, matchAssignments)
+	matchUC := usecasematch.New(matchQueue, matchAssignments, cfg.PlayersPerMatch)
 	matchHandler := gatewaymatchhandler.New(matchUC)
 	matchmaker := usecasematch.NewMatchmaker(matchQueue, matchAllocator, signer, usecasematch.Config{
 		Interval:                 cfg.MatchmakerInterval,

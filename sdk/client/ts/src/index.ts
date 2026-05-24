@@ -135,10 +135,23 @@ export class VfxClient {
     return this.player;
   }
 
-  /** Enqueue a matchmaking ticket and return its id. */
-  async createTicket(gameMode: string): Promise<string> {
+  /**
+   * Enqueue a matchmaking ticket and return its id.
+   *
+   * Pass party member ids to queue as a party (the caller is added automatically): every member must queue with the same party so the matchmaker places them in one match together, and the party must fit within the match size.
+   */
+  async createTicket(
+    gameMode: string,
+    opts: { party?: string[]; rating?: number; region?: string; attributes?: Record<string, string> } = {},
+  ): Promise<string> {
     const resp = await this.match.createTicket(
-      { gameMode },
+      {
+        gameMode,
+        partyMembers: opts.party ?? [],
+        rating: opts.rating,
+        region: opts.region,
+        attributes: opts.attributes ?? {},
+      },
       { headers: this.authHeaders() },
     );
     return resp.ticketId;

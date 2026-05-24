@@ -12,6 +12,7 @@ vfx hosts realtime multiplayer matches. You write the game logic as a WebAssembl
 - **Sandboxed game logic** — plugins run as WebAssembly under [`wazero`](https://wazero.io/), so you can write a game in any language that targets WASM (or link a Go plugin in directly).
 - **Kubernetes-native** — one process per match, with the room fleet's lifecycle managed by [Agones](https://agones.dev/).
 - **Authentication** — anonymous guest accounts and OIDC sign-in (Google, Apple), with account linking to upgrade a guest into a federated identity.
+- **Matchmaking** — ticket queue with rating- and region-aware tiers that widen as a player waits, parties that are placed into one match together, and atomic claiming so replicas never double-match a ticket.
 - **Leaderboards** — configurable ascending or descending boards, keep-best scoring applied atomically, and ranked / around-player queries.
 - **Player & title storage** — owner-scoped save data and operator-published content. File bytes stream directly between the client and object storage over signed URLs; the gateway brokers only metadata and authorization, never the bytes.
 - **Social graph** — friend requests with mutual auto-accept, friend lists, blocking, and player groups (create / join / leave / members).

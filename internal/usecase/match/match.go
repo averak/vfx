@@ -16,14 +16,17 @@ import (
 type Usecase struct {
 	queue       match.Queue
 	assignments match.AssignmentStore
+	// maxPartySize rejects a party that cannot possibly be placed; it is the match size, since a party larger than a match never matches. Zero means no limit.
+	maxPartySize int
 }
 
 // New treats a nil assignments store as one that reports "no active match", convenient for tests that exercise only the ticket flow.
-func New(queue match.Queue, assignments match.AssignmentStore) *Usecase {
+// maxPartySize is normally the configured players-per-match; pass 0 to disable the up-front party-size check.
+func New(queue match.Queue, assignments match.AssignmentStore, maxPartySize int) *Usecase {
 	if assignments == nil {
 		assignments = noopAssignmentStore{}
 	}
-	return &Usecase{queue: queue, assignments: assignments}
+	return &Usecase{queue: queue, assignments: assignments, maxPartySize: maxPartySize}
 }
 
 type noopAssignmentStore struct{}
@@ -54,7 +57,12 @@ func (u *Usecase) CreateTicket(ctx context.Context, in *TicketInput) (uuid.UUID,
 	}
 	t.Rating = in.Rating
 	t.Region = in.Region
-	t.PartyMembers = in.PartyMembers
+	// Normalize the roster to the canonical (self-included, deduped, sorted) form so every party member's ticket carries an identical roster the matchmaker can group on, no matter who each member listed.
+	roster := match.NormalizeParty(in.PlayerID, in.PartyMembers)
+	if u.maxPartySize > 0 && len(roster) > u.maxPartySize {
+		return uuid.Nil, match.ErrPartyTooLarge
+	}
+	t.PartyMembers = roster
 	t.Attributes = in.Attributes
 	if err := u.queue.Enqueue(ctx, t); err != nil {
 		return uuid.Nil, err

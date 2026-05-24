@@ -105,6 +105,35 @@ func TestWatchTicket_StreamsQueued(t *testing.T) {
 	}
 }
 
+// A party that lists members is accepted; one larger than the match size is rejected up front.
+func TestCreateTicket_PartyValidation(t *testing.T) {
+	srv := testconnect.New(t)
+	token := login(t, srv, "party-device")
+
+	mate := uuid.NewString()
+	if _, err := srv.Match.CreateTicket(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&matchv1.CreateTicketRequest{GameMode: gameModeRPS, PartyMembers: []string{mate}}), token)); err != nil {
+		t.Fatalf("valid party CreateTicket: %v", err)
+	}
+
+	// The submitter plus MaxPartySize listed members exceeds the match size, so it is rejected.
+	oversized := make([]string, testconnect.MaxPartySize)
+	for i := range oversized {
+		oversized[i] = uuid.NewString()
+	}
+	_, err := srv.Match.CreateTicket(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&matchv1.CreateTicketRequest{GameMode: gameModeRPS, PartyMembers: oversized}), token))
+	requireCode(t, err, connect.CodeInvalidArgument)
+}
+
+func TestCreateTicket_RejectsInvalidPartyMember(t *testing.T) {
+	srv := testconnect.New(t)
+	token := login(t, srv, "bad-party-device")
+	_, err := srv.Match.CreateTicket(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&matchv1.CreateTicketRequest{GameMode: gameModeRPS, PartyMembers: []string{"not-a-uuid"}}), token))
+	requireCode(t, err, connect.CodeInvalidArgument)
+}
+
 func TestWatchTicket_RequiresAuth(t *testing.T) {
 	srv := testconnect.New(t)
 

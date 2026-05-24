@@ -9,6 +9,29 @@ import (
 	"github.com/averak/vfx/internal/domain/match"
 )
 
+// party builds the member tickets of one party: every member's ticket carries the same normalized roster, as the usecase produces.
+func party(created time.Time, members ...uuid.UUID) []*match.Ticket {
+	roster := match.NormalizeParty(members[0], members[1:])
+	out := make([]*match.Ticket, len(members))
+	for i, pid := range members {
+		t, err := match.NewTicket(uuid.New(), pid, "rps", created)
+		if err != nil {
+			panic(err)
+		}
+		t.PartyMembers = roster
+		out[i] = t
+	}
+	return out
+}
+
+func playerSet(group []*match.Ticket) map[uuid.UUID]bool {
+	out := make(map[uuid.UUID]bool, len(group))
+	for _, g := range group {
+		out[g.PlayerID] = true
+	}
+	return out
+}
+
 // policy is a fixed test policy: base window 100, +50/sec, region
 // relaxes after 15s. Boundary tests below lean on these exact numbers.
 func policy() match.MatchingPolicy {
@@ -134,6 +157,131 @@ func TestMatcher_NilWhenNoPartner(t *testing.T) {
 	pending := []*match.Ticket{ticket(now, f(1000), s("us")), ticket(now, f(1000), s("eu"))}
 	if m.SelectGroup(now, pending) != nil {
 		t.Fatal("formed a group despite no compatible partner")
+	}
+}
+
+func TestMatcher_KeepsPartyTogether(t *testing.T) {
+	m := match.NewMatcher(2, policy())
+	now := time.Now()
+	a, b := uuid.New(), uuid.New()
+	group := m.SelectGroup(now, party(now, a, b))
+	if len(group) != 2 {
+		t.Fatalf("party of 2 not matched: %v", group)
+	}
+	players := playerSet(group)
+	if !players[a] || !players[b] {
+		t.Errorf("party members missing from match: %v", players)
+	}
+}
+
+// A party member must not be matched as a solo while the rest of the party is still queuing.
+func TestMatcher_IncompletePartyWaits(t *testing.T) {
+	m := match.NewMatcher(2, policy())
+	now := time.Now()
+	a, b := uuid.New(), uuid.New()
+	full := party(now, a, b)
+	// Only member a is present; b never queued. A lone solo also waits.
+	pending := []*match.Ticket{full[0], ticket(now, nil, nil)}
+	if g := m.SelectGroup(now, pending); g != nil {
+		t.Fatalf("incomplete party was matched (possibly with the solo): %v", g)
+	}
+}
+
+func TestMatcher_PartyPlusSoloFillsMatch(t *testing.T) {
+	m := match.NewMatcher(3, policy())
+	now := time.Now()
+	a, b := uuid.New(), uuid.New()
+	pending := append(party(now, a, b), ticket(now, nil, nil))
+	group := m.SelectGroup(now, pending)
+	if len(group) != 3 {
+		t.Fatalf("party + solo did not fill a 3-player match: %v", group)
+	}
+}
+
+func TestMatcher_TwoPartiesFillMatch(t *testing.T) {
+	m := match.NewMatcher(4, policy())
+	now := time.Now()
+	a, b, c, d := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	pending := append(party(now, a, b), party(now, c, d)...)
+	group := m.SelectGroup(now, pending)
+	if len(group) != 4 {
+		t.Fatalf("two 2-player parties did not fill a 4-player match: %v", group)
+	}
+}
+
+func TestMatcher_PartyLargerThanMatchNeverPlaced(t *testing.T) {
+	m := match.NewMatcher(2, policy())
+	now := time.Now()
+	a, b, c := uuid.New(), uuid.New(), uuid.New()
+	if g := m.SelectGroup(now, party(now, a, b, c)); g != nil {
+		t.Fatalf("a party larger than the match was placed: %v", g)
+	}
+}
+
+// Even when a single party member could fill the last slot, the matcher places the party whole or not at all.
+func TestMatcher_DoesNotSplitParty(t *testing.T) {
+	m := match.NewMatcher(2, policy())
+	now := time.Now()
+	a, b := uuid.New(), uuid.New()
+	pty := party(now, a, b)
+	// Solo first, so a naive matcher would pair solo + a and strand b.
+	pending := []*match.Ticket{ticket(now, nil, nil), pty[0], pty[1]}
+	group := m.SelectGroup(now, pending)
+	if len(group) != 2 {
+		t.Fatalf("no group formed: %v", group)
+	}
+	players := playerSet(group)
+	if !players[a] || !players[b] {
+		t.Errorf("party was split; group players = %v", players)
+	}
+}
+
+// A party mixed into a seed's match still respects that seed's rating tier.
+func TestMatcher_PartyRespectsSeedTier(t *testing.T) {
+	m := match.NewMatcher(3, policy())
+	now := time.Now()
+	a, b := uuid.New(), uuid.New()
+	pty := party(now, a, b)
+	pty[0].Rating, pty[1].Rating = f(1000), f(1000)
+	// A fresh solo seed at 3000 cannot admit a 1000-rated party (gap 2000 > base window 100), so no match forms.
+	pending := append([]*match.Ticket{ticket(now, f(3000), nil)}, pty...)
+	if g := m.SelectGroup(now, pending); g != nil {
+		t.Fatalf("party outside the seed's rating window was placed: %v", g)
+	}
+}
+
+func TestNormalizeParty(t *testing.T) {
+	a := uuid.New()
+	b := uuid.New()
+	if r := match.NormalizeParty(a, nil); r != nil {
+		t.Errorf("solo (no members) roster = %v, want nil", r)
+	}
+	if r := match.NormalizeParty(a, []uuid.UUID{a}); r != nil {
+		t.Errorf("self-only roster = %v, want nil", r)
+	}
+	// Self is auto-included and duplicates collapse, so either member yields the identical canonical roster.
+	r1 := match.NormalizeParty(a, []uuid.UUID{b, b})
+	r2 := match.NormalizeParty(b, []uuid.UUID{a})
+	if len(r1) != 2 || r1[0] != r2[0] || r1[1] != r2[1] {
+		t.Errorf("rosters not canonical/equal: %v vs %v", r1, r2)
+	}
+	if r1[0].String() > r1[1].String() {
+		t.Error("roster is not sorted")
+	}
+}
+
+func TestPartyKey(t *testing.T) {
+	a, b := uuid.New(), uuid.New()
+	pty := party(time.Now(), a, b)
+	if !pty[0].IsParty() || !pty[1].IsParty() {
+		t.Fatal("party tickets not detected as a party")
+	}
+	if pty[0].PartyKey() != pty[1].PartyKey() {
+		t.Errorf("party members disagree on key: %q vs %q", pty[0].PartyKey(), pty[1].PartyKey())
+	}
+	solo := ticket(time.Now(), nil, nil)
+	if solo.IsParty() || solo.PartyKey() != "" {
+		t.Error("solo ticket misclassified as a party")
 	}
 }
 

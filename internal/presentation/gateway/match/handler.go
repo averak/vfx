@@ -178,6 +178,8 @@ func toConnectError(err error) error {
 	switch {
 	case errors.Is(err, domainmatch.ErrTicketNotFound):
 		return connect.NewError(connect.CodeNotFound, err)
+	case errors.Is(err, domainmatch.ErrPartyTooLarge):
+		return connect.NewError(connect.CodeInvalidArgument, err)
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}

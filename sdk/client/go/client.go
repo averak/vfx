@@ -135,8 +135,36 @@ func (c *Client) LinkIdentity(ctx context.Context, provider authv1.Provider, idT
 	return nil
 }
 
-func (c *Client) CreateTicket(ctx context.Context, gameMode string) (string, error) {
-	req := connect.NewRequest(&matchv1.CreateTicketRequest{GameMode: gameMode})
+// CreateTicketOption tunes an optional matchmaking dimension; see WithParty, WithRating, WithRegion, and WithAttributes.
+type CreateTicketOption func(*matchv1.CreateTicketRequest)
+
+// WithParty queues as a party with the given members (the caller is added automatically).
+// Every member must queue with the same party so the matchmaker places them in one match together; the party must fit within the match size.
+func WithParty(memberPlayerIDs ...string) CreateTicketOption {
+	return func(r *matchv1.CreateTicketRequest) { r.PartyMembers = memberPlayerIDs }
+}
+
+// WithRating sets the ticket's skill rating for rating-windowed matching.
+func WithRating(rating float64) CreateTicketOption {
+	return func(r *matchv1.CreateTicketRequest) { r.Rating = &rating }
+}
+
+// WithRegion sets the ticket's region for region-aware matching.
+func WithRegion(region string) CreateTicketOption {
+	return func(r *matchv1.CreateTicketRequest) { r.Region = &region }
+}
+
+// WithAttributes attaches free-form matching attributes interpreted by the matchmaking plugin.
+func WithAttributes(attributes map[string]string) CreateTicketOption {
+	return func(r *matchv1.CreateTicketRequest) { r.Attributes = attributes }
+}
+
+func (c *Client) CreateTicket(ctx context.Context, gameMode string, opts ...CreateTicketOption) (string, error) {
+	msg := &matchv1.CreateTicketRequest{GameMode: gameMode}
+	for _, opt := range opts {
+		opt(msg)
+	}
+	req := connect.NewRequest(msg)
 	c.authorize(req.Header())
 	resp, err := c.match.CreateTicket(ctx, req)
 	if err != nil {

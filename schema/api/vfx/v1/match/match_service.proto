@@ -36,8 +36,9 @@ message CreateTicketRequest {
   // 任意のマッチング属性。プラグイン側で解釈する。
   map<string, string> attributes = 2;
 
-  // 任意。同じパーティを組みたい相手の player_id 群。
-  // 全員が同じ party_members で CreateTicket するとパーティとしてマッチング対象になる。
+  // 任意。一緒にマッチングしたいパーティの player_id 群。自分は含めても含めなくてもよい (サーバが正規化する)。
+  // パーティの全員が同じ顔ぶれで CreateTicket して初めてマッチング対象になり、成立時は全員が同一マッチに入る (一部だけ入ることはない)。
+  // 揃わない間はキューで待機する。人数が 1 マッチの定員を超えるパーティは成立しえないため、CreateTicket 時点で InvalidArgument を返す。
   repeated string party_members = 3;
 
   // 任意。レーティング (rating 差ベースのマッチング用)。
