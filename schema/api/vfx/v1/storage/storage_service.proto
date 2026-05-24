@@ -52,7 +52,8 @@ message FileMetadata {
   // 内容の hash (object storage が返す md5 の hex)。差分判定に使う不透明な識別子。
   string hash = 3;
 
-  google.protobuf.Timestamp updated_at = 4;
+  // バイトを最後に commit した時刻。
+  google.protobuf.Timestamp modified_at = 4;
 }
 
 message QueryFilesRequest {

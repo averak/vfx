@@ -126,8 +126,9 @@ CREATE TABLE player_files (
   filename    TEXT         NOT NULL,
   size        BIGINT       NOT NULL,
   hash        TEXT         NOT NULL,
+  -- modified_at is when the file's bytes were last committed (domain data the client diff-syncs on); created_at is row audit.
+  modified_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   -- The unique constraint's index leads with owner_id, so it also serves owner-scoped list and prefix scans; no separate owner_id index is needed.
   UNIQUE (owner_id, filename)
 );
@@ -144,8 +145,9 @@ CREATE TABLE title_files (
   size        BIGINT       NOT NULL,
   hash        TEXT         NOT NULL,
   tags        TEXT[]       NOT NULL DEFAULT '{}',
-  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  -- modified_at is when the file was last published (domain data); created_at is row audit.
+  modified_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_title_files_tags

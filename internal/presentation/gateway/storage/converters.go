@@ -28,10 +28,10 @@ func requireAuth(ctx context.Context) (uuid.UUID, error) {
 
 func toFileMetadataPb(f *domainstorage.File) *storagev1.FileMetadata {
 	return &storagev1.FileMetadata{
-		Filename:  f.Filename,
-		Size:      f.Size,
-		Hash:      f.Hash,
-		UpdatedAt: timestamppb.New(f.UpdatedAt),
+		Filename:   f.Filename,
+		Size:       f.Size,
+		Hash:       f.Hash,
+		ModifiedAt: timestamppb.New(f.ModifiedAt),
 	}
 }
 

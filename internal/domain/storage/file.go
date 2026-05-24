@@ -29,13 +29,13 @@ var (
 // File is one stored object's metadata.
 // Hash is whatever the object store reports for the content (md5 hex today); it is an opaque content identifier the client compares for diff-sync, not a security check.
 type File struct {
-	Filename  string
-	Size      uint64
-	Hash      string
-	UpdatedAt time.Time
+	Filename   string
+	Size       uint64
+	Hash       string
+	ModifiedAt time.Time
 }
 
-func NewFile(filename string, size uint64, hash string, updatedAt time.Time) (*File, error) {
+func NewFile(filename string, size uint64, hash string, modifiedAt time.Time) (*File, error) {
 	if err := ValidateFilename(filename); err != nil {
 		return nil, err
 	}
@@ -43,10 +43,10 @@ func NewFile(filename string, size uint64, hash string, updatedAt time.Time) (*F
 		return nil, err
 	}
 	return &File{
-		Filename:  filename,
-		Size:      size,
-		Hash:      hash,
-		UpdatedAt: updatedAt,
+		Filename:   filename,
+		Size:       size,
+		Hash:       hash,
+		ModifiedAt: modifiedAt,
 	}, nil
 }
 

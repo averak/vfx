@@ -63,10 +63,9 @@ func (PlayerFile) SaveFile(ctx context.Context, ownerID uuid.UUID, f *storage.Fi
 		OwnerID:  ownerID,
 		Filename: f.Filename,
 		//nolint:gosec // Size is bounded by storage.MaxFileSize, well within int64 range.
-		Size:      int64(f.Size),
-		Hash:      f.Hash,
-		CreatedAt: toTimestamptz(f.UpdatedAt),
-		UpdatedAt: toTimestamptz(f.UpdatedAt),
+		Size:       int64(f.Size),
+		Hash:       f.Hash,
+		ModifiedAt: toTimestamptz(f.ModifiedAt),
 	})
 	return err
 }
@@ -158,11 +157,10 @@ func (TitleFile) SaveFile(ctx context.Context, f *storage.File, tags []string) e
 		ID:       uuid.New(),
 		Filename: f.Filename,
 		//nolint:gosec // Size is bounded by storage.MaxFileSize, well within int64 range.
-		Size:      int64(f.Size),
-		Hash:      f.Hash,
-		Tags:      tags,
-		CreatedAt: toTimestamptz(f.UpdatedAt),
-		UpdatedAt: toTimestamptz(f.UpdatedAt),
+		Size:       int64(f.Size),
+		Hash:       f.Hash,
+		Tags:       tags,
+		ModifiedAt: toTimestamptz(f.ModifiedAt),
 	})
 	return err
 }
@@ -171,9 +169,9 @@ func playerFileToDomain(row dbgen.PlayerFile) *storage.File {
 	return &storage.File{
 		Filename: row.Filename,
 		//nolint:gosec // Stored sizes are non-negative and bounded by storage.MaxFileSize.
-		Size:      uint64(row.Size),
-		Hash:      row.Hash,
-		UpdatedAt: row.UpdatedAt.Time,
+		Size:       uint64(row.Size),
+		Hash:       row.Hash,
+		ModifiedAt: row.ModifiedAt.Time,
 	}
 }
 
@@ -181,8 +179,8 @@ func titleFileToDomain(row dbgen.TitleFile) *storage.File {
 	return &storage.File{
 		Filename: row.Filename,
 		//nolint:gosec // Stored sizes are non-negative and bounded by storage.MaxFileSize.
-		Size:      uint64(row.Size),
-		Hash:      row.Hash,
-		UpdatedAt: row.UpdatedAt.Time,
+		Size:       uint64(row.Size),
+		Hash:       row.Hash,
+		ModifiedAt: row.ModifiedAt.Time,
 	}
 }

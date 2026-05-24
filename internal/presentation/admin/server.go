@@ -94,11 +94,11 @@ func NewHandler(uc *usecaseadmin.Usecase, storageUC *usecasestorage.Usecase, poo
 				return
 			}
 			writeJSON(w, http.StatusOK, titleFileView{
-				Filename:  file.Filename,
-				Size:      file.Size,
-				Hash:      file.Hash,
-				Tags:      tags,
-				UpdatedAt: file.UpdatedAt,
+				Filename:   file.Filename,
+				Size:       file.Size,
+				Hash:       file.Hash,
+				Tags:       tags,
+				ModifiedAt: file.ModifiedAt,
 			})
 		}))
 
@@ -170,11 +170,11 @@ type queueView struct {
 }
 
 type titleFileView struct {
-	Filename  string    `json:"filename"`
-	Size      uint64    `json:"size"`
-	Hash      string    `json:"hash"`
-	Tags      []string  `json:"tags"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Filename   string    `json:"filename"`
+	Size       uint64    `json:"size"`
+	Hash       string    `json:"hash"`
+	Tags       []string  `json:"tags"`
+	ModifiedAt time.Time `json:"modified_at"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

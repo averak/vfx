@@ -9,12 +9,12 @@ WHERE owner_id = sqlc.arg(owner_id) AND starts_with(filename, sqlc.arg(prefix))
 ORDER BY filename ASC;
 
 -- name: UpsertPlayerFile :one
-INSERT INTO player_files (id, owner_id, filename, size, hash, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO player_files (id, owner_id, filename, size, hash, modified_at)
+VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (owner_id, filename) DO UPDATE
 SET size = EXCLUDED.size,
     hash = EXCLUDED.hash,
-    updated_at = EXCLUDED.updated_at
+    modified_at = EXCLUDED.modified_at
 RETURNING *;
 
 -- name: DeletePlayerFile :exec
@@ -37,13 +37,13 @@ SELECT * FROM title_files
 WHERE filename = $1;
 
 -- name: UpsertTitleFile :one
-INSERT INTO title_files (id, filename, size, hash, tags, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO title_files (id, filename, size, hash, tags, modified_at)
+VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (filename) DO UPDATE
 SET size = EXCLUDED.size,
     hash = EXCLUDED.hash,
     tags = EXCLUDED.tags,
-    updated_at = EXCLUDED.updated_at
+    modified_at = EXCLUDED.modified_at
 RETURNING *;
 
 -- name: DeleteTitleFile :exec

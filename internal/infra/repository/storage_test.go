@@ -54,15 +54,15 @@ func TestPlayerFile_UpsertGetListUsageDelete(t *testing.T) {
 	now := time.Now().UTC()
 
 	mustRW(t, s, func(ctx context.Context) error {
-		if err := repo.SaveFile(ctx, owner, &storage.File{Filename: fileA, Size: 100, Hash: "h1", UpdatedAt: now}); err != nil {
+		if err := repo.SaveFile(ctx, owner, &storage.File{Filename: fileA, Size: 100, Hash: "h1", ModifiedAt: now}); err != nil {
 			return err
 		}
-		return repo.SaveFile(ctx, owner, &storage.File{Filename: "b.dat", Size: 50, Hash: "h2", UpdatedAt: now})
+		return repo.SaveFile(ctx, owner, &storage.File{Filename: "b.dat", Size: 50, Hash: "h2", ModifiedAt: now})
 	})
 
 	// SaveFile on an existing (owner, filename) overwrites size and hash rather than inserting a duplicate.
 	mustRW(t, s, func(ctx context.Context) error {
-		return repo.SaveFile(ctx, owner, &storage.File{Filename: fileA, Size: 200, Hash: "h1b", UpdatedAt: now.Add(time.Minute)})
+		return repo.SaveFile(ctx, owner, &storage.File{Filename: fileA, Size: 200, Hash: "h1b", ModifiedAt: now.Add(time.Minute)})
 	})
 	mustRW(t, s, func(ctx context.Context) error {
 		got, err := repo.GetFile(ctx, owner, fileA)
@@ -127,7 +127,7 @@ func TestPlayerFile_OwnerIsolation(t *testing.T) {
 	repo := repository.NewPlayerFile()
 
 	mustRW(t, s, func(ctx context.Context) error {
-		return repo.SaveFile(ctx, alice, &storage.File{Filename: "save.dat", Size: 10, Hash: "h", UpdatedAt: time.Now().UTC()})
+		return repo.SaveFile(ctx, alice, &storage.File{Filename: "save.dat", Size: 10, Hash: "h", ModifiedAt: time.Now().UTC()})
 	})
 
 	err := s.RW(t.Context(), func(ctx context.Context) error {
@@ -155,13 +155,13 @@ func TestTitleFile_TagFilter(t *testing.T) {
 	now := time.Now().UTC()
 
 	mustRW(t, s, func(ctx context.Context) error {
-		if err := repo.SaveFile(ctx, &storage.File{Filename: titleConfig, Size: 10, Hash: "h", UpdatedAt: now}, []string{tagProd, "config"}); err != nil {
+		if err := repo.SaveFile(ctx, &storage.File{Filename: titleConfig, Size: 10, Hash: "h", ModifiedAt: now}, []string{tagProd, "config"}); err != nil {
 			return err
 		}
-		if err := repo.SaveFile(ctx, &storage.File{Filename: titleBanner, Size: 20, Hash: "h", UpdatedAt: now}, []string{tagProd, "content"}); err != nil {
+		if err := repo.SaveFile(ctx, &storage.File{Filename: titleBanner, Size: 20, Hash: "h", ModifiedAt: now}, []string{tagProd, "content"}); err != nil {
 			return err
 		}
-		return repo.SaveFile(ctx, &storage.File{Filename: "dev.json", Size: 5, Hash: "h", UpdatedAt: now}, []string{"dev"})
+		return repo.SaveFile(ctx, &storage.File{Filename: "dev.json", Size: 5, Hash: "h", ModifiedAt: now}, []string{"dev"})
 	})
 
 	tests := []struct {

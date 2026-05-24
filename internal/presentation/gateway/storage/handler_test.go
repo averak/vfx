@@ -265,10 +265,10 @@ func TestTitle_QueryAndRead(t *testing.T) {
 	ctx := t.Context()
 
 	srv.SeedTitleFile(t, &domainstorage.File{
-		Filename:  titleMotd,
-		Size:      16,
-		Hash:      "deadbeef",
-		UpdatedAt: time.Now().UTC(),
+		Filename:   titleMotd,
+		Size:       16,
+		Hash:       "deadbeef",
+		ModifiedAt: time.Now().UTC(),
 	}, []string{"prod"})
 
 	query, err := srv.Title.QueryFiles(ctx,
