@@ -231,7 +231,8 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 		pool.Close()
 		return nil, nil, err
 	}
-	leaderboardRepo := repository.NewLeaderboard()
+	// Valkey accelerates ranking (ZREVRANK is O(log N)); Postgres stays the source of truth and the fallback when Valkey is unavailable.
+	leaderboardRepo := repository.NewLeaderboardIndex(valkeyClient, cfg.LeaderboardIndexTTL)
 	leaderboardUC := usecaseleaderboard.New(session, session, leaderboardRepo, leaderboardDefs, usecaseleaderboard.Config{
 		DefaultLimit: cfg.LeaderboardDefaultLimit,
 		MaxLimit:     cfg.LeaderboardMaxLimit,

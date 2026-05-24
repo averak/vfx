@@ -71,7 +71,7 @@ Goal: feature breadth comparable to mature game backends.
 
 - [x] OIDC providers: Google, Apple (ID-token verification via JWKS), with account linking to upgrade an anonymous player; anonymous device already shipped.
 - [x] Storage API — player data (owner-scoped) and title storage (operator-published, tag-gated); bytes in object storage via signed URLs, metadata in PostgreSQL.
-- [x] Leaderboard — config-defined boards (asc/desc), keep-best scores, ranked/around-player queries.
+- [x] Leaderboard — config-defined boards (asc/desc), keep-best scores, ranked/around-player queries; ranking accelerated by a Valkey sorted-set index (O(log N)) with PostgreSQL as the durable source of truth and fallback.
 - [x] Friends, blocking, and groups — friend request lifecycle (send/accept/decline/cancel, mutual auto-accept), block/unblock, and player groups (create/join/leave/delete/members). (Parties still pending — they integrate with matchmaking's party_members.)
 - [x] Chat — direct messages (send + paginated, newest-first history). (Group channels and realtime subscribe still pending.)
 - [ ] Admin web UI, embedded via `go:embed`.

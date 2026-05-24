@@ -34,6 +34,19 @@ WHERE e.leaderboard_id = $1
 ORDER BY e.score ASC, e.updated_at ASC
 LIMIT $2 OFFSET $3;
 
+-- AllLeaderboardEntries feeds the Valkey ZSET rebuild (player_id + score for every entry on a board).
+-- name: AllLeaderboardEntries :many
+SELECT player_id, score
+FROM leaderboard_entries
+WHERE leaderboard_id = $1;
+
+-- LeaderboardEntryByPlayer fetches one entry's score, name, and time without the rank count, for the Valkey-accelerated RankOf (rank comes from the ZSET).
+-- name: LeaderboardEntryByPlayer :one
+SELECT e.player_id, p.nickname, e.score, e.updated_at
+FROM leaderboard_entries e
+JOIN players p ON p.id = e.player_id
+WHERE e.leaderboard_id = $1 AND e.player_id = $2;
+
 -- The rank counts entries strictly ahead in the total (score, then earlier updated_at) order, so it matches the paginated rank.
 -- name: RankOfDesc :one
 SELECT

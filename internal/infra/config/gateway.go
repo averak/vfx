@@ -85,6 +85,9 @@ type Gateway struct {
 	LeaderboardMaxLimit     int      `env:"VFX_LEADERBOARD_MAX_LIMIT"      envDefault:"100"`
 	LeaderboardMaxRadius    int      `env:"VFX_LEADERBOARD_MAX_RADIUS"     envDefault:"50"`
 
+	// LeaderboardIndexTTL bounds how stale the Valkey ranking index may get: after this, the next access rebuilds it from PostgreSQL.
+	LeaderboardIndexTTL time.Duration `env:"VFX_LEADERBOARD_INDEX_TTL" envDefault:"1h"`
+
 	ChatHistoryDefaultLimit int `env:"VFX_CHAT_HISTORY_DEFAULT_LIMIT" envDefault:"50"`
 	ChatHistoryMaxLimit     int `env:"VFX_CHAT_HISTORY_MAX_LIMIT"     envDefault:"200"`
 }
