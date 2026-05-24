@@ -27,7 +27,7 @@ type Group struct {
 	ID        uuid.UUID
 	Name      string
 	OwnerID   uuid.UUID
-	CreatedAt time.Time
+	FoundedAt time.Time
 }
 
 func New(id, ownerID uuid.UUID, name string, now time.Time) (*Group, error) {
@@ -35,7 +35,7 @@ func New(id, ownerID uuid.UUID, name string, now time.Time) (*Group, error) {
 	if name == "" || utf8.RuneCountInString(name) > MaxNameLength {
 		return nil, ErrInvalidName
 	}
-	return &Group{ID: id, Name: name, OwnerID: ownerID, CreatedAt: now}, nil
+	return &Group{ID: id, Name: name, OwnerID: ownerID, FoundedAt: now}, nil
 }
 
 // Member is a read model: a group member with their display name and join time.

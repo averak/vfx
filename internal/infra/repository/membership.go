@@ -82,7 +82,7 @@ func (GroupMembership) ListGroupsForPlayer(ctx context.Context, playerID uuid.UU
 	}
 	out := make([]*group.Group, len(rows))
 	for i, row := range rows {
-		out[i] = &group.Group{ID: row.ID, Name: row.Name, OwnerID: row.OwnerID, CreatedAt: row.CreatedAt.Time}
+		out[i] = &group.Group{ID: row.ID, Name: row.Name, OwnerID: row.OwnerID, FoundedAt: row.FoundedAt.Time}
 	}
 	return out, nil
 }

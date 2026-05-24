@@ -31,7 +31,7 @@ message Group {
   string id = 1;
   string name = 2;
   string owner_id = 3;
-  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp founded_at = 4;
 }
 
 message Member {

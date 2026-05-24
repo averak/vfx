@@ -256,7 +256,8 @@ CREATE TABLE groups (
   id          UUID         PRIMARY KEY,
   name        TEXT         NOT NULL,
   owner_id    UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  -- founded_at is when the group was created (domain data the API surfaces), not a generic row audit.
+  founded_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_groups_owner

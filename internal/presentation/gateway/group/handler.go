@@ -146,7 +146,7 @@ func toGroupPb(g *domaingroup.Group) *groupv1.Group {
 		Id:        g.ID.String(),
 		Name:      g.Name,
 		OwnerId:   g.OwnerID.String(),
-		CreatedAt: timestamppb.New(g.CreatedAt),
+		FoundedAt: timestamppb.New(g.FoundedAt),
 	}
 }
 

@@ -3,7 +3,7 @@ SELECT * FROM groups
 WHERE id = $1;
 
 -- name: UpsertGroup :exec
-INSERT INTO groups (id, name, owner_id, created_at)
+INSERT INTO groups (id, name, owner_id, founded_at)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (id) DO UPDATE
 SET name = EXCLUDED.name;
@@ -32,7 +32,7 @@ SELECT g.*
 FROM groups g
 JOIN group_members m ON m.group_id = g.id
 WHERE m.player_id = $1
-ORDER BY g.created_at DESC;
+ORDER BY g.founded_at DESC;
 
 -- name: ListGroupMembers :many
 SELECT p.id, p.nickname, m.joined_at

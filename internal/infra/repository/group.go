@@ -32,7 +32,7 @@ func (Group) Find(ctx context.Context, id uuid.UUID) (*group.Group, error) {
 		}
 		return nil, err
 	}
-	return &group.Group{ID: row.ID, Name: row.Name, OwnerID: row.OwnerID, CreatedAt: row.CreatedAt.Time}, nil
+	return &group.Group{ID: row.ID, Name: row.Name, OwnerID: row.OwnerID, FoundedAt: row.FoundedAt.Time}, nil
 }
 
 func (Group) Save(ctx context.Context, g *group.Group) error {
@@ -44,7 +44,7 @@ func (Group) Save(ctx context.Context, g *group.Group) error {
 		ID:        g.ID,
 		Name:      g.Name,
 		OwnerID:   g.OwnerID,
-		CreatedAt: toTimestamptz(g.CreatedAt),
+		FoundedAt: toTimestamptz(g.FoundedAt),
 	})
 }
 
