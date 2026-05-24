@@ -14,7 +14,8 @@ vfx hosts realtime multiplayer matches. You write the game logic as a WebAssembl
 - **Authentication** — anonymous guest accounts and OIDC sign-in (Google, Apple), with account linking to upgrade a guest into a federated identity.
 - **Leaderboards** — configurable ascending or descending boards, keep-best scoring applied atomically, and ranked / around-player queries.
 - **Player & title storage** — owner-scoped save data and operator-published content. File bytes stream directly between the client and object storage over signed URLs; the gateway brokers only metadata and authorization, never the bytes.
-- **Friends & chat** — friend requests with mutual auto-accept and friend lists, plus 1:1 direct messaging with paginated history.
+- **Social graph** — friend requests with mutual auto-accept, friend lists, blocking, and player groups (create / join / leave / members).
+- **Chat** — 1:1 direct messages and membership-gated group channels with paginated history, plus a realtime channel subscription that streams new messages as they are posted.
 
 ## Quickstart
 

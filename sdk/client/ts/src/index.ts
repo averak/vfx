@@ -346,6 +346,18 @@ export class VfxClient {
     return resp.messages;
   }
 
+  /**
+   * Stream messages posted to a channel after the call attaches.
+   * Only new messages are delivered; pair it with listChannelMessages for backlog and de-duplicate the small overlap by message id.
+   */
+  async *subscribeChannel(channelId: string): AsyncIterable<ChannelMessage> {
+    for await (const resp of this.chat.subscribeChannel({ channelId }, { headers: this.authHeaders() })) {
+      if (resp.message) {
+        yield resp.message;
+      }
+    }
+  }
+
   /** Create a group with the caller as owner and first member. */
   async createGroup(name: string): Promise<Group | undefined> {
     const resp = await this.group.createGroup({ name }, { headers: this.authHeaders() });

@@ -23,16 +23,24 @@ type Membership interface {
 	IsMember(ctx context.Context, channelID, playerID uuid.UUID) (bool, error)
 }
 
+// Broker fans channel messages out to live subscribers across gateway replicas.
+// Delivery is best-effort: the persisted history is the durable record, and Subscribe streams only messages published after the subscription attaches.
+type Broker interface {
+	Publish(ctx context.Context, m *domainchat.ChannelMessage) error
+	Subscribe(ctx context.Context, channelID uuid.UUID) (<-chan *domainchat.ChannelMessage, error)
+}
+
 type Usecase struct {
 	rw      tx.ReadWriter
 	ro      tx.Reader
 	repo    domainchat.Repository
 	members Membership
+	broker  Broker
 	cfg     Config
 }
 
-func New(rw tx.ReadWriter, ro tx.Reader, repo domainchat.Repository, members Membership, cfg Config) *Usecase {
-	return &Usecase{rw: rw, ro: ro, repo: repo, members: members, cfg: cfg}
+func New(rw tx.ReadWriter, ro tx.Reader, repo domainchat.Repository, members Membership, broker Broker, cfg Config) *Usecase {
+	return &Usecase{rw: rw, ro: ro, repo: repo, members: members, broker: broker, cfg: cfg}
 }
 
 // SendDirectMessage validates and stores a message from sender to recipient.
@@ -80,7 +88,28 @@ func (u *Usecase) SendChannelMessage(ctx context.Context, sender, channelID uuid
 	}); err != nil {
 		return nil, err
 	}
+	// Fan out only after the message is committed, so subscribers never see a write that later rolled back.
+	// The push is best-effort: the message is already durable and served by ListChannelMessages, so a broker hiccup must not fail an otherwise successful send (which would push the client into a retry that double-posts).
+	_ = u.broker.Publish(ctx, msg) //nolint:errcheck // Best-effort realtime fan-out; history is the durable record.
 	return msg, nil
+}
+
+// SubscribeChannel streams messages posted to the channel after the subscription attaches; the caller must be a member.
+// Clients pair this with ListChannelMessages for backlog and de-duplicate the small overlap by message id.
+func (u *Usecase) SubscribeChannel(ctx context.Context, me, channelID uuid.UUID) (<-chan *domainchat.ChannelMessage, error) {
+	var member bool
+	if err := u.ro.RO(ctx, func(ctx context.Context) error {
+		var err error
+		member, err = u.members.IsMember(ctx, channelID, me)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	if !member {
+		return nil, domainchat.ErrNotChannelMember
+	}
+	// Subscribe on the request context, not the transaction-scoped one: the stream outlives the membership check's read transaction.
+	return u.broker.Subscribe(ctx, channelID)
 }
 
 // ListChannelMessages returns a channel's history newest-first; the caller must be a member.

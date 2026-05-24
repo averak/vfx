@@ -20,6 +20,10 @@ service ChatService {
 
   // ListChannelMessages はチャンネルの履歴を新しい順で返す。メンバー限定。
   rpc ListChannelMessages(ListChannelMessagesRequest) returns (ListChannelMessagesResponse);
+
+  // SubscribeChannel はチャンネルに届く新着メッセージをストリームで流す。メンバー限定。
+  // 配信は購読開始以降の新着のみ。過去分は ListChannelMessages で取得し、購読と多少重複しうるので id で重複排除する。
+  rpc SubscribeChannel(SubscribeChannelRequest) returns (stream SubscribeChannelResponse);
 }
 
 // ChannelMessage はチャンネル (グループ) の 1 メッセージ。
@@ -48,6 +52,14 @@ message ListChannelMessagesRequest {
 
 message ListChannelMessagesResponse {
   repeated ChannelMessage messages = 1;
+}
+
+message SubscribeChannelRequest {
+  string channel_id = 1;
+}
+
+message SubscribeChannelResponse {
+  ChannelMessage message = 1;
 }
 
 // Message は 1 通の DM。

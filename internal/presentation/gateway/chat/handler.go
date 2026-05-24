@@ -109,6 +109,27 @@ func (h *Handler) ListChannelMessages(ctx context.Context, req *connect.Request[
 	return connect.NewResponse(&chatv1.ListChannelMessagesResponse{Messages: out}), nil
 }
 
+func (h *Handler) SubscribeChannel(ctx context.Context, req *connect.Request[chatv1.SubscribeChannelRequest], stream *connect.ServerStream[chatv1.SubscribeChannelResponse]) error {
+	me, err := requireAuth(ctx)
+	if err != nil {
+		return err
+	}
+	channelID, err := parsePlayerID(req.Msg.GetChannelId())
+	if err != nil {
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("invalid channel id"))
+	}
+	messages, err := h.uc.SubscribeChannel(ctx, me, channelID)
+	if err != nil {
+		return toConnectError(err)
+	}
+	for m := range messages {
+		if err := stream.Send(&chatv1.SubscribeChannelResponse{Message: toChannelMessagePb(m)}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func requireAuth(ctx context.Context) (uuid.UUID, error) {
 	id, ok := authctx.From(ctx)
 	if !ok {

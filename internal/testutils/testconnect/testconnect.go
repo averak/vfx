@@ -23,6 +23,7 @@ import (
 	domainleaderboard "github.com/averak/vfx/internal/domain/leaderboard"
 	domainstorage "github.com/averak/vfx/internal/domain/storage"
 	"github.com/averak/vfx/internal/infra/assignmentstore"
+	"github.com/averak/vfx/internal/infra/chatstream"
 	"github.com/averak/vfx/internal/infra/connectrpc/interceptor"
 	"github.com/averak/vfx/internal/infra/db"
 	"github.com/averak/vfx/internal/infra/matchqueue"
@@ -140,7 +141,7 @@ func New(t *testing.T) *Server {
 	socialPath, socialHandler := socialconnect.NewSocialServiceHandler(gatewaysocialhandler.New(socialUC), interceptors)
 	mux.Handle(socialPath, socialHandler)
 
-	chatUC := usecasechat.New(session, session, repository.NewChat(), repository.NewGroup(), usecasechat.Config{DefaultLimit: 50, MaxLimit: 200})
+	chatUC := usecasechat.New(session, session, repository.NewChat(), repository.NewGroup(), chatstream.NewInMem(), usecasechat.Config{DefaultLimit: 50, MaxLimit: 200})
 	chatPath, chatHandler := chatconnect.NewChatServiceHandler(gatewaychathandler.New(chatUC), interceptors)
 	mux.Handle(chatPath, chatHandler)
 

@@ -62,3 +62,26 @@ func (c *Client) ListChannelMessages(ctx context.Context, channelID string, befo
 	}
 	return resp.Msg.GetMessages(), nil
 }
+
+// SubscribeChannel streams messages posted to the channel after the call attaches, invoking handle for each.
+// It blocks until ctx is cancelled, the stream ends, or handle returns a non-nil error (which it propagates).
+// Only messages newer than the subscription are delivered; pair it with ListChannelMessages for backlog and de-duplicate the small overlap by message id.
+func (c *Client) SubscribeChannel(ctx context.Context, channelID string, handle func(*chatv1.ChannelMessage) error) error {
+	req := connect.NewRequest(&chatv1.SubscribeChannelRequest{ChannelId: channelID})
+	c.authorize(req.Header())
+	stream, err := c.chat.SubscribeChannel(ctx, req)
+	if err != nil {
+		return fmt.Errorf("vfxclient: subscribe channel: %w", err)
+	}
+	//nolint:errcheck // Close errors at end-of-stream are not actionable.
+	defer func() { _ = stream.Close() }()
+	for stream.Receive() {
+		if err := handle(stream.Msg().GetMessage()); err != nil {
+			return err
+		}
+	}
+	if err := stream.Err(); err != nil {
+		return fmt.Errorf("vfxclient: channel stream: %w", err)
+	}
+	return nil
+}

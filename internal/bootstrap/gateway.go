@@ -18,6 +18,7 @@ import (
 	"github.com/averak/vfx/internal/infra/allocator"
 	"github.com/averak/vfx/internal/infra/assignmentstore"
 	"github.com/averak/vfx/internal/infra/blobstore"
+	"github.com/averak/vfx/internal/infra/chatstream"
 	"github.com/averak/vfx/internal/infra/config"
 	"github.com/averak/vfx/internal/infra/db"
 	"github.com/averak/vfx/internal/infra/matchqueue"
@@ -243,7 +244,7 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	socialUC := usecasesocial.New(session, session, repository.NewSocial())
 	socialHandler := gatewaysocialhandler.New(socialUC)
 
-	chatUC := usecasechat.New(session, session, repository.NewChat(), repository.NewGroup(), usecasechat.Config{
+	chatUC := usecasechat.New(session, session, repository.NewChat(), repository.NewGroup(), chatstream.NewValkey(valkeyClient), usecasechat.Config{
 		DefaultLimit: cfg.ChatHistoryDefaultLimit,
 		MaxLimit:     cfg.ChatHistoryMaxLimit,
 	})
