@@ -163,8 +163,9 @@ func (u *Usecase) DeletePlayerFile(ctx context.Context, ownerID uuid.UUID, filen
 
 	// The metadata row is deleted first (above), the blob second, on purpose.
 	// The metadata is the source of truth for what exists, so once the row is gone the file is already invisible to every API; the blob delete is therefore best-effort.
-	// If it fails, the bytes linger as an orphan object with no metadata row, which the bucket's lifecycle/sweep reclaims later — a transient blob-store error must not be reported back as a failed delete and resurrect a file the client already removed.
-	//nolint:errcheck // Best-effort by design; see the comment above. The orphan is reclaimed out of band.
+	// If it fails, the bytes linger as an orphan object with no metadata row — harmless, because nothing without a row is ever listed or served. A transient blob-store error must not be reported back as a failed delete and resurrect a file the client already removed.
+	// We deliberately do not sweep orphans: they live under the same key namespace as live files, so no age-based bucket lifecycle rule can safely distinguish them, and a list-and-reconcile scan would be O(objects). Operators who care can run that reconciliation out of band.
+	//nolint:errcheck // Best-effort by design; see the comment above. A leftover orphan is harmless.
 	_ = u.blobs.Delete(ctx, u.playerKey(ownerID, filename))
 	return nil
 }
@@ -222,8 +223,8 @@ func (u *Usecase) DeleteTitleFile(ctx context.Context, filename string) error {
 	}); err != nil {
 		return err
 	}
-	// Same metadata-first, best-effort ordering as DeletePlayerFile: the row is the source of truth, the orphaned blob is reclaimed by the bucket lifecycle/sweep.
-	//nolint:errcheck // Best-effort by design; a leftover blob is reclaimed out of band.
+	// Same metadata-first, best-effort ordering as DeletePlayerFile: the row is the source of truth, and a leftover orphan blob is harmless because nothing without a row is served.
+	//nolint:errcheck // Best-effort by design; a leftover orphan is harmless.
 	_ = u.blobs.Delete(ctx, u.titleKey(filename))
 	return nil
 }

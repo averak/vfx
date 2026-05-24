@@ -21,7 +21,7 @@ service PlayerDataStorageService {
   // WriteFile はアップロード用の署名付き URL を発行する。この時点では metadata を永続化しない。
   //
   // 2 段に分ける理由: アップロードは client から object storage への直接転送なので、gateway は「上がった事実とサイズ・hash」を自分で確認するまで metadata を確定できない。
-  // CommitFile されなかったアップロードは metadata 行を持たない孤児オブジェクトとなり、ライフサイクル/sweep で回収される。
+  // CommitFile されなかったアップロードは metadata 行を持たない孤児オブジェクトとして残るが、行が無いオブジェクトは一覧にも配信にも一切現れないため無害。意図的に自動 sweep はしない (実データと同じキー空間に住むので期間ベースの lifecycle では区別できず、突き合わせ走査は O(オブジェクト数) になる)。回収が要るなら運用側で別途行う。
   rpc WriteFile(WriteFileRequest) returns (WriteFileResponse);
 
   // CommitFile はアップロード完了後に呼び、object storage 上のオブジェクト属性を検証して metadata を確定する。
