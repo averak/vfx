@@ -26,8 +26,7 @@ import (
 // maxTitleFileBytes caps an in-request title upload; title content is small config/assets, and the operator API proxies the bytes rather than streaming, so a bound keeps memory predictable.
 const maxTitleFileBytes = 8 << 20 // 8 MiB
 
-// NewHandler builds the admin HTTP handler.
-// When authToken is non-empty, every /api request must present it as a bearer token; the health probes stay open so orchestrators reach them without credentials.
+// NewHandler gates /api behind a bearer token when authToken is non-empty, while leaving the health probes open so orchestrators reach them without credentials.
 // storageUC may be nil, in which case the title-file endpoints are not mounted (no object store configured).
 func NewHandler(uc *usecaseadmin.Usecase, storageUC *usecasestorage.Usecase, pool *pgxpool.Pool, authToken string) http.Handler {
 	mux := http.NewServeMux()

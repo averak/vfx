@@ -43,8 +43,7 @@ func New(rw tx.ReadWriter, ro tx.Reader, repo domainchat.Repository, members Mem
 	return &Usecase{rw: rw, ro: ro, repo: repo, members: members, broker: broker, cfg: cfg}
 }
 
-// SendDirectMessage validates and stores a message from sender to recipient.
-// It returns domainchat.ErrSelfMessage / ErrInvalidBody for bad input.
+// SendDirectMessage returns domainchat.ErrSelfMessage or ErrInvalidBody for bad input.
 func (u *Usecase) SendDirectMessage(ctx context.Context, sender, recipient uuid.UUID, body string) (*domainchat.Message, error) {
 	msg, err := domainchat.NewMessage(uuid.New(), sender, recipient, body, clock.Now(ctx))
 	if err != nil {
@@ -58,7 +57,7 @@ func (u *Usecase) SendDirectMessage(ctx context.Context, sender, recipient uuid.
 	return msg, nil
 }
 
-// ListDirectMessages returns the conversation between me and other, newest-first, older than before (zero means latest).
+// ListDirectMessages returns the conversation newest first; the zero before means "from latest".
 func (u *Usecase) ListDirectMessages(ctx context.Context, me, other uuid.UUID, before time.Time, limit int) ([]*domainchat.Message, error) {
 	limit = u.clampLimit(limit)
 	var messages []*domainchat.Message
@@ -70,7 +69,7 @@ func (u *Usecase) ListDirectMessages(ctx context.Context, me, other uuid.UUID, b
 	return messages, err
 }
 
-// SendChannelMessage stores a message in a channel after checking the sender is a member.
+// SendChannelMessage returns domainchat.ErrNotChannelMember when the sender does not belong to the channel.
 func (u *Usecase) SendChannelMessage(ctx context.Context, sender, channelID uuid.UUID, body string) (*domainchat.ChannelMessage, error) {
 	msg, err := domainchat.NewChannelMessage(uuid.New(), channelID, sender, body, clock.Now(ctx))
 	if err != nil {

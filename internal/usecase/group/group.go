@@ -22,7 +22,7 @@ func New(rw tx.ReadWriter, ro tx.Reader, repo domaingroup.Repository, members do
 	return &Usecase{rw: rw, ro: ro, repo: repo, members: members}
 }
 
-// CreateGroup creates a group with the caller as owner and first member.
+// CreateGroup makes the caller the owner and first member.
 func (u *Usecase) CreateGroup(ctx context.Context, owner uuid.UUID, name string) (*domaingroup.Group, error) {
 	now := clock.Now(ctx)
 	g, valErr := domaingroup.New(uuid.New(), owner, name, now)

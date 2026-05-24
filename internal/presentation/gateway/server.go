@@ -22,7 +22,6 @@ import (
 	"github.com/averak/vfx/internal/infra/connectrpc/interceptor"
 )
 
-// NewHandler returns the root HTTP handler for the gateway process.
 func NewHandler(c *bootstrap.Gateway) (http.Handler, error) {
 	mux := http.NewServeMux()
 
