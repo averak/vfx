@@ -20,8 +20,3 @@ WHERE provider = $1
 INSERT INTO player_identities (id, player_id, provider, provider_uid, created_at)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
-
--- name: ListPlayerIdentities :many
-SELECT * FROM player_identities
-WHERE player_id = $1
-ORDER BY created_at ASC;

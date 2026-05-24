@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -11,37 +10,28 @@ import (
 	"github.com/averak/vfx/internal/infra/dbgen"
 )
 
-// Social is the storage implementation of [social.Repository].
-type Social struct{}
+type FriendRequests struct{}
 
-var _ social.Repository = (*Social)(nil)
+var _ social.FriendRequestRepository = (*FriendRequests)(nil)
 
-func NewSocial() *Social {
-	return &Social{}
+func NewFriendRequests() *FriendRequests {
+	return &FriendRequests{}
 }
 
-func (Social) CreateRequest(ctx context.Context, requester, addressee uuid.UUID, now time.Time) error {
+func (FriendRequests) Save(ctx context.Context, r *social.FriendRequest) error {
 	tx, err := db.Tx(ctx)
 	if err != nil {
 		return err
 	}
 	return dbgen.New(tx).CreateFriendRequest(ctx, dbgen.CreateFriendRequestParams{
 		ID:          uuid.New(),
-		RequesterID: requester,
-		AddresseeID: addressee,
-		CreatedAt:   toTimestamptz(now),
+		RequesterID: r.Requester,
+		AddresseeID: r.Addressee,
+		CreatedAt:   toTimestamptz(r.CreatedAt),
 	})
 }
 
-func (Social) RequestExists(ctx context.Context, requester, addressee uuid.UUID) (bool, error) {
-	tx, err := db.Tx(ctx)
-	if err != nil {
-		return false, err
-	}
-	return dbgen.New(tx).FriendRequestExists(ctx, dbgen.FriendRequestExistsParams{RequesterID: requester, AddresseeID: addressee})
-}
-
-func (Social) DeleteRequest(ctx context.Context, requester, addressee uuid.UUID) error {
+func (FriendRequests) Delete(ctx context.Context, requester, addressee uuid.UUID) error {
 	tx, err := db.Tx(ctx)
 	if err != nil {
 		return err
@@ -56,7 +46,15 @@ func (Social) DeleteRequest(ctx context.Context, requester, addressee uuid.UUID)
 	return nil
 }
 
-func (Social) ListIncoming(ctx context.Context, addressee uuid.UUID) ([]*social.PendingRequest, error) {
+func (FriendRequests) Exists(ctx context.Context, requester, addressee uuid.UUID) (bool, error) {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return false, err
+	}
+	return dbgen.New(tx).FriendRequestExists(ctx, dbgen.FriendRequestExistsParams{RequesterID: requester, AddresseeID: addressee})
+}
+
+func (FriendRequests) ListIncoming(ctx context.Context, addressee uuid.UUID) ([]*social.PendingRequest, error) {
 	tx, err := db.Tx(ctx)
 	if err != nil {
 		return nil, err
@@ -72,7 +70,7 @@ func (Social) ListIncoming(ctx context.Context, addressee uuid.UUID) ([]*social.
 	return out, nil
 }
 
-func (Social) ListOutgoing(ctx context.Context, requester uuid.UUID) ([]*social.PendingRequest, error) {
+func (FriendRequests) ListOutgoing(ctx context.Context, requester uuid.UUID) ([]*social.PendingRequest, error) {
 	tx, err := db.Tx(ctx)
 	if err != nil {
 		return nil, err
@@ -88,30 +86,28 @@ func (Social) ListOutgoing(ctx context.Context, requester uuid.UUID) ([]*social.
 	return out, nil
 }
 
-func (Social) CreateFriendship(ctx context.Context, a, b uuid.UUID, now time.Time) error {
+type Friendships struct{}
+
+var _ social.FriendshipRepository = (*Friendships)(nil)
+
+func NewFriendships() *Friendships {
+	return &Friendships{}
+}
+
+func (Friendships) Save(ctx context.Context, f *social.Friendship) error {
 	tx, err := db.Tx(ctx)
 	if err != nil {
 		return err
 	}
-	low, high := social.OrderPair(a, b)
 	return dbgen.New(tx).CreateFriendship(ctx, dbgen.CreateFriendshipParams{
 		ID:         uuid.New(),
-		PlayerLow:  low,
-		PlayerHigh: high,
-		CreatedAt:  toTimestamptz(now),
+		PlayerLow:  f.Low,
+		PlayerHigh: f.High,
+		CreatedAt:  toTimestamptz(f.CreatedAt),
 	})
 }
 
-func (Social) AreFriends(ctx context.Context, a, b uuid.UUID) (bool, error) {
-	tx, err := db.Tx(ctx)
-	if err != nil {
-		return false, err
-	}
-	low, high := social.OrderPair(a, b)
-	return dbgen.New(tx).FriendshipExists(ctx, dbgen.FriendshipExistsParams{PlayerLow: low, PlayerHigh: high})
-}
-
-func (Social) DeleteFriendship(ctx context.Context, a, b uuid.UUID) error {
+func (Friendships) Delete(ctx context.Context, a, b uuid.UUID) error {
 	tx, err := db.Tx(ctx)
 	if err != nil {
 		return err
@@ -127,52 +123,16 @@ func (Social) DeleteFriendship(ctx context.Context, a, b uuid.UUID) error {
 	return nil
 }
 
-func (Social) Block(ctx context.Context, blocker, blocked uuid.UUID, now time.Time) error {
-	tx, err := db.Tx(ctx)
-	if err != nil {
-		return err
-	}
-	return dbgen.New(tx).BlockPlayer(ctx, dbgen.BlockPlayerParams{
-		ID:        uuid.New(),
-		BlockerID: blocker,
-		BlockedID: blocked,
-		CreatedAt: toTimestamptz(now),
-	})
-}
-
-func (Social) Unblock(ctx context.Context, blocker, blocked uuid.UUID) error {
-	tx, err := db.Tx(ctx)
-	if err != nil {
-		return err
-	}
-	return dbgen.New(tx).UnblockPlayer(ctx, dbgen.UnblockPlayerParams{BlockerID: blocker, BlockedID: blocked})
-}
-
-func (Social) IsBlocked(ctx context.Context, a, b uuid.UUID) (bool, error) {
+func (Friendships) Exists(ctx context.Context, a, b uuid.UUID) (bool, error) {
 	tx, err := db.Tx(ctx)
 	if err != nil {
 		return false, err
 	}
-	return dbgen.New(tx).BlockExistsEitherWay(ctx, dbgen.BlockExistsEitherWayParams{BlockerID: a, BlockedID: b})
+	low, high := social.OrderPair(a, b)
+	return dbgen.New(tx).FriendshipExists(ctx, dbgen.FriendshipExistsParams{PlayerLow: low, PlayerHigh: high})
 }
 
-func (Social) ListBlocked(ctx context.Context, blocker uuid.UUID) ([]*social.BlockedPlayer, error) {
-	tx, err := db.Tx(ctx)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := dbgen.New(tx).ListBlocked(ctx, blocker)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]*social.BlockedPlayer, len(rows))
-	for i, row := range rows {
-		out[i] = &social.BlockedPlayer{PlayerID: row.ID, Nickname: row.Nickname, BlockedAt: row.CreatedAt.Time}
-	}
-	return out, nil
-}
-
-func (Social) ListFriends(ctx context.Context, playerID uuid.UUID) ([]*social.Friend, error) {
+func (Friendships) ListFriends(ctx context.Context, playerID uuid.UUID) ([]*social.Friend, error) {
 	tx, err := db.Tx(ctx)
 	if err != nil {
 		return nil, err
@@ -184,6 +144,59 @@ func (Social) ListFriends(ctx context.Context, playerID uuid.UUID) ([]*social.Fr
 	out := make([]*social.Friend, len(rows))
 	for i, row := range rows {
 		out[i] = &social.Friend{PlayerID: row.ID, Nickname: row.Nickname, Since: row.CreatedAt.Time}
+	}
+	return out, nil
+}
+
+type Blocks struct{}
+
+var _ social.BlockRepository = (*Blocks)(nil)
+
+func NewBlocks() *Blocks {
+	return &Blocks{}
+}
+
+func (Blocks) Save(ctx context.Context, b *social.Block) error {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	return dbgen.New(tx).BlockPlayer(ctx, dbgen.BlockPlayerParams{
+		ID:        uuid.New(),
+		BlockerID: b.Blocker,
+		BlockedID: b.Blocked,
+		CreatedAt: toTimestamptz(b.CreatedAt),
+	})
+}
+
+func (Blocks) Delete(ctx context.Context, blocker, blocked uuid.UUID) error {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	return dbgen.New(tx).UnblockPlayer(ctx, dbgen.UnblockPlayerParams{BlockerID: blocker, BlockedID: blocked})
+}
+
+func (Blocks) IsBlocked(ctx context.Context, a, b uuid.UUID) (bool, error) {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return false, err
+	}
+	return dbgen.New(tx).BlockExistsEitherWay(ctx, dbgen.BlockExistsEitherWayParams{BlockerID: a, BlockedID: b})
+}
+
+func (Blocks) ListBlocked(ctx context.Context, blocker uuid.UUID) ([]*social.BlockedPlayer, error) {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := dbgen.New(tx).ListBlocked(ctx, blocker)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*social.BlockedPlayer, len(rows))
+	for i, row := range rows {
+		out[i] = &social.BlockedPlayer{PlayerID: row.ID, Nickname: row.Nickname, BlockedAt: row.CreatedAt.Time}
 	}
 	return out, nil
 }

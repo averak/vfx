@@ -242,7 +242,7 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	})
 	leaderboardHandler := gatewayleaderboardhandler.New(leaderboardUC)
 
-	socialUC := usecasesocial.New(session, session, repository.NewSocial())
+	socialUC := usecasesocial.New(session, session, repository.NewFriendRequests(), repository.NewFriendships(), repository.NewBlocks())
 	socialHandler := gatewaysocialhandler.New(socialUC)
 
 	chatUC := usecasechat.New(session, session, repository.NewChat(), repository.NewGroupMembership(), chatstream.NewValkey(valkeyClient), usecasechat.Config{

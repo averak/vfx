@@ -20,6 +20,40 @@ var (
 	ErrBlocked          = errors.New("social: blocked between these players")
 )
 
+// FriendRequest is an aggregate root: a directed, pending request from Requester to Addressee.
+type FriendRequest struct {
+	Requester uuid.UUID
+	Addressee uuid.UUID
+	CreatedAt time.Time
+}
+
+func NewFriendRequest(requester, addressee uuid.UUID, now time.Time) *FriendRequest {
+	return &FriendRequest{Requester: requester, Addressee: addressee, CreatedAt: now}
+}
+
+// Friendship is an aggregate root: an undirected friendship stored once. NewFriendship canonicalizes the pair into (Low, High).
+type Friendship struct {
+	Low       uuid.UUID
+	High      uuid.UUID
+	CreatedAt time.Time
+}
+
+func NewFriendship(a, b uuid.UUID, now time.Time) *Friendship {
+	low, high := OrderPair(a, b)
+	return &Friendship{Low: low, High: high, CreatedAt: now}
+}
+
+// Block is an aggregate root: a directed block from Blocker to Blocked.
+type Block struct {
+	Blocker   uuid.UUID
+	Blocked   uuid.UUID
+	CreatedAt time.Time
+}
+
+func NewBlock(blocker, blocked uuid.UUID, now time.Time) *Block {
+	return &Block{Blocker: blocker, Blocked: blocked, CreatedAt: now}
+}
+
 // Friend is a read model: an accepted friend with their display name and when the friendship formed.
 type Friend struct {
 	PlayerID uuid.UUID

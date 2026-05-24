@@ -142,7 +142,7 @@ func New(t *testing.T) *Server {
 	leaderboardPath, leaderboardHandler := leaderboardconnect.NewLeaderboardServiceHandler(gatewayleaderboardhandler.New(leaderboardUC), interceptors)
 	mux.Handle(leaderboardPath, leaderboardHandler)
 
-	socialUC := usecasesocial.New(session, session, repository.NewSocial())
+	socialUC := usecasesocial.New(session, session, repository.NewFriendRequests(), repository.NewFriendships(), repository.NewBlocks())
 	socialPath, socialHandler := socialconnect.NewSocialServiceHandler(gatewaysocialhandler.New(socialUC), interceptors)
 	mux.Handle(socialPath, socialHandler)
 

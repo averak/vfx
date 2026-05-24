@@ -13,13 +13,15 @@ import (
 )
 
 type Usecase struct {
-	rw   tx.ReadWriter
-	ro   tx.Reader
-	repo domainsocial.Repository
+	rw       tx.ReadWriter
+	ro       tx.Reader
+	requests domainsocial.FriendRequestRepository
+	friends  domainsocial.FriendshipRepository
+	blocks   domainsocial.BlockRepository
 }
 
-func New(rw tx.ReadWriter, ro tx.Reader, repo domainsocial.Repository) *Usecase {
-	return &Usecase{rw: rw, ro: ro, repo: repo}
+func New(rw tx.ReadWriter, ro tx.Reader, requests domainsocial.FriendRequestRepository, friends domainsocial.FriendshipRepository, blocks domainsocial.BlockRepository) *Usecase {
+	return &Usecase{rw: rw, ro: ro, requests: requests, friends: friends, blocks: blocks}
 }
 
 // SendFriendRequest sends a request, or forms the friendship immediately when the addressee already has a pending request to the caller (mutual request).
@@ -32,7 +34,7 @@ func (u *Usecase) SendFriendRequest(ctx context.Context, me, addressee uuid.UUID
 
 	var accepted bool
 	err := u.rw.RW(ctx, func(ctx context.Context) error {
-		blocked, err := u.repo.IsBlocked(ctx, me, addressee)
+		blocked, err := u.blocks.IsBlocked(ctx, me, addressee)
 		if err != nil {
 			return err
 		}
@@ -40,7 +42,7 @@ func (u *Usecase) SendFriendRequest(ctx context.Context, me, addressee uuid.UUID
 			return domainsocial.ErrBlocked
 		}
 
-		friends, err := u.repo.AreFriends(ctx, me, addressee)
+		friends, err := u.friends.Exists(ctx, me, addressee)
 		if err != nil {
 			return err
 		}
@@ -48,26 +50,26 @@ func (u *Usecase) SendFriendRequest(ctx context.Context, me, addressee uuid.UUID
 			return domainsocial.ErrAlreadyFriends
 		}
 
-		reverse, err := u.repo.RequestExists(ctx, addressee, me)
+		reverse, err := u.requests.Exists(ctx, addressee, me)
 		if err != nil {
 			return err
 		}
 		if reverse {
-			if delErr := u.repo.DeleteRequest(ctx, addressee, me); delErr != nil {
+			if delErr := u.requests.Delete(ctx, addressee, me); delErr != nil {
 				return delErr
 			}
 			accepted = true
-			return u.repo.CreateFriendship(ctx, me, addressee, now)
+			return u.friends.Save(ctx, domainsocial.NewFriendship(me, addressee, now))
 		}
 
-		forward, err := u.repo.RequestExists(ctx, me, addressee)
+		forward, err := u.requests.Exists(ctx, me, addressee)
 		if err != nil {
 			return err
 		}
 		if forward {
 			return domainsocial.ErrAlreadyRequested
 		}
-		return u.repo.CreateRequest(ctx, me, addressee, now)
+		return u.requests.Save(ctx, domainsocial.NewFriendRequest(me, addressee, now))
 	})
 	return accepted, err
 }
@@ -77,30 +79,30 @@ func (u *Usecase) SendFriendRequest(ctx context.Context, me, addressee uuid.UUID
 func (u *Usecase) AcceptFriendRequest(ctx context.Context, me, requester uuid.UUID) error {
 	now := clock.Now(ctx)
 	return u.rw.RW(ctx, func(ctx context.Context) error {
-		if err := u.repo.DeleteRequest(ctx, requester, me); err != nil {
+		if err := u.requests.Delete(ctx, requester, me); err != nil {
 			return err
 		}
-		return u.repo.CreateFriendship(ctx, requester, me, now)
+		return u.friends.Save(ctx, domainsocial.NewFriendship(requester, me, now))
 	})
 }
 
 // DeclineFriendRequest rejects the pending request requester -> me.
 func (u *Usecase) DeclineFriendRequest(ctx context.Context, me, requester uuid.UUID) error {
 	return u.rw.RW(ctx, func(ctx context.Context) error {
-		return u.repo.DeleteRequest(ctx, requester, me)
+		return u.requests.Delete(ctx, requester, me)
 	})
 }
 
 // CancelFriendRequest withdraws the pending request me -> addressee.
 func (u *Usecase) CancelFriendRequest(ctx context.Context, me, addressee uuid.UUID) error {
 	return u.rw.RW(ctx, func(ctx context.Context) error {
-		return u.repo.DeleteRequest(ctx, me, addressee)
+		return u.requests.Delete(ctx, me, addressee)
 	})
 }
 
 func (u *Usecase) RemoveFriend(ctx context.Context, me, friend uuid.UUID) error {
 	return u.rw.RW(ctx, func(ctx context.Context) error {
-		return u.repo.DeleteFriendship(ctx, me, friend)
+		return u.friends.Delete(ctx, me, friend)
 	})
 }
 
@@ -111,16 +113,16 @@ func (u *Usecase) BlockPlayer(ctx context.Context, me, target uuid.UUID) error {
 	}
 	now := clock.Now(ctx)
 	return u.rw.RW(ctx, func(ctx context.Context) error {
-		if err := u.repo.Block(ctx, me, target, now); err != nil {
+		if err := u.blocks.Save(ctx, domainsocial.NewBlock(me, target, now)); err != nil {
 			return err
 		}
-		if err := u.repo.DeleteFriendship(ctx, me, target); err != nil && !errors.Is(err, domainsocial.ErrNotFriends) {
+		if err := u.friends.Delete(ctx, me, target); err != nil && !errors.Is(err, domainsocial.ErrNotFriends) {
 			return err
 		}
-		if err := u.repo.DeleteRequest(ctx, me, target); err != nil && !errors.Is(err, domainsocial.ErrRequestNotFound) {
+		if err := u.requests.Delete(ctx, me, target); err != nil && !errors.Is(err, domainsocial.ErrRequestNotFound) {
 			return err
 		}
-		if err := u.repo.DeleteRequest(ctx, target, me); err != nil && !errors.Is(err, domainsocial.ErrRequestNotFound) {
+		if err := u.requests.Delete(ctx, target, me); err != nil && !errors.Is(err, domainsocial.ErrRequestNotFound) {
 			return err
 		}
 		return nil
@@ -129,7 +131,7 @@ func (u *Usecase) BlockPlayer(ctx context.Context, me, target uuid.UUID) error {
 
 func (u *Usecase) UnblockPlayer(ctx context.Context, me, target uuid.UUID) error {
 	return u.rw.RW(ctx, func(ctx context.Context) error {
-		return u.repo.Unblock(ctx, me, target)
+		return u.blocks.Delete(ctx, me, target)
 	})
 }
 
@@ -137,7 +139,7 @@ func (u *Usecase) ListBlocked(ctx context.Context, me uuid.UUID) ([]*domainsocia
 	var blocked []*domainsocial.BlockedPlayer
 	err := u.ro.RO(ctx, func(ctx context.Context) error {
 		var err error
-		blocked, err = u.repo.ListBlocked(ctx, me)
+		blocked, err = u.blocks.ListBlocked(ctx, me)
 		return err
 	})
 	return blocked, err
@@ -147,7 +149,7 @@ func (u *Usecase) ListFriends(ctx context.Context, me uuid.UUID) ([]*domainsocia
 	var friends []*domainsocial.Friend
 	err := u.ro.RO(ctx, func(ctx context.Context) error {
 		var err error
-		friends, err = u.repo.ListFriends(ctx, me)
+		friends, err = u.friends.ListFriends(ctx, me)
 		return err
 	})
 	return friends, err
@@ -157,7 +159,7 @@ func (u *Usecase) ListIncomingRequests(ctx context.Context, me uuid.UUID) ([]*do
 	var requests []*domainsocial.PendingRequest
 	err := u.ro.RO(ctx, func(ctx context.Context) error {
 		var err error
-		requests, err = u.repo.ListIncoming(ctx, me)
+		requests, err = u.requests.ListIncoming(ctx, me)
 		return err
 	})
 	return requests, err
@@ -167,7 +169,7 @@ func (u *Usecase) ListOutgoingRequests(ctx context.Context, me uuid.UUID) ([]*do
 	var requests []*domainsocial.PendingRequest
 	err := u.ro.RO(ctx, func(ctx context.Context) error {
 		var err error
-		requests, err = u.repo.ListOutgoing(ctx, me)
+		requests, err = u.requests.ListOutgoing(ctx, me)
 		return err
 	})
 	return requests, err
