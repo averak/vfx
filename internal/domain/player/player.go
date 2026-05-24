@@ -17,7 +17,6 @@ const MaxNicknameLength = 32
 // ErrInvalidNickname rejects a present nickname that is blank or longer than MaxNicknameLength.
 var ErrInvalidNickname = errors.New("player: invalid nickname")
 
-// Player can carry multiple Identity rows (anonymous device today, OAuth providers later).
 type Player struct {
 	ID        uuid.UUID
 	Nickname  *string
@@ -25,7 +24,7 @@ type Player struct {
 	UpdatedAt time.Time
 }
 
-// New accepts a nil nickname (the player is unnamed); a non-nil one must satisfy the nickname invariant.
+// A nil nickname leaves the player unnamed.
 func New(id uuid.UUID, nickname *string, now time.Time) (*Player, error) {
 	if err := validateNickname(nickname); err != nil {
 		return nil, err
@@ -38,7 +37,7 @@ func New(id uuid.UUID, nickname *string, now time.Time) (*Player, error) {
 	}, nil
 }
 
-// SetNickname clears the nickname when nickname is nil; a non-nil one must satisfy the nickname invariant.
+// A nil nickname clears it.
 func (p *Player) SetNickname(nickname *string, now time.Time) error {
 	if err := validateNickname(nickname); err != nil {
 		return err

@@ -30,7 +30,6 @@ type Group struct {
 	CreatedAt time.Time
 }
 
-// New validates the name so an invalid group can never be constructed.
 func New(id, ownerID uuid.UUID, name string, now time.Time) (*Group, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || utf8.RuneCountInString(name) > MaxNameLength {

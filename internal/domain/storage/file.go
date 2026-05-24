@@ -35,7 +35,6 @@ type File struct {
 	UpdatedAt time.Time
 }
 
-// NewFile is built at commit time from the verified object-store attributes, so it revalidates the name and size rather than trusting the caller.
 func NewFile(filename string, size uint64, hash string, updatedAt time.Time) (*File, error) {
 	if err := ValidateFilename(filename); err != nil {
 		return nil, err

@@ -7,16 +7,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// Repository persists friend requests and friendships.
-// Friendship methods take the pair in any order and canonicalize internally; the usecase need not pre-order.
+// Friendship and block methods take the pair in any order and canonicalize internally; the caller need not pre-order.
 type Repository interface {
-	// CreateRequest records a pending request requester -> addressee.
 	CreateRequest(ctx context.Context, requester, addressee uuid.UUID, now time.Time) error
-
-	// RequestExists reports whether a pending request requester -> addressee exists.
 	RequestExists(ctx context.Context, requester, addressee uuid.UUID) (bool, error)
 
-	// DeleteRequest removes the pending request requester -> addressee, returning ErrRequestNotFound when there is none.
+	// DeleteRequest returns ErrRequestNotFound when no such pending request exists.
 	DeleteRequest(ctx context.Context, requester, addressee uuid.UUID) error
 
 	ListIncoming(ctx context.Context, addressee uuid.UUID) ([]*PendingRequest, error)
@@ -25,18 +21,18 @@ type Repository interface {
 	CreateFriendship(ctx context.Context, a, b uuid.UUID, now time.Time) error
 	AreFriends(ctx context.Context, a, b uuid.UUID) (bool, error)
 
-	// DeleteFriendship removes the friendship, returning ErrNotFriends when the two are not friends.
+	// DeleteFriendship returns ErrNotFriends when the two are not friends.
 	DeleteFriendship(ctx context.Context, a, b uuid.UUID) error
 
 	ListFriends(ctx context.Context, playerID uuid.UUID) ([]*Friend, error)
 
-	// Block records blocker -> blocked; it is idempotent (re-blocking is a no-op).
+	// Block is idempotent: re-blocking is a no-op.
 	Block(ctx context.Context, blocker, blocked uuid.UUID, now time.Time) error
 
-	// Unblock removes blocker -> blocked; it is idempotent (unblocking a non-block is a no-op).
+	// Unblock is idempotent: unblocking a non-block is a no-op.
 	Unblock(ctx context.Context, blocker, blocked uuid.UUID) error
 
-	// IsBlocked reports whether either player has blocked the other.
+	// IsBlocked reports whether either player has blocked the other, in either direction.
 	IsBlocked(ctx context.Context, a, b uuid.UUID) (bool, error)
 
 	ListBlocked(ctx context.Context, blocker uuid.UUID) ([]*BlockedPlayer, error)

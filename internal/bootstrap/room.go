@@ -34,9 +34,7 @@ func (m roomMetrics) IncActiveMatches()           { m.reg.RoomMatchesActive.Inc(
 func (m roomMetrics) DecActiveMatches()           { m.reg.RoomMatchesActive.Dec() }
 func (m roomMetrics) ObserveTick(d time.Duration) { m.reg.RoomTickDuration.Observe(d.Seconds()) }
 
-// NewRoom constructs and validates the room container.
-//
-// Plugin selection follows VFX_ROOM_PLUGIN_PATH:
+// NewRoom selects the room plugin from VFX_ROOM_PLUGIN_PATH:
 //   - a path ending in .wasm is compiled and run by the wazero host, the production sandboxed path;
 //   - any other value names a plugin registered into the supplied registry (the in-process Go path used by the example vfx-rps binary);
 //   - empty falls back to the first registered plugin, so a single-plugin quickstart binary needs no configuration.

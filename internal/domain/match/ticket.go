@@ -46,7 +46,6 @@ func NewTicket(id, playerID uuid.UUID, gameMode string, now time.Time) (*Ticket,
 	}, nil
 }
 
-// IsParty reports whether the ticket queues a party (a roster of two or more) rather than a solo player.
 func (t *Ticket) IsParty() bool { return len(t.PartyMembers) >= 2 }
 
 // PartyKey identifies the party a ticket belongs to: the canonical roster that every member's ticket shares.

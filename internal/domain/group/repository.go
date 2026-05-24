@@ -7,13 +7,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// Repository persists groups and their memberships.
 type Repository interface {
 	// Find returns ErrNotFound when no group has that id.
 	Find(ctx context.Context, id uuid.UUID) (*Group, error)
 	Save(ctx context.Context, g *Group) error
 
-	// Delete removes the group; memberships cascade.
+	// Delete cascades to the group's memberships.
 	Delete(ctx context.Context, id uuid.UUID) error
 
 	// AddMember is idempotent: re-joining is a no-op.

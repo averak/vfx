@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// MaxBodyLength bounds a message in runes; enforcing it here keeps a valid body intrinsic to a Message.
+// MaxBodyLength bounds a message body in runes.
 const MaxBodyLength = 2000
 
 var (
@@ -21,7 +21,6 @@ var (
 	ErrNotChannelMember = errors.New("chat: not a member of the channel")
 )
 
-// Message is one direct message.
 type Message struct {
 	ID          uuid.UUID
 	SenderID    uuid.UUID
@@ -30,7 +29,6 @@ type Message struct {
 	SentAt      time.Time
 }
 
-// NewMessage validates the body and rejects self-messages, so an invalid message can never be constructed.
 func NewMessage(id, sender, recipient uuid.UUID, body string, now time.Time) (*Message, error) {
 	if sender == recipient {
 		return nil, ErrSelfMessage
@@ -47,7 +45,7 @@ func NewMessage(id, sender, recipient uuid.UUID, body string, now time.Time) (*M
 	}, nil
 }
 
-// ChannelMessage is one message in a channel (a group); the channel is identified by its group id.
+// ChannelMessage's ChannelID is the group id the channel maps to.
 type ChannelMessage struct {
 	ID        uuid.UUID
 	ChannelID uuid.UUID
@@ -56,7 +54,6 @@ type ChannelMessage struct {
 	SentAt    time.Time
 }
 
-// NewChannelMessage validates the body so an invalid channel message can never be constructed.
 func NewChannelMessage(id, channelID, sender uuid.UUID, body string, now time.Time) (*ChannelMessage, error) {
 	if strings.TrimSpace(body) == "" || utf8.RuneCountInString(body) > MaxBodyLength {
 		return nil, ErrInvalidBody
@@ -64,7 +61,6 @@ func NewChannelMessage(id, channelID, sender uuid.UUID, body string, now time.Ti
 	return &ChannelMessage{ID: id, ChannelID: channelID, SenderID: sender, Body: body, SentAt: now}, nil
 }
 
-// Conversation returns the canonical (low, high) ordering of two participants, so the pair maps to one conversation regardless of who sends.
 func Conversation(a, b uuid.UUID) (low, high uuid.UUID) {
 	for i := range a {
 		switch {
