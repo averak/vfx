@@ -12,13 +12,14 @@ import (
 )
 
 type Usecase struct {
-	rw   tx.ReadWriter
-	ro   tx.Reader
-	repo domaingroup.Repository
+	rw      tx.ReadWriter
+	ro      tx.Reader
+	repo    domaingroup.Repository
+	members domaingroup.MembershipRepository
 }
 
-func New(rw tx.ReadWriter, ro tx.Reader, repo domaingroup.Repository) *Usecase {
-	return &Usecase{rw: rw, ro: ro, repo: repo}
+func New(rw tx.ReadWriter, ro tx.Reader, repo domaingroup.Repository, members domaingroup.MembershipRepository) *Usecase {
+	return &Usecase{rw: rw, ro: ro, repo: repo, members: members}
 }
 
 // CreateGroup creates a group with the caller as owner and first member.
@@ -32,7 +33,7 @@ func (u *Usecase) CreateGroup(ctx context.Context, owner uuid.UUID, name string)
 		if err := u.repo.Save(ctx, g); err != nil {
 			return err
 		}
-		return u.repo.AddMember(ctx, g.ID, owner, now)
+		return u.members.Save(ctx, domaingroup.NewMembership(g.ID, owner, now))
 	})
 	if err != nil {
 		return nil, err
@@ -61,7 +62,7 @@ func (u *Usecase) JoinGroup(ctx context.Context, me, groupID uuid.UUID) error {
 		if _, err := u.repo.Find(ctx, groupID); err != nil {
 			return err
 		}
-		return u.repo.AddMember(ctx, groupID, me, now)
+		return u.members.Save(ctx, domaingroup.NewMembership(groupID, me, now))
 	})
 }
 
@@ -75,7 +76,7 @@ func (u *Usecase) LeaveGroup(ctx context.Context, me, groupID uuid.UUID) error {
 		if g.OwnerID == me {
 			return domaingroup.ErrOwnerMustDelete
 		}
-		return u.repo.RemoveMember(ctx, groupID, me)
+		return u.members.Delete(ctx, groupID, me)
 	})
 }
 
@@ -83,7 +84,7 @@ func (u *Usecase) ListMyGroups(ctx context.Context, me uuid.UUID) ([]*domaingrou
 	var groups []*domaingroup.Group
 	err := u.ro.RO(ctx, func(ctx context.Context) error {
 		var err error
-		groups, err = u.repo.ListForPlayer(ctx, me)
+		groups, err = u.members.ListGroupsForPlayer(ctx, me)
 		return err
 	})
 	return groups, err
@@ -93,14 +94,14 @@ func (u *Usecase) ListMyGroups(ctx context.Context, me uuid.UUID) ([]*domaingrou
 func (u *Usecase) ListMembers(ctx context.Context, me, groupID uuid.UUID) ([]*domaingroup.Member, error) {
 	var members []*domaingroup.Member
 	err := u.ro.RO(ctx, func(ctx context.Context) error {
-		member, err := u.repo.IsMember(ctx, groupID, me)
+		member, err := u.members.IsMember(ctx, groupID, me)
 		if err != nil {
 			return err
 		}
 		if !member {
 			return domaingroup.ErrNotMember
 		}
-		members, err = u.repo.ListMembers(ctx, groupID)
+		members, err = u.members.ListMembers(ctx, groupID)
 		return err
 	})
 	return members, err

@@ -146,11 +146,11 @@ func New(t *testing.T) *Server {
 	socialPath, socialHandler := socialconnect.NewSocialServiceHandler(gatewaysocialhandler.New(socialUC), interceptors)
 	mux.Handle(socialPath, socialHandler)
 
-	chatUC := usecasechat.New(session, session, repository.NewChat(), repository.NewGroup(), chatstream.NewInMem(), usecasechat.Config{DefaultLimit: 50, MaxLimit: 200})
+	chatUC := usecasechat.New(session, session, repository.NewChat(), repository.NewGroupMembership(), chatstream.NewInMem(), usecasechat.Config{DefaultLimit: 50, MaxLimit: 200})
 	chatPath, chatHandler := chatconnect.NewChatServiceHandler(gatewaychathandler.New(chatUC), interceptors)
 	mux.Handle(chatPath, chatHandler)
 
-	groupUC := usecasegroup.New(session, session, repository.NewGroup())
+	groupUC := usecasegroup.New(session, session, repository.NewGroup(), repository.NewGroupMembership())
 	groupPath, groupHandler := groupconnect.NewGroupServiceHandler(gatewaygrouphandler.New(groupUC), interceptors)
 	mux.Handle(groupPath, groupHandler)
 

@@ -245,13 +245,13 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	socialUC := usecasesocial.New(session, session, repository.NewSocial())
 	socialHandler := gatewaysocialhandler.New(socialUC)
 
-	chatUC := usecasechat.New(session, session, repository.NewChat(), repository.NewGroup(), chatstream.NewValkey(valkeyClient), usecasechat.Config{
+	chatUC := usecasechat.New(session, session, repository.NewChat(), repository.NewGroupMembership(), chatstream.NewValkey(valkeyClient), usecasechat.Config{
 		DefaultLimit: cfg.ChatHistoryDefaultLimit,
 		MaxLimit:     cfg.ChatHistoryMaxLimit,
 	})
 	chatHandler := gatewaychathandler.New(chatUC)
 
-	groupUC := usecasegroup.New(session, session, repository.NewGroup())
+	groupUC := usecasegroup.New(session, session, repository.NewGroup(), repository.NewGroupMembership())
 	groupHandler := gatewaygrouphandler.New(groupUC)
 
 	cleanup := func() {
