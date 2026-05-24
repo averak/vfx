@@ -26,7 +26,7 @@ service LeaderboardService {
 
 // RankEntry は 1 エントリの順位・プレイヤー・スコア。
 message RankEntry {
-  // 1 始まり。同点は先に到達した方 (updated_at が早い方) が上位。
+  // 1 始まり。同点は先に到達した方 (achieved_at が早い方) が上位。
   int64 rank = 1;
 
   string player_id = 2;
@@ -36,7 +36,8 @@ message RankEntry {
 
   int64 score = 4;
 
-  google.protobuf.Timestamp updated_at = 5;
+  // その順位のスコアに到達した時刻。
+  google.protobuf.Timestamp achieved_at = 5;
 }
 
 message SubmitScoreRequest {

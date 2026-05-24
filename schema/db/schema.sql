@@ -163,14 +163,15 @@ CREATE TABLE leaderboard_entries (
   leaderboard_id TEXT         NOT NULL,
   player_id      UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
   score          BIGINT       NOT NULL,
+  -- achieved_at is when the player's current best was reached; it breaks ties (earlier reach ranks higher) and is domain data, kept distinct from the audit created_at.
+  achieved_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   UNIQUE (leaderboard_id, player_id)
 );
 
--- Serves both the ranked scans (ORDER BY score, updated_at) and the count-of-better-scores rank query, scoped per leaderboard.
+-- Serves both the ranked scans (ORDER BY score, achieved_at) and the count-of-better-scores rank query, scoped per leaderboard.
 CREATE INDEX idx_leaderboard_entries_ranking
-  ON leaderboard_entries (leaderboard_id, score, updated_at);
+  ON leaderboard_entries (leaderboard_id, score, achieved_at);
 
 -- ============================================================================
 -- friend_requests

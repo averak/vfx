@@ -26,11 +26,11 @@ func requireAuth(ctx context.Context) (uuid.UUID, error) {
 
 func toRankEntryPb(e *domainleaderboard.RankedEntry) *leaderboardv1.RankEntry {
 	return &leaderboardv1.RankEntry{
-		Rank:      e.Rank,
-		PlayerId:  e.PlayerID.String(),
-		Nickname:  e.Nickname,
-		Score:     e.Score,
-		UpdatedAt: timestamppb.New(e.UpdatedAt),
+		Rank:       e.Rank,
+		PlayerId:   e.PlayerID.String(),
+		Nickname:   e.Nickname,
+		Score:      e.Score,
+		AchievedAt: timestamppb.New(e.AchievedAt),
 	}
 }
 

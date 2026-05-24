@@ -36,7 +36,7 @@ func (Leaderboard) Submit(ctx context.Context, lb leaderboard.Leaderboard, playe
 			LeaderboardID: lb.ID,
 			PlayerID:      playerID,
 			Score:         score,
-			CreatedAt:     toTimestamptz(now),
+			AchievedAt:    toTimestamptz(now),
 		})
 		return affected > 0, ascErr
 	}
@@ -45,7 +45,7 @@ func (Leaderboard) Submit(ctx context.Context, lb leaderboard.Leaderboard, playe
 		LeaderboardID: lb.ID,
 		PlayerID:      playerID,
 		Score:         score,
-		CreatedAt:     toTimestamptz(now),
+		AchievedAt:    toTimestamptz(now),
 	})
 	return affected > 0, err
 }
@@ -62,13 +62,13 @@ func (Leaderboard) RankOf(ctx context.Context, lb leaderboard.Leaderboard, playe
 		if ascErr != nil {
 			return nil, rankErr(ascErr)
 		}
-		return &leaderboard.RankedEntry{Rank: int64(row.Rank), PlayerID: row.PlayerID, Nickname: row.Nickname, Score: row.Score, UpdatedAt: row.UpdatedAt.Time}, nil
+		return &leaderboard.RankedEntry{Rank: int64(row.Rank), PlayerID: row.PlayerID, Nickname: row.Nickname, Score: row.Score, AchievedAt: row.AchievedAt.Time}, nil
 	}
 	row, err := q.RankOfDesc(ctx, params)
 	if err != nil {
 		return nil, rankErr(err)
 	}
-	return &leaderboard.RankedEntry{Rank: int64(row.Rank), PlayerID: row.PlayerID, Nickname: row.Nickname, Score: row.Score, UpdatedAt: row.UpdatedAt.Time}, nil
+	return &leaderboard.RankedEntry{Rank: int64(row.Rank), PlayerID: row.PlayerID, Nickname: row.Nickname, Score: row.Score, AchievedAt: row.AchievedAt.Time}, nil
 }
 
 func (Leaderboard) TopRanks(ctx context.Context, lb leaderboard.Leaderboard, offset, limit int) ([]*leaderboard.RankedEntry, error) {
@@ -87,7 +87,7 @@ func (Leaderboard) TopRanks(ctx context.Context, lb leaderboard.Leaderboard, off
 			return nil, ascErr
 		}
 		for i, row := range rows {
-			out = append(out, &leaderboard.RankedEntry{Rank: int64(offset + i + 1), PlayerID: row.PlayerID, Nickname: row.Nickname, Score: row.Score, UpdatedAt: row.UpdatedAt.Time})
+			out = append(out, &leaderboard.RankedEntry{Rank: int64(offset + i + 1), PlayerID: row.PlayerID, Nickname: row.Nickname, Score: row.Score, AchievedAt: row.AchievedAt.Time})
 		}
 		return out, nil
 	}
@@ -96,7 +96,7 @@ func (Leaderboard) TopRanks(ctx context.Context, lb leaderboard.Leaderboard, off
 		return nil, err
 	}
 	for i, row := range rows {
-		out = append(out, &leaderboard.RankedEntry{Rank: int64(offset + i + 1), PlayerID: row.PlayerID, Nickname: row.Nickname, Score: row.Score, UpdatedAt: row.UpdatedAt.Time})
+		out = append(out, &leaderboard.RankedEntry{Rank: int64(offset + i + 1), PlayerID: row.PlayerID, Nickname: row.Nickname, Score: row.Score, AchievedAt: row.AchievedAt.Time})
 	}
 	return out, nil
 }

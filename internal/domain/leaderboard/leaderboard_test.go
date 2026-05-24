@@ -6,7 +6,7 @@ import (
 	"github.com/averak/vfx/internal/domain/leaderboard"
 )
 
-// Beats is strict: an equal score never beats the incumbent, so keep-best does not churn updated_at on a re-submit of the same value.
+// Beats is strict: an equal score never beats the incumbent, so keep-best does not churn achieved_at on a re-submit of the same value.
 func TestLeaderboard_Beats(t *testing.T) {
 	desc := leaderboard.Leaderboard{SortOrder: leaderboard.Descending}
 	asc := leaderboard.Leaderboard{SortOrder: leaderboard.Ascending}

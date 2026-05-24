@@ -60,7 +60,7 @@ func (s *LeaderboardIndex) RankOf(ctx context.Context, lb leaderboard.Leaderboar
 	}
 }
 
-// TopRanks stays on Postgres: an ORDER BY score LIMIT over the (leaderboard_id, score, updated_at) index is already efficient for the shallow pages clients request.
+// TopRanks stays on Postgres: an ORDER BY score LIMIT over the (leaderboard_id, score, achieved_at) index is already efficient for the shallow pages clients request.
 func (s *LeaderboardIndex) TopRanks(ctx context.Context, lb leaderboard.Leaderboard, offset, limit int) ([]*leaderboard.RankedEntry, error) {
 	return s.pg.TopRanks(ctx, lb, offset, limit)
 }
@@ -88,11 +88,11 @@ func (s *LeaderboardIndex) rankViaIndex(ctx context.Context, lb leaderboard.Lead
 		return nil, err
 	}
 	return &leaderboard.RankedEntry{
-		Rank:      rank + 1,
-		PlayerID:  row.PlayerID,
-		Nickname:  row.Nickname,
-		Score:     row.Score,
-		UpdatedAt: row.UpdatedAt.Time,
+		Rank:       rank + 1,
+		PlayerID:   row.PlayerID,
+		Nickname:   row.Nickname,
+		Score:      row.Score,
+		AchievedAt: row.AchievedAt.Time,
 	}, nil
 }
 

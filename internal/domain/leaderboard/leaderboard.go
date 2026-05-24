@@ -43,9 +43,9 @@ func (l Leaderboard) Beats(a, b int64) bool {
 
 // RankedEntry is a read model: an entry with its computed 1-based rank and the player's display name.
 type RankedEntry struct {
-	Rank      int64
-	PlayerID  uuid.UUID
-	Nickname  *string
-	Score     int64
-	UpdatedAt time.Time
+	Rank       int64
+	PlayerID   uuid.UUID
+	Nickname   *string
+	Score      int64
+	AchievedAt time.Time
 }
