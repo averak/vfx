@@ -1,4 +1,4 @@
-// Package chat orchestrates the ChatService (direct messages).
+// Package chat orchestrates the ChatService (direct messages and channel/group chat).
 package chat
 
 import (
@@ -18,15 +18,21 @@ type Config struct {
 	MaxLimit     int
 }
 
-type Usecase struct {
-	rw   tx.ReadWriter
-	ro   tx.Reader
-	repo domainchat.Repository
-	cfg  Config
+// Membership reports whether a player belongs to a channel; a channel is a group, so the group repository satisfies this.
+type Membership interface {
+	IsMember(ctx context.Context, channelID, playerID uuid.UUID) (bool, error)
 }
 
-func New(rw tx.ReadWriter, ro tx.Reader, repo domainchat.Repository, cfg Config) *Usecase {
-	return &Usecase{rw: rw, ro: ro, repo: repo, cfg: cfg}
+type Usecase struct {
+	rw      tx.ReadWriter
+	ro      tx.Reader
+	repo    domainchat.Repository
+	members Membership
+	cfg     Config
+}
+
+func New(rw tx.ReadWriter, ro tx.Reader, repo domainchat.Repository, members Membership, cfg Config) *Usecase {
+	return &Usecase{rw: rw, ro: ro, repo: repo, members: members, cfg: cfg}
 }
 
 // SendDirectMessage validates and stores a message from sender to recipient.
@@ -51,6 +57,45 @@ func (u *Usecase) ListDirectMessages(ctx context.Context, me, other uuid.UUID, b
 	err := u.ro.RO(ctx, func(ctx context.Context) error {
 		var err error
 		messages, err = u.repo.ListConversation(ctx, me, other, before, limit)
+		return err
+	})
+	return messages, err
+}
+
+// SendChannelMessage stores a message in a channel after checking the sender is a member.
+func (u *Usecase) SendChannelMessage(ctx context.Context, sender, channelID uuid.UUID, body string) (*domainchat.ChannelMessage, error) {
+	msg, err := domainchat.NewChannelMessage(uuid.New(), channelID, sender, body, clock.Now(ctx))
+	if err != nil {
+		return nil, err
+	}
+	if err := u.rw.RW(ctx, func(ctx context.Context) error {
+		member, err := u.members.IsMember(ctx, channelID, sender)
+		if err != nil {
+			return err
+		}
+		if !member {
+			return domainchat.ErrNotChannelMember
+		}
+		return u.repo.SaveChannelMessage(ctx, msg)
+	}); err != nil {
+		return nil, err
+	}
+	return msg, nil
+}
+
+// ListChannelMessages returns a channel's history newest-first; the caller must be a member.
+func (u *Usecase) ListChannelMessages(ctx context.Context, me, channelID uuid.UUID, before time.Time, limit int) ([]*domainchat.ChannelMessage, error) {
+	limit = u.clampLimit(limit)
+	var messages []*domainchat.ChannelMessage
+	err := u.ro.RO(ctx, func(ctx context.Context) error {
+		member, err := u.members.IsMember(ctx, channelID, me)
+		if err != nil {
+			return err
+		}
+		if !member {
+			return domainchat.ErrNotChannelMember
+		}
+		messages, err = u.repo.ListChannel(ctx, channelID, before, limit)
 		return err
 	})
 	return messages, err

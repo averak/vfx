@@ -14,6 +14,14 @@ import (
 
 // tables are truncated by Truncate, child-first so foreign keys allow it.
 var tables = []string{
+	"channel_messages",
+	"group_members",
+	"groups",
+	"direct_messages",
+	"player_blocks",
+	"friendships",
+	"friend_requests",
+	"leaderboard_entries",
 	"player_files",
 	"title_files",
 	"match_players",

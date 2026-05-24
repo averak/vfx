@@ -38,12 +38,16 @@ import {
   type FriendRequest,
   type BlockedPlayer,
 } from "./gen/vfx/v1/social/social_service_pb.js";
-import { ChatService, type Message as ChatMessage } from "./gen/vfx/v1/chat/chat_service_pb.js";
+import {
+  ChatService,
+  type Message as ChatMessage,
+  type ChannelMessage,
+} from "./gen/vfx/v1/chat/chat_service_pb.js";
 import { GroupService, type Group, type Member } from "./gen/vfx/v1/group/group_service_pb.js";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 
 export { Provider, RequestStatus };
-export type { Player, Frame, FileMetadata, RankEntry, Friend, FriendRequest, BlockedPlayer, ChatMessage, Group, Member };
+export type { Player, Frame, FileMetadata, RankEntry, Friend, FriendRequest, BlockedPlayer, ChatMessage, ChannelMessage, Group, Member };
 
 /** Options for constructing a VfxClient. */
 export interface VfxClientOptions {
@@ -312,6 +316,28 @@ export class VfxClient {
     const resp = await this.chat.listDirectMessages(
       {
         otherPlayerId,
+        before: opts.before ? timestampFromDate(opts.before) : undefined,
+        limit: opts.limit ?? 0,
+      },
+      { headers: this.authHeaders() },
+    );
+    return resp.messages;
+  }
+
+  /** Post a message to a channel (a group the caller belongs to) and return the stored message. */
+  async sendChannelMessage(channelId: string, body: string): Promise<ChannelMessage | undefined> {
+    const resp = await this.chat.sendChannelMessage({ channelId, body }, { headers: this.authHeaders() });
+    return resp.message;
+  }
+
+  /** Channel history, newest-first; pass before to page back to older messages. */
+  async listChannelMessages(
+    channelId: string,
+    opts: { before?: Date; limit?: number } = {},
+  ): Promise<ChannelMessage[]> {
+    const resp = await this.chat.listChannelMessages(
+      {
+        channelId,
         before: opts.before ? timestampFromDate(opts.before) : undefined,
         limit: opts.limit ?? 0,
       },

@@ -9,3 +9,14 @@ FROM direct_messages
 WHERE player_low = $1 AND player_high = $2 AND created_at < $3
 ORDER BY created_at DESC
 LIMIT $4;
+
+-- name: InsertChannelMessage :exec
+INSERT INTO channel_messages (id, channel_id, sender_id, body, created_at)
+VALUES ($1, $2, $3, $4, $5);
+
+-- name: ListChannelMessages :many
+SELECT id, channel_id, sender_id, body, created_at
+FROM channel_messages
+WHERE channel_id = $1 AND created_at < $2
+ORDER BY created_at DESC
+LIMIT $3;

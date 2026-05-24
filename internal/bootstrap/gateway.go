@@ -243,7 +243,7 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	socialUC := usecasesocial.New(session, session, repository.NewSocial())
 	socialHandler := gatewaysocialhandler.New(socialUC)
 
-	chatUC := usecasechat.New(session, session, repository.NewChat(), usecasechat.Config{
+	chatUC := usecasechat.New(session, session, repository.NewChat(), repository.NewGroup(), usecasechat.Config{
 		DefaultLimit: cfg.ChatHistoryDefaultLimit,
 		MaxLimit:     cfg.ChatHistoryMaxLimit,
 	})

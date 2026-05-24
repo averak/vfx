@@ -140,7 +140,7 @@ func New(t *testing.T) *Server {
 	socialPath, socialHandler := socialconnect.NewSocialServiceHandler(gatewaysocialhandler.New(socialUC), interceptors)
 	mux.Handle(socialPath, socialHandler)
 
-	chatUC := usecasechat.New(session, session, repository.NewChat(), usecasechat.Config{DefaultLimit: 50, MaxLimit: 200})
+	chatUC := usecasechat.New(session, session, repository.NewChat(), repository.NewGroup(), usecasechat.Config{DefaultLimit: 50, MaxLimit: 200})
 	chatPath, chatHandler := chatconnect.NewChatServiceHandler(gatewaychathandler.New(chatUC), interceptors)
 	mux.Handle(chatPath, chatHandler)
 

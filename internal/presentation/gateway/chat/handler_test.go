@@ -7,6 +7,7 @@ import (
 
 	authv1 "github.com/averak/vfx/gen/go/vfx/v1/auth"
 	chatv1 "github.com/averak/vfx/gen/go/vfx/v1/chat"
+	groupv1 "github.com/averak/vfx/gen/go/vfx/v1/group"
 	"github.com/averak/vfx/internal/testutils/testconnect"
 )
 
@@ -124,6 +125,124 @@ func TestDirectMessages_Pagination(t *testing.T) {
 	oldest := page1.Msg.GetMessages()[1].GetSentAt()
 	page2, err := srv.Chat.ListDirectMessages(t.Context(),
 		testconnect.Authorize(connect.NewRequest(&chatv1.ListDirectMessagesRequest{OtherPlayerId: b.id, Limit: 2, Before: oldest}), a.token))
+	if err != nil {
+		t.Fatalf("page2: %v", err)
+	}
+	if len(page2.Msg.GetMessages()) != 2 || page2.Msg.GetMessages()[0].GetBody() != "m3" {
+		t.Errorf("page2 = %+v, want [m3, m2]", page2.Msg.GetMessages())
+	}
+}
+
+func createGroup(t *testing.T, srv *testconnect.Server, owner member) string {
+	t.Helper()
+	resp, err := srv.Group.CreateGroup(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&groupv1.CreateGroupRequest{Name: "clan"}), owner.token))
+	if err != nil {
+		t.Fatalf("CreateGroup: %v", err)
+	}
+	return resp.Msg.GetGroup().GetId()
+}
+
+func joinGroup(t *testing.T, srv *testconnect.Server, m member, groupID string) {
+	t.Helper()
+	if _, err := srv.Group.JoinGroup(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&groupv1.JoinGroupRequest{GroupId: groupID}), m.token)); err != nil {
+		t.Fatalf("JoinGroup: %v", err)
+	}
+}
+
+func TestSendChannelMessage_RequiresAuth(t *testing.T) {
+	srv := testconnect.New(t)
+	owner := join(t, srv, "ca-owner")
+	channelID := createGroup(t, srv, owner)
+	_, err := srv.Chat.SendChannelMessage(t.Context(), connect.NewRequest(&chatv1.SendChannelMessageRequest{ChannelId: channelID, Body: "hi"}))
+	requireCode(t, err, connect.CodeUnauthenticated)
+}
+
+// A non-member cannot post to or read a channel.
+func TestChannelMessage_RejectsNonMember(t *testing.T) {
+	srv := testconnect.New(t)
+	owner := join(t, srv, "cm-owner")
+	outsider := join(t, srv, "cm-outsider")
+	channelID := createGroup(t, srv, owner)
+
+	_, sendErr := srv.Chat.SendChannelMessage(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&chatv1.SendChannelMessageRequest{ChannelId: channelID, Body: "intrude"}), outsider.token))
+	requireCode(t, sendErr, connect.CodeFailedPrecondition)
+
+	_, listErr := srv.Chat.ListChannelMessages(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&chatv1.ListChannelMessagesRequest{ChannelId: channelID}), outsider.token))
+	requireCode(t, listErr, connect.CodeFailedPrecondition)
+}
+
+func TestSendChannelMessage_RejectsBlank(t *testing.T) {
+	srv := testconnect.New(t)
+	owner := join(t, srv, "cb-owner")
+	channelID := createGroup(t, srv, owner)
+	_, err := srv.Chat.SendChannelMessage(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&chatv1.SendChannelMessageRequest{ChannelId: channelID, Body: "   "}), owner.token))
+	requireCode(t, err, connect.CodeInvalidArgument)
+}
+
+// Every member sees the same channel history, newest-first, with the right sender.
+func TestChannelMessages_History(t *testing.T) {
+	srv := testconnect.New(t)
+	owner := join(t, srv, "ch-owner")
+	other := join(t, srv, "ch-other")
+	channelID := createGroup(t, srv, owner)
+	joinGroup(t, srv, other, channelID)
+
+	send := func(from member, body string) {
+		t.Helper()
+		if _, err := srv.Chat.SendChannelMessage(t.Context(),
+			testconnect.Authorize(connect.NewRequest(&chatv1.SendChannelMessageRequest{ChannelId: channelID, Body: body}), from.token)); err != nil {
+			t.Fatalf("SendChannelMessage: %v", err)
+		}
+	}
+	send(owner, "first")
+	send(other, "second")
+	send(owner, "third")
+
+	resp, err := srv.Chat.ListChannelMessages(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&chatv1.ListChannelMessagesRequest{ChannelId: channelID}), other.token))
+	if err != nil {
+		t.Fatalf("ListChannelMessages: %v", err)
+	}
+	msgs := resp.Msg.GetMessages()
+	if len(msgs) != 3 {
+		t.Fatalf("got %d messages, want 3", len(msgs))
+	}
+	if msgs[0].GetBody() != "third" || msgs[2].GetBody() != "first" {
+		t.Errorf("order wrong: %q ... %q", msgs[0].GetBody(), msgs[2].GetBody())
+	}
+	if msgs[1].GetBody() != "second" || msgs[1].GetSenderId() != other.id || msgs[1].GetChannelId() != channelID {
+		t.Errorf("message fields wrong: %+v", msgs[1])
+	}
+}
+
+func TestChannelMessages_Pagination(t *testing.T) {
+	srv := testconnect.New(t)
+	owner := join(t, srv, "cp-owner")
+	channelID := createGroup(t, srv, owner)
+	for _, body := range []string{"m1", "m2", "m3", "m4", "m5"} {
+		if _, err := srv.Chat.SendChannelMessage(t.Context(),
+			testconnect.Authorize(connect.NewRequest(&chatv1.SendChannelMessageRequest{ChannelId: channelID, Body: body}), owner.token)); err != nil {
+			t.Fatalf("SendChannelMessage: %v", err)
+		}
+	}
+
+	page1, err := srv.Chat.ListChannelMessages(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&chatv1.ListChannelMessagesRequest{ChannelId: channelID, Limit: 2}), owner.token))
+	if err != nil {
+		t.Fatalf("page1: %v", err)
+	}
+	if len(page1.Msg.GetMessages()) != 2 || page1.Msg.GetMessages()[0].GetBody() != "m5" {
+		t.Fatalf("page1 = %+v, want [m5, m4]", page1.Msg.GetMessages())
+	}
+
+	oldest := page1.Msg.GetMessages()[1].GetSentAt()
+	page2, err := srv.Chat.ListChannelMessages(t.Context(),
+		testconnect.Authorize(connect.NewRequest(&chatv1.ListChannelMessagesRequest{ChannelId: channelID, Limit: 2, Before: oldest}), owner.token))
 	if err != nil {
 		t.Fatalf("page2: %v", err)
 	}

@@ -39,6 +39,50 @@ func (Chat) Save(ctx context.Context, m *chat.Message) error {
 	})
 }
 
+func (Chat) SaveChannelMessage(ctx context.Context, m *chat.ChannelMessage) error {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	return dbgen.New(tx).InsertChannelMessage(ctx, dbgen.InsertChannelMessageParams{
+		ID:        m.ID,
+		ChannelID: m.ChannelID,
+		SenderID:  m.SenderID,
+		Body:      m.Body,
+		CreatedAt: toTimestamptz(m.SentAt),
+	})
+}
+
+func (Chat) ListChannel(ctx context.Context, channelID uuid.UUID, before time.Time, limit int) ([]*chat.ChannelMessage, error) {
+	tx, err := db.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if before.IsZero() {
+		before = farFuture
+	}
+	rows, err := dbgen.New(tx).ListChannelMessages(ctx, dbgen.ListChannelMessagesParams{
+		ChannelID: channelID,
+		CreatedAt: toTimestamptz(before),
+		//nolint:gosec // limit is a small, server-clamped page size.
+		Limit: int32(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*chat.ChannelMessage, len(rows))
+	for i, row := range rows {
+		out[i] = &chat.ChannelMessage{
+			ID:        row.ID,
+			ChannelID: row.ChannelID,
+			SenderID:  row.SenderID,
+			Body:      row.Body,
+			SentAt:    row.CreatedAt.Time,
+		}
+	}
+	return out, nil
+}
+
 func (Chat) ListConversation(ctx context.Context, a, b uuid.UUID, before time.Time, limit int) ([]*chat.Message, error) {
 	tx, err := db.Tx(ctx)
 	if err != nil {

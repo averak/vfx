@@ -69,6 +69,46 @@ func (h *Handler) ListDirectMessages(ctx context.Context, req *connect.Request[c
 	return connect.NewResponse(&chatv1.ListDirectMessagesResponse{Messages: out}), nil
 }
 
+func (h *Handler) SendChannelMessage(ctx context.Context, req *connect.Request[chatv1.SendChannelMessageRequest]) (*connect.Response[chatv1.SendChannelMessageResponse], error) {
+	sender, err := requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	channelID, err := parsePlayerID(req.Msg.GetChannelId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid channel id"))
+	}
+	msg, err := h.uc.SendChannelMessage(ctx, sender, channelID, req.Msg.GetBody())
+	if err != nil {
+		return nil, toConnectError(err)
+	}
+	return connect.NewResponse(&chatv1.SendChannelMessageResponse{Message: toChannelMessagePb(msg)}), nil
+}
+
+func (h *Handler) ListChannelMessages(ctx context.Context, req *connect.Request[chatv1.ListChannelMessagesRequest]) (*connect.Response[chatv1.ListChannelMessagesResponse], error) {
+	me, err := requireAuth(ctx)
+	if err != nil {
+		return nil, err
+	}
+	channelID, err := parsePlayerID(req.Msg.GetChannelId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid channel id"))
+	}
+	var before time.Time
+	if req.Msg.GetBefore() != nil {
+		before = req.Msg.GetBefore().AsTime()
+	}
+	messages, err := h.uc.ListChannelMessages(ctx, me, channelID, before, int(req.Msg.GetLimit()))
+	if err != nil {
+		return nil, toConnectError(err)
+	}
+	out := make([]*chatv1.ChannelMessage, len(messages))
+	for i, m := range messages {
+		out[i] = toChannelMessagePb(m)
+	}
+	return connect.NewResponse(&chatv1.ListChannelMessagesResponse{Messages: out}), nil
+}
+
 func requireAuth(ctx context.Context) (uuid.UUID, error) {
 	id, ok := authctx.From(ctx)
 	if !ok {
@@ -95,10 +135,22 @@ func toMessagePb(m *domainchat.Message) *chatv1.Message {
 	}
 }
 
+func toChannelMessagePb(m *domainchat.ChannelMessage) *chatv1.ChannelMessage {
+	return &chatv1.ChannelMessage{
+		Id:        m.ID.String(),
+		ChannelId: m.ChannelID.String(),
+		SenderId:  m.SenderID.String(),
+		Body:      m.Body,
+		SentAt:    timestamppb.New(m.SentAt),
+	}
+}
+
 func toConnectError(err error) error {
 	switch {
 	case errors.Is(err, domainchat.ErrSelfMessage), errors.Is(err, domainchat.ErrInvalidBody):
 		return connect.NewError(connect.CodeInvalidArgument, err)
+	case errors.Is(err, domainchat.ErrNotChannelMember):
+		return connect.NewError(connect.CodeFailedPrecondition, err)
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}

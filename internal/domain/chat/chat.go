@@ -16,8 +16,9 @@ import (
 const MaxBodyLength = 2000
 
 var (
-	ErrSelfMessage = errors.New("chat: cannot message yourself")
-	ErrInvalidBody = errors.New("chat: body is blank or too long")
+	ErrSelfMessage      = errors.New("chat: cannot message yourself")
+	ErrInvalidBody      = errors.New("chat: body is blank or too long")
+	ErrNotChannelMember = errors.New("chat: not a member of the channel")
 )
 
 // Message is one direct message.
@@ -44,6 +45,23 @@ func NewMessage(id, sender, recipient uuid.UUID, body string, now time.Time) (*M
 		Body:        body,
 		SentAt:      now,
 	}, nil
+}
+
+// ChannelMessage is one message in a channel (a group); the channel is identified by its group id.
+type ChannelMessage struct {
+	ID        uuid.UUID
+	ChannelID uuid.UUID
+	SenderID  uuid.UUID
+	Body      string
+	SentAt    time.Time
+}
+
+// NewChannelMessage validates the body so an invalid channel message can never be constructed.
+func NewChannelMessage(id, channelID, sender uuid.UUID, body string, now time.Time) (*ChannelMessage, error) {
+	if strings.TrimSpace(body) == "" || utf8.RuneCountInString(body) > MaxBodyLength {
+		return nil, ErrInvalidBody
+	}
+	return &ChannelMessage{ID: id, ChannelID: channelID, SenderID: sender, Body: body, SentAt: now}, nil
 }
 
 // Conversation returns the canonical (low, high) ordering of two participants, so the pair maps to one conversation regardless of who sends.

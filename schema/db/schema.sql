@@ -269,3 +269,19 @@ CREATE TABLE group_members (
 
 CREATE INDEX idx_group_members_player
   ON group_members (player_id);
+
+-- ============================================================================
+-- channel_messages
+--   Group chat: a message addressed to a channel, which is a group (channel_id = groups.id). Deleting the group cascades its messages.
+-- ============================================================================
+
+CREATE TABLE channel_messages (
+  id          UUID         PRIMARY KEY,
+  channel_id  UUID         NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  sender_id   UUID         NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  body        TEXT         NOT NULL,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_channel_messages_history
+  ON channel_messages (channel_id, created_at DESC);

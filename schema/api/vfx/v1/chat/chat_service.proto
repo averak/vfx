@@ -4,9 +4,9 @@ package vfx.v1.chat;
 
 import "google/protobuf/timestamp.proto";
 
-// ChatService はプレイヤー間のダイレクトメッセージを提供する。
+// ChatService は 1 対 1 の DM と、グループ単位のチャンネルチャットを提供する。
 //
-// v1 は 1 対 1 の DM のみ。グループチャンネルとリアルタイム購読 (server stream) は後続。
+// チャンネルは group をそのまま使う (channel_id = group の id)。送受信はそのグループのメンバーに限る。
 // 履歴は新しい順で、before カーソル (その時刻より古いもの) + limit でページングする。
 service ChatService {
   // SendDirectMessage は相手に DM を送り、保存されたメッセージを返す。
@@ -14,6 +14,40 @@ service ChatService {
 
   // ListDirectMessages は相手との会話履歴を新しい順で返す。
   rpc ListDirectMessages(ListDirectMessagesRequest) returns (ListDirectMessagesResponse);
+
+  // SendChannelMessage はチャンネル (グループ) にメッセージを送る。送信者はそのグループのメンバーである必要がある。
+  rpc SendChannelMessage(SendChannelMessageRequest) returns (SendChannelMessageResponse);
+
+  // ListChannelMessages はチャンネルの履歴を新しい順で返す。メンバー限定。
+  rpc ListChannelMessages(ListChannelMessagesRequest) returns (ListChannelMessagesResponse);
+}
+
+// ChannelMessage はチャンネル (グループ) の 1 メッセージ。
+message ChannelMessage {
+  string id = 1;
+  string channel_id = 2;
+  string sender_id = 3;
+  string body = 4;
+  google.protobuf.Timestamp sent_at = 5;
+}
+
+message SendChannelMessageRequest {
+  string channel_id = 1;
+  string body = 2;
+}
+
+message SendChannelMessageResponse {
+  ChannelMessage message = 1;
+}
+
+message ListChannelMessagesRequest {
+  string channel_id = 1;
+  google.protobuf.Timestamp before = 2;
+  int32 limit = 3;
+}
+
+message ListChannelMessagesResponse {
+  repeated ChannelMessage messages = 1;
 }
 
 // Message は 1 通の DM。

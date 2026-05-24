@@ -30,6 +30,22 @@ func TestNewMessage_Validation(t *testing.T) {
 	}
 }
 
+func TestNewChannelMessage_Validation(t *testing.T) {
+	channelID := uuid.New()
+	sender := uuid.New()
+	now := time.Now()
+
+	if _, err := chat.NewChannelMessage(uuid.New(), channelID, sender, "   ", now); !errors.Is(err, chat.ErrInvalidBody) {
+		t.Errorf("blank body: err = %v, want ErrInvalidBody", err)
+	}
+	if _, err := chat.NewChannelMessage(uuid.New(), channelID, sender, strings.Repeat("x", chat.MaxBodyLength+1), now); !errors.Is(err, chat.ErrInvalidBody) {
+		t.Errorf("over-length body: err = %v, want ErrInvalidBody", err)
+	}
+	if _, err := chat.NewChannelMessage(uuid.New(), channelID, sender, "hello", now); err != nil {
+		t.Errorf("valid channel message rejected: %v", err)
+	}
+}
+
 // Conversation is canonical: either argument order yields the same (low, high) pair.
 func TestConversation_Canonical(t *testing.T) {
 	a := uuid.MustParse("00000000-0000-0000-0000-000000000001")
