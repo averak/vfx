@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -17,7 +16,6 @@ func TestIdentity_SaveFindAndUniqueViolation(t *testing.T) {
 	repo := repository.NewIdentity()
 	p1 := seedPlayer(t, s)
 	p2 := seedPlayer(t, s)
-	now := time.Now().UTC()
 
 	mustRW(t, s, func(ctx context.Context) error {
 		if _, err := repo.Find(ctx, player.ProviderGoogle, "sub-x"); !errors.Is(err, player.ErrIdentityNotFound) {
@@ -27,7 +25,7 @@ func TestIdentity_SaveFindAndUniqueViolation(t *testing.T) {
 	})
 
 	mustRW(t, s, func(ctx context.Context) error {
-		return repo.Save(ctx, player.NewIdentity(uuid.New(), p1, player.ProviderGoogle, "sub-1", now))
+		return repo.Save(ctx, player.NewIdentity(uuid.New(), p1, player.ProviderGoogle, "sub-1"))
 	})
 	mustRW(t, s, func(ctx context.Context) error {
 		got, err := repo.Find(ctx, player.ProviderGoogle, "sub-1")
@@ -42,7 +40,7 @@ func TestIdentity_SaveFindAndUniqueViolation(t *testing.T) {
 
 	// The same (provider, uid) linked to a different player is the global-uniqueness violation.
 	err := s.RW(t.Context(), func(ctx context.Context) error {
-		return repo.Save(ctx, player.NewIdentity(uuid.New(), p2, player.ProviderGoogle, "sub-1", now))
+		return repo.Save(ctx, player.NewIdentity(uuid.New(), p2, player.ProviderGoogle, "sub-1"))
 	})
 	if !errors.Is(err, player.ErrIdentityAlreadyLinked) {
 		t.Errorf("duplicate identity = %v, want ErrIdentityAlreadyLinked", err)

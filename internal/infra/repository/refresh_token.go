@@ -32,7 +32,6 @@ func (RefreshToken) Create(ctx context.Context, rt *player.RefreshToken) error {
 		PlayerID:  rt.PlayerID,
 		TokenHash: rt.Hash,
 		ExpiresAt: toTimestamptz(rt.ExpiresAt),
-		CreatedAt: toTimestamptz(rt.CreatedAt),
 	})
 	return err
 }
@@ -58,7 +57,6 @@ func (RefreshToken) FindByHash(ctx context.Context, hash []byte, now time.Time) 
 		Hash:      row.TokenHash,
 		ExpiresAt: row.ExpiresAt.Time,
 		RevokedAt: fromNullableTimestamptz(row.RevokedAt),
-		CreatedAt: row.CreatedAt.Time,
 	}, nil
 }
 

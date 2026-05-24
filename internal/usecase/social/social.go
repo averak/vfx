@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 
 	domainsocial "github.com/averak/vfx/internal/domain/social"
-	"github.com/averak/vfx/internal/stdx/clock"
 	"github.com/averak/vfx/internal/usecase/tx"
 )
 
@@ -30,7 +29,6 @@ func (u *Usecase) SendFriendRequest(ctx context.Context, me, addressee uuid.UUID
 	if me == addressee {
 		return false, domainsocial.ErrSelfFriend
 	}
-	now := clock.Now(ctx)
 
 	var accepted bool
 	err := u.rw.RW(ctx, func(ctx context.Context) error {
@@ -59,7 +57,7 @@ func (u *Usecase) SendFriendRequest(ctx context.Context, me, addressee uuid.UUID
 				return delErr
 			}
 			accepted = true
-			return u.friends.Save(ctx, domainsocial.NewFriendship(me, addressee, now))
+			return u.friends.Save(ctx, domainsocial.NewFriendship(me, addressee))
 		}
 
 		forward, err := u.requests.Exists(ctx, me, addressee)
@@ -69,7 +67,7 @@ func (u *Usecase) SendFriendRequest(ctx context.Context, me, addressee uuid.UUID
 		if forward {
 			return domainsocial.ErrAlreadyRequested
 		}
-		return u.requests.Save(ctx, domainsocial.NewFriendRequest(me, addressee, now))
+		return u.requests.Save(ctx, domainsocial.NewFriendRequest(me, addressee))
 	})
 	return accepted, err
 }
@@ -77,12 +75,11 @@ func (u *Usecase) SendFriendRequest(ctx context.Context, me, addressee uuid.UUID
 // AcceptFriendRequest accepts the pending request requester -> me, forming the friendship.
 // It returns domainsocial.ErrRequestNotFound when there is no such request.
 func (u *Usecase) AcceptFriendRequest(ctx context.Context, me, requester uuid.UUID) error {
-	now := clock.Now(ctx)
 	return u.rw.RW(ctx, func(ctx context.Context) error {
 		if err := u.requests.Delete(ctx, requester, me); err != nil {
 			return err
 		}
-		return u.friends.Save(ctx, domainsocial.NewFriendship(requester, me, now))
+		return u.friends.Save(ctx, domainsocial.NewFriendship(requester, me))
 	})
 }
 
@@ -111,9 +108,8 @@ func (u *Usecase) BlockPlayer(ctx context.Context, me, target uuid.UUID) error {
 	if me == target {
 		return domainsocial.ErrSelfBlock
 	}
-	now := clock.Now(ctx)
 	return u.rw.RW(ctx, func(ctx context.Context) error {
-		if err := u.blocks.Save(ctx, domainsocial.NewBlock(me, target, now)); err != nil {
+		if err := u.blocks.Save(ctx, domainsocial.NewBlock(me, target)); err != nil {
 			return err
 		}
 		if err := u.friends.Delete(ctx, me, target); err != nil && !errors.Is(err, domainsocial.ErrNotFriends) {

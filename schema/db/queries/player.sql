@@ -17,6 +17,6 @@ WHERE provider = $1
   AND provider_uid = $2;
 
 -- name: CreatePlayerIdentity :one
-INSERT INTO player_identities (id, player_id, provider, provider_uid, created_at)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO player_identities (id, player_id, provider, provider_uid)
+VALUES ($1, $2, $3, $4)
 RETURNING *;

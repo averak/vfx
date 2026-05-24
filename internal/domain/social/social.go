@@ -21,37 +21,35 @@ var (
 )
 
 // FriendRequest is an aggregate root: a directed, pending request from Requester to Addressee.
+// When it was sent is an audit concern (the row's created_at), surfaced read-only as PendingRequest.RequestedAt, not carried here.
 type FriendRequest struct {
 	Requester uuid.UUID
 	Addressee uuid.UUID
-	CreatedAt time.Time
 }
 
-func NewFriendRequest(requester, addressee uuid.UUID, now time.Time) *FriendRequest {
-	return &FriendRequest{Requester: requester, Addressee: addressee, CreatedAt: now}
+func NewFriendRequest(requester, addressee uuid.UUID) *FriendRequest {
+	return &FriendRequest{Requester: requester, Addressee: addressee}
 }
 
 // Friendship is an aggregate root: an undirected friendship stored once. NewFriendship canonicalizes the pair into (Low, High).
 type Friendship struct {
-	Low       uuid.UUID
-	High      uuid.UUID
-	CreatedAt time.Time
+	Low  uuid.UUID
+	High uuid.UUID
 }
 
-func NewFriendship(a, b uuid.UUID, now time.Time) *Friendship {
+func NewFriendship(a, b uuid.UUID) *Friendship {
 	low, high := OrderPair(a, b)
-	return &Friendship{Low: low, High: high, CreatedAt: now}
+	return &Friendship{Low: low, High: high}
 }
 
 // Block is an aggregate root: a directed block from Blocker to Blocked.
 type Block struct {
-	Blocker   uuid.UUID
-	Blocked   uuid.UUID
-	CreatedAt time.Time
+	Blocker uuid.UUID
+	Blocked uuid.UUID
 }
 
-func NewBlock(blocker, blocked uuid.UUID, now time.Time) *Block {
-	return &Block{Blocker: blocker, Blocked: blocked, CreatedAt: now}
+func NewBlock(blocker, blocked uuid.UUID) *Block {
+	return &Block{Blocker: blocker, Blocked: blocked}
 }
 
 // Friend is a read model: an accepted friend with their display name and when the friendship formed.

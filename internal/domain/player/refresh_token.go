@@ -18,7 +18,6 @@ type RefreshToken struct {
 	Hash      []byte // SHA-256 of the raw token; the raw value is never stored
 	ExpiresAt time.Time
 	RevokedAt *time.Time
-	CreatedAt time.Time
 }
 
 func (rt *RefreshToken) IsActive(now time.Time) bool {

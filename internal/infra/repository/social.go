@@ -27,7 +27,6 @@ func (FriendRequests) Save(ctx context.Context, r *social.FriendRequest) error {
 		ID:          uuid.New(),
 		RequesterID: r.Requester,
 		AddresseeID: r.Addressee,
-		CreatedAt:   toTimestamptz(r.CreatedAt),
 	})
 }
 
@@ -103,7 +102,6 @@ func (Friendships) Save(ctx context.Context, f *social.Friendship) error {
 		ID:         uuid.New(),
 		PlayerLow:  f.Low,
 		PlayerHigh: f.High,
-		CreatedAt:  toTimestamptz(f.CreatedAt),
 	})
 }
 
@@ -165,7 +163,6 @@ func (Blocks) Save(ctx context.Context, b *social.Block) error {
 		ID:        uuid.New(),
 		BlockerID: b.Blocker,
 		BlockedID: b.Blocked,
-		CreatedAt: toTimestamptz(b.CreatedAt),
 	})
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/averak/vfx/internal/domain/social"
 	"github.com/averak/vfx/internal/infra/repository"
@@ -15,9 +14,8 @@ func TestFriendRequests_SaveExistsDeleteList(t *testing.T) {
 	repo := repository.NewFriendRequests()
 	a := seedPlayer(t, s)
 	b := seedPlayer(t, s)
-	now := time.Now().UTC()
 
-	mustRW(t, s, func(ctx context.Context) error { return repo.Save(ctx, social.NewFriendRequest(a, b, now)) })
+	mustRW(t, s, func(ctx context.Context) error { return repo.Save(ctx, social.NewFriendRequest(a, b)) })
 
 	mustRW(t, s, func(ctx context.Context) error {
 		ok, err := repo.Exists(ctx, a, b)
@@ -55,9 +53,8 @@ func TestFriendships_CanonicalPairOrderIndependent(t *testing.T) {
 	repo := repository.NewFriendships()
 	a := seedPlayer(t, s)
 	b := seedPlayer(t, s)
-	now := time.Now().UTC()
 
-	mustRW(t, s, func(ctx context.Context) error { return repo.Save(ctx, social.NewFriendship(a, b, now)) })
+	mustRW(t, s, func(ctx context.Context) error { return repo.Save(ctx, social.NewFriendship(a, b)) })
 
 	mustRW(t, s, func(ctx context.Context) error {
 		ab, err := repo.Exists(ctx, a, b)
@@ -93,14 +90,13 @@ func TestBlocks_IdempotentAndEitherDirection(t *testing.T) {
 	repo := repository.NewBlocks()
 	a := seedPlayer(t, s)
 	b := seedPlayer(t, s)
-	now := time.Now().UTC()
 
 	mustRW(t, s, func(ctx context.Context) error {
-		if err := repo.Save(ctx, social.NewBlock(a, b, now)); err != nil {
+		if err := repo.Save(ctx, social.NewBlock(a, b)); err != nil {
 			return err
 		}
 		// Re-block is a no-op.
-		return repo.Save(ctx, social.NewBlock(a, b, now))
+		return repo.Save(ctx, social.NewBlock(a, b))
 	})
 
 	mustRW(t, s, func(ctx context.Context) error {

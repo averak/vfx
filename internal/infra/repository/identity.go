@@ -39,7 +39,6 @@ func (Identity) Find(ctx context.Context, provider player.Provider, providerUID 
 		PlayerID:    row.PlayerID,
 		Provider:    player.Provider(row.Provider),
 		ProviderUID: row.ProviderUid,
-		CreatedAt:   row.CreatedAt.Time,
 	}, nil
 }
 
@@ -53,7 +52,6 @@ func (Identity) Save(ctx context.Context, i *player.Identity) error {
 		PlayerID:    i.PlayerID,
 		Provider:    string(i.Provider),
 		ProviderUid: i.ProviderUID,
-		CreatedAt:   toTimestamptz(i.CreatedAt),
 	})
 	// The unique (provider, provider_uid) index turns a concurrent link into this violation; surface the domain error so the caller can resolve the race (retry login and find the winner, or reject a relink).
 	if isUniqueViolation(err) {

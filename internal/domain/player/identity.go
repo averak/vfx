@@ -2,7 +2,6 @@ package player
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -20,16 +19,14 @@ type Identity struct {
 	PlayerID    uuid.UUID
 	Provider    Provider
 	ProviderUID string
-	CreatedAt   time.Time
 }
 
-func NewIdentity(id, playerID uuid.UUID, provider Provider, providerUID string, now time.Time) *Identity {
+func NewIdentity(id, playerID uuid.UUID, provider Provider, providerUID string) *Identity {
 	return &Identity{
 		ID:          id,
 		PlayerID:    playerID,
 		Provider:    provider,
 		ProviderUID: providerUID,
-		CreatedAt:   now,
 	}
 }
 

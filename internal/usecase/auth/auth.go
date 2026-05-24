@@ -155,7 +155,6 @@ func (u *Usecase) LinkIdentity(ctx context.Context, playerID uuid.UUID, provider
 	if verifyErr != nil {
 		return nil, ErrInvalidCredential
 	}
-	now := clock.Now(ctx)
 
 	var linked *player.Player
 	err := u.tx.RW(ctx, func(ctx context.Context) error {
@@ -178,7 +177,7 @@ func (u *Usecase) LinkIdentity(ctx context.Context, playerID uuid.UUID, provider
 		if err != nil {
 			return err
 		}
-		if err := u.identityRepo.Save(ctx, player.NewIdentity(uuid.New(), playerID, provider, identity.Subject, now)); err != nil {
+		if err := u.identityRepo.Save(ctx, player.NewIdentity(uuid.New(), playerID, provider, identity.Subject)); err != nil {
 			return fmt.Errorf("auth: link identity: %w", err)
 		}
 		linked = me
@@ -287,7 +286,7 @@ func (u *Usecase) findOrCreatePlayer(ctx context.Context, deviceID, nickname *st
 	if err := u.playerRepo.Save(ctx, p); err != nil {
 		return nil, fmt.Errorf("auth: save player: %w", err)
 	}
-	identity := player.NewIdentity(uuid.New(), p.ID, player.ProviderAnonymous, providerUID, now)
+	identity := player.NewIdentity(uuid.New(), p.ID, player.ProviderAnonymous, providerUID)
 	if err := u.identityRepo.Save(ctx, identity); err != nil {
 		return nil, fmt.Errorf("auth: save identity: %w", err)
 	}
@@ -313,7 +312,7 @@ func (u *Usecase) findOrCreateByIdentity(ctx context.Context, provider player.Pr
 	if err := u.playerRepo.Save(ctx, p); err != nil {
 		return nil, fmt.Errorf("auth: save player: %w", err)
 	}
-	if err := u.identityRepo.Save(ctx, player.NewIdentity(uuid.New(), p.ID, provider, providerUID, now)); err != nil {
+	if err := u.identityRepo.Save(ctx, player.NewIdentity(uuid.New(), p.ID, provider, providerUID)); err != nil {
 		return nil, fmt.Errorf("auth: save identity: %w", err)
 	}
 	return p, nil
@@ -342,7 +341,6 @@ func (u *Usecase) issueTokens(ctx context.Context, playerID uuid.UUID, now time.
 		PlayerID:  playerID,
 		Hash:      refreshHash,
 		ExpiresAt: now.Add(u.refreshTokenTTL),
-		CreatedAt: now,
 	}
 	if err = u.refreshTokenRepo.Create(ctx, rt); err != nil {
 		return "", "", fmt.Errorf("auth: create refresh token: %w", err)

@@ -1,6 +1,6 @@
 -- name: CreateFriendRequest :exec
-INSERT INTO friend_requests (id, requester_id, addressee_id, created_at)
-VALUES ($1, $2, $3, $4);
+INSERT INTO friend_requests (id, requester_id, addressee_id)
+VALUES ($1, $2, $3);
 
 -- name: FriendRequestExists :one
 SELECT EXISTS (
@@ -27,8 +27,8 @@ WHERE fr.requester_id = $1
 ORDER BY fr.created_at DESC;
 
 -- name: CreateFriendship :exec
-INSERT INTO friendships (id, player_low, player_high, created_at)
-VALUES ($1, $2, $3, $4);
+INSERT INTO friendships (id, player_low, player_high)
+VALUES ($1, $2, $3);
 
 -- name: FriendshipExists :one
 SELECT EXISTS (
@@ -50,8 +50,8 @@ ORDER BY f.created_at DESC;
 
 -- ON CONFLICT DO NOTHING makes blocking idempotent.
 -- name: BlockPlayer :exec
-INSERT INTO player_blocks (id, blocker_id, blocked_id, created_at)
-VALUES ($1, $2, $3, $4)
+INSERT INTO player_blocks (id, blocker_id, blocked_id)
+VALUES ($1, $2, $3)
 ON CONFLICT (blocker_id, blocked_id) DO NOTHING;
 
 -- name: UnblockPlayer :exec
