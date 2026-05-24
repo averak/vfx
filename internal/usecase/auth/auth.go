@@ -47,6 +47,7 @@ type OIDCVerifier interface {
 type Usecase struct {
 	tx               tx.ReadWriter
 	playerRepo       player.Repository
+	identityRepo     player.IdentityRepository
 	refreshTokenRepo player.RefreshTokenRepository
 	tokens           TokenIssuer
 	verifier         OIDCVerifier
@@ -57,6 +58,7 @@ type Usecase struct {
 func New(
 	transactor tx.ReadWriter,
 	playerRepo player.Repository,
+	identityRepo player.IdentityRepository,
 	refreshTokenRepo player.RefreshTokenRepository,
 	tokens TokenIssuer,
 	verifier OIDCVerifier,
@@ -66,6 +68,7 @@ func New(
 	return &Usecase{
 		tx:               transactor,
 		playerRepo:       playerRepo,
+		identityRepo:     identityRepo,
 		refreshTokenRepo: refreshTokenRepo,
 		tokens:           tokens,
 		verifier:         verifier,
@@ -156,14 +159,15 @@ func (u *Usecase) LinkIdentity(ctx context.Context, playerID uuid.UUID, provider
 
 	var linked *player.Player
 	err := u.tx.RW(ctx, func(ctx context.Context) error {
-		owner, err := u.playerRepo.FindPlayerByIdentity(ctx, provider, identity.Subject)
+		owner, err := u.identityRepo.Find(ctx, provider, identity.Subject)
 		switch {
 		case err == nil:
-			if owner.ID != playerID {
+			if owner.PlayerID != playerID {
 				return player.ErrIdentityAlreadyLinked
 			}
-			linked = owner // already linked to this player; nothing to do
-			return nil
+			// Already linked to this player; idempotent.
+			linked, err = u.playerRepo.GetByID(ctx, playerID)
+			return err
 		case errors.Is(err, player.ErrIdentityNotFound):
 			// fall through to link it
 		default:
@@ -174,7 +178,7 @@ func (u *Usecase) LinkIdentity(ctx context.Context, playerID uuid.UUID, provider
 		if err != nil {
 			return err
 		}
-		if err := u.playerRepo.SaveIdentity(ctx, player.NewIdentity(uuid.New(), playerID, provider, identity.Subject, now)); err != nil {
+		if err := u.identityRepo.Save(ctx, player.NewIdentity(uuid.New(), playerID, provider, identity.Subject, now)); err != nil {
 			return fmt.Errorf("auth: link identity: %w", err)
 		}
 		linked = me
@@ -260,10 +264,10 @@ func (u *Usecase) UpdateProfile(ctx context.Context, playerID uuid.UUID, nicknam
 
 func (u *Usecase) findOrCreatePlayer(ctx context.Context, deviceID, nickname *string, now time.Time) (*player.Player, error) {
 	if deviceID != nil {
-		existing, err := u.playerRepo.FindPlayerByIdentity(ctx, player.ProviderAnonymous, *deviceID)
+		id, err := u.identityRepo.Find(ctx, player.ProviderAnonymous, *deviceID)
 		switch {
 		case err == nil:
-			return existing, nil
+			return u.playerRepo.GetByID(ctx, id.PlayerID)
 		case errors.Is(err, player.ErrIdentityNotFound):
 			// fall through to creation with the supplied device id
 		default:
@@ -284,7 +288,7 @@ func (u *Usecase) findOrCreatePlayer(ctx context.Context, deviceID, nickname *st
 		return nil, fmt.Errorf("auth: save player: %w", err)
 	}
 	identity := player.NewIdentity(uuid.New(), p.ID, player.ProviderAnonymous, providerUID, now)
-	if err := u.playerRepo.SaveIdentity(ctx, identity); err != nil {
+	if err := u.identityRepo.Save(ctx, identity); err != nil {
 		return nil, fmt.Errorf("auth: save identity: %w", err)
 	}
 	return p, nil
@@ -292,10 +296,10 @@ func (u *Usecase) findOrCreatePlayer(ctx context.Context, deviceID, nickname *st
 
 // findOrCreateByIdentity returns the Player owning (provider, providerUID), creating a fresh Player and identity on first sign-in.
 func (u *Usecase) findOrCreateByIdentity(ctx context.Context, provider player.Provider, providerUID string, nickname *string, now time.Time) (*player.Player, error) {
-	existing, err := u.playerRepo.FindPlayerByIdentity(ctx, provider, providerUID)
+	existing, err := u.identityRepo.Find(ctx, provider, providerUID)
 	switch {
 	case err == nil:
-		return existing, nil
+		return u.playerRepo.GetByID(ctx, existing.PlayerID)
 	case errors.Is(err, player.ErrIdentityNotFound):
 		// fall through to creation
 	default:
@@ -309,7 +313,7 @@ func (u *Usecase) findOrCreateByIdentity(ctx context.Context, provider player.Pr
 	if err := u.playerRepo.Save(ctx, p); err != nil {
 		return nil, fmt.Errorf("auth: save player: %w", err)
 	}
-	if err := u.playerRepo.SaveIdentity(ctx, player.NewIdentity(uuid.New(), p.ID, provider, providerUID, now)); err != nil {
+	if err := u.identityRepo.Save(ctx, player.NewIdentity(uuid.New(), p.ID, provider, providerUID, now)); err != nil {
 		return nil, fmt.Errorf("auth: save identity: %w", err)
 	}
 	return p, nil

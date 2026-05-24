@@ -61,43 +61,6 @@ func (Player) Save(ctx context.Context, p *player.Player) error {
 	return err
 }
 
-func (Player) FindPlayerByIdentity(ctx context.Context, provider player.Provider, providerUID string) (*player.Player, error) {
-	tx, err := db.Tx(ctx)
-	if err != nil {
-		return nil, err
-	}
-	row, err := dbgen.New(tx).FindPlayerByIdentity(ctx, dbgen.FindPlayerByIdentityParams{
-		Provider:    string(provider),
-		ProviderUid: providerUID,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, player.ErrIdentityNotFound
-		}
-		return nil, err
-	}
-	return playerFromRow(row), nil
-}
-
-func (Player) SaveIdentity(ctx context.Context, i *player.Identity) error {
-	tx, err := db.Tx(ctx)
-	if err != nil {
-		return err
-	}
-	_, err = dbgen.New(tx).CreatePlayerIdentity(ctx, dbgen.CreatePlayerIdentityParams{
-		ID:          i.ID,
-		PlayerID:    i.PlayerID,
-		Provider:    string(i.Provider),
-		ProviderUid: i.ProviderUID,
-		CreatedAt:   toTimestamptz(i.CreatedAt),
-	})
-	// The unique (provider, provider_uid) index turns a concurrent identity insert into this violation; surface it as the domain error so the caller can resolve the race (relink target, or retry login and find the winner).
-	if isUniqueViolation(err) {
-		return player.ErrIdentityAlreadyLinked
-	}
-	return err
-}
-
 func playerFromRow(row dbgen.Player) *player.Player {
 	return &player.Player{
 		ID:        row.ID,

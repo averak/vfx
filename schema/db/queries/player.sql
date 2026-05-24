@@ -11,12 +11,10 @@ SET nickname = EXCLUDED.nickname,
     updated_at = EXCLUDED.updated_at
 RETURNING *;
 
--- name: FindPlayerByIdentity :one
-SELECT p.*
-FROM players p
-JOIN player_identities pi ON pi.player_id = p.id
-WHERE pi.provider = $1
-  AND pi.provider_uid = $2;
+-- name: FindIdentity :one
+SELECT * FROM player_identities
+WHERE provider = $1
+  AND provider_uid = $2;
 
 -- name: CreatePlayerIdentity :one
 INSERT INTO player_identities (id, player_id, provider, provider_uid, created_at)

@@ -21,6 +21,7 @@ func newUsecase(t *testing.T) *usecaseauth.Usecase {
 	return usecaseauth.New(
 		db.NewSession(pool),
 		repository.NewPlayer(),
+		repository.NewIdentity(),
 		repository.NewRefreshToken(),
 		token.NewSigner("test-secret"),
 		fakeoidc.New(),

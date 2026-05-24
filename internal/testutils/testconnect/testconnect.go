@@ -94,6 +94,7 @@ func New(t *testing.T) *Server {
 	authUC := usecaseauth.New(
 		session,
 		repository.NewPlayer(),
+		repository.NewIdentity(),
 		repository.NewRefreshToken(),
 		signer,
 		fakeoidc.New(),

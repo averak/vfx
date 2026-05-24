@@ -155,6 +155,7 @@ func NewGateway(ctx context.Context) (*Gateway, func(), error) {
 	authUC := usecaseauth.New(
 		session,
 		playerRepo,
+		repository.NewIdentity(),
 		refreshRepo,
 		signer,
 		oidcVerifier,

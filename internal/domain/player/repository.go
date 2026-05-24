@@ -16,14 +16,10 @@ var (
 	ErrIdentityAlreadyLinked = errors.New("player: identity already linked to another player")
 )
 
-// Repository takes only a context: the usecase owns the transaction boundary (via a Transactor) and the active transaction rides on the context.
-// This keeps the domain interface free of any persistence-technology type.
+// Repository takes only a context; the usecase owns the transaction boundary and the active transaction rides on the context, keeping the domain free of any persistence type.
 type Repository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*Player, error)
 
-	// Save persists the whole Player aggregate (create or update); there is no per-field update, so a caller mutates the Player via its methods and saves it back.
+	// Save persists the whole Player aggregate; there is no per-field update, so a caller mutates the Player via its methods and saves it back.
 	Save(ctx context.Context, p *Player) error
-
-	FindPlayerByIdentity(ctx context.Context, provider Provider, providerUID string) (*Player, error)
-	SaveIdentity(ctx context.Context, i *Identity) error
 }
