@@ -146,10 +146,10 @@ func seedTitleFile(ctx context.Context, t *testing.T, gcsClient *storage.Client,
 	session := db.NewSession(pool)
 	if err := session.RW(ctx, func(ctx context.Context) error {
 		return repository.NewTitleFile().SaveFile(ctx, &domainstorage.File{
-			Filename:  filename,
-			Size:      uint64(len(body)),
-			Hash:      hex.EncodeToString(sum[:]),
-			UpdatedAt: time.Now().UTC(),
+			Filename:   filename,
+			Size:       uint64(len(body)),
+			Hash:       hex.EncodeToString(sum[:]),
+			ModifiedAt: time.Now().UTC(),
 		}, tags)
 	}); err != nil {
 		t.Fatalf("seed title metadata: %v", err)
