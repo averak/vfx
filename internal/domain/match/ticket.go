@@ -28,7 +28,8 @@ type Ticket struct {
 	PartyMembers []uuid.UUID
 	Attributes   map[string]string
 
-	CreatedAt time.Time
+	// EnqueuedAt is when the ticket joined the queue; the matchmaker orders by it and widens the rating/region tier from it.
+	EnqueuedAt time.Time
 }
 
 func NewTicket(id, playerID uuid.UUID, gameMode string, now time.Time) (*Ticket, error) {
@@ -39,10 +40,10 @@ func NewTicket(id, playerID uuid.UUID, gameMode string, now time.Time) (*Ticket,
 		return nil, ErrTicketNoGameMode
 	}
 	return &Ticket{
-		ID:        id,
-		PlayerID:  playerID,
-		GameMode:  gameMode,
-		CreatedAt: now,
+		ID:         id,
+		PlayerID:   playerID,
+		GameMode:   gameMode,
+		EnqueuedAt: now,
 	}, nil
 }
 

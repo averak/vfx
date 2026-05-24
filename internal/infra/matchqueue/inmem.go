@@ -44,7 +44,7 @@ func (q *InMem) Enqueue(_ context.Context, t *match.Ticket) error {
 	}
 	depth := q.countPendingLocked(t.GameMode) + 1
 	queued := match.EventQueued{
-		QueuedAt:   t.CreatedAt,
+		QueuedAt:   t.EnqueuedAt,
 		QueueDepth: depth,
 	}
 	q.tickets[t.ID] = &ticketEntry{
@@ -115,7 +115,7 @@ func (q *InMem) Pending(_ context.Context, gameMode string) ([]*match.Ticket, er
 		out = append(out, e.ticket)
 	}
 	// Older tickets first so the matchmaker is FIFO-ish.
-	sortByCreatedAt(out)
+	sortByEnqueuedAt(out)
 	return out, nil
 }
 
@@ -217,11 +217,11 @@ func isTerminal(e match.Event) bool {
 	return false
 }
 
-// sortByCreatedAt orders tickets oldest-first.
+// sortByEnqueuedAt orders tickets oldest-first.
 // An insertion sort is fine for the small queue sizes a single gateway holds in memory.
-func sortByCreatedAt(ts []*match.Ticket) {
+func sortByEnqueuedAt(ts []*match.Ticket) {
 	for i := 1; i < len(ts); i++ {
-		for j := i; j > 0 && ts[j-1].CreatedAt.After(ts[j].CreatedAt); j-- {
+		for j := i; j > 0 && ts[j-1].EnqueuedAt.After(ts[j].EnqueuedAt); j-- {
 			ts[j-1], ts[j] = ts[j], ts[j-1]
 		}
 	}

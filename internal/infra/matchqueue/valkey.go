@@ -47,7 +47,7 @@ type ticketDTO struct {
 	Region       *string           `json:"region,omitempty"`
 	PartyMembers []string          `json:"party_members,omitempty"`
 	Attributes   map[string]string `json:"attributes,omitempty"`
-	CreatedAt    time.Time         `json:"created_at"`
+	EnqueuedAt   time.Time         `json:"enqueued_at"`
 }
 
 func marshalTicket(t *match.Ticket) ([]byte, error) {
@@ -58,7 +58,7 @@ func marshalTicket(t *match.Ticket) ([]byte, error) {
 		Rating:     t.Rating,
 		Region:     t.Region,
 		Attributes: t.Attributes,
-		CreatedAt:  t.CreatedAt,
+		EnqueuedAt: t.EnqueuedAt,
 	}
 	for _, p := range t.PartyMembers {
 		dto.PartyMembers = append(dto.PartyMembers, p.String())
@@ -86,7 +86,7 @@ func unmarshalTicket(raw string) (*match.Ticket, error) {
 		Rating:     dto.Rating,
 		Region:     dto.Region,
 		Attributes: dto.Attributes,
-		CreatedAt:  dto.CreatedAt,
+		EnqueuedAt: dto.EnqueuedAt,
 	}
 	for _, p := range dto.PartyMembers {
 		pid, perr := uuid.Parse(p)
@@ -197,7 +197,7 @@ func (q *Valkey) Enqueue(ctx context.Context, t *match.Ticket) error {
 	if err != nil {
 		return fmt.Errorf("matchqueue: zcard: %w", err)
 	}
-	queued := match.EventQueued{QueuedAt: t.CreatedAt, QueueDepth: int32(depth) + 1} //nolint:gosec // queue depth fits int32.
+	queued := match.EventQueued{QueuedAt: t.EnqueuedAt, QueueDepth: int32(depth) + 1} //nolint:gosec // queue depth fits int32.
 	if err := q.setEvent(ctx, t.ID, queued); err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func (q *Valkey) Enqueue(ctx context.Context, t *match.Ticket) error {
 		return err
 	}
 
-	score := float64(t.CreatedAt.UnixNano())
+	score := float64(t.EnqueuedAt.UnixNano())
 	if err := q.client.Do(ctx, q.client.B().Zadd().Key(pendingKey(t.GameMode)).ScoreMember().ScoreMember(score, t.ID.String()).Build()).Error(); err != nil {
 		return fmt.Errorf("matchqueue: zadd pending: %w", err)
 	}

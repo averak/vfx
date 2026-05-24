@@ -67,7 +67,7 @@ func (m *Matcher) SelectGroup(now time.Time, pending []*Ticket) []*Ticket {
 // matchUnit is an indivisible matchmaking entry: a solo ticket, or a complete party (one ticket per member) that is placed together or not at all.
 type matchUnit struct {
 	tickets []*Ticket
-	seedAt  time.Time // oldest CreatedAt among the unit's tickets; governs its place in line and its tier
+	seedAt  time.Time // oldest EnqueuedAt among the unit's tickets; governs its place in line and its tier
 }
 
 func (u matchUnit) size() int { return len(u.tickets) }
@@ -76,7 +76,7 @@ func (u matchUnit) size() int { return len(u.tickets) }
 func (u matchUnit) anchor() *Ticket {
 	a := u.tickets[0]
 	for _, t := range u.tickets[1:] {
-		if t.CreatedAt.Before(a.CreatedAt) {
+		if t.EnqueuedAt.Before(a.EnqueuedAt) {
 			a = t
 		}
 	}
@@ -91,7 +91,7 @@ func buildUnits(pending []*Ticket) []matchUnit {
 	byKeyPlayer := make(map[string]map[uuid.UUID]*Ticket)
 	for _, t := range pending {
 		if !t.IsParty() {
-			units = append(units, matchUnit{tickets: []*Ticket{t}, seedAt: t.CreatedAt})
+			units = append(units, matchUnit{tickets: []*Ticket{t}, seedAt: t.EnqueuedAt})
 			continue
 		}
 		key := t.PartyKey()
@@ -101,7 +101,7 @@ func buildUnits(pending []*Ticket) []matchUnit {
 			members = make(map[uuid.UUID]*Ticket)
 			byKeyPlayer[key] = members
 		}
-		if cur, ok := members[t.PlayerID]; !ok || t.CreatedAt.Before(cur.CreatedAt) {
+		if cur, ok := members[t.PlayerID]; !ok || t.EnqueuedAt.Before(cur.EnqueuedAt) {
 			members[t.PlayerID] = t
 		}
 	}
@@ -118,8 +118,8 @@ func buildUnits(pending []*Ticket) []matchUnit {
 				break
 			}
 			tickets = append(tickets, tk)
-			if seedAt.IsZero() || tk.CreatedAt.Before(seedAt) {
-				seedAt = tk.CreatedAt
+			if seedAt.IsZero() || tk.EnqueuedAt.Before(seedAt) {
+				seedAt = tk.EnqueuedAt
 			}
 		}
 		if complete {
@@ -143,7 +143,7 @@ func (m *Matcher) groupFromSeed(now time.Time, units []matchUnit, seedIdx int) [
 		return nil // a party larger than a match can never be placed
 	}
 	anchor := seed.anchor()
-	waited := now.Sub(anchor.CreatedAt)
+	waited := now.Sub(anchor.EnqueuedAt)
 	window := m.policy.BaseRatingWindow + m.policy.RatingWindowGrowthPerSec*waited.Seconds()
 	ignoreRegion := waited >= m.policy.RegionRelaxAfter
 
